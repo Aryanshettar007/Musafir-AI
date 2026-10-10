@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Musafir Trip Demo</title>
+<style>
+  :root {
+    --bg:#f6f4f0; --panel:#ffffff; --raised:#faf8f5; --text:#1f1d1a; --muted:#6b665e; --line:#e7e2da;
+    --accent:#d9480f; --accent-soft:#fde8dc; --ok:#2f9e44; --gold:#c98a00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#121110; --panel:#1b1a18; --raised:#232120; --text:#f1ede6; --muted:#a39d93; --line:#302d29; --accent-soft:#3a2216; }
+  }
+  * { box-sizing:border-box; }
+  html, body { height:100%; }
+  body { margin:0; font:14px/1.5 system-ui, -apple-system, "Segoe UI", "Noto Sans Kannada", sans-serif; background:var(--bg); color:var(--text); }
+  .app { display:grid; grid-template-columns: minmax(0,1fr) 400px; height:100vh; }
+  .mapwrap { position:relative; }
+  #map { position:absolute; inset:0; }
+  .hud { position:absolute; left:16px; right:16px; bottom:16px; display:flex; gap:12px; align-items:center; background:var(--panel);
+         border:1px solid var(--line); border-radius:14px; padding:10px 14px; box-shadow:0 6px 24px rgba(0,0,0,.18); }
+  .hud .km { font-variant-numeric:tabular-nums; font-weight:600; min-width:120px; }
+  .track { flex:1; height:8px; background:var(--line); border-radius:4px; position:relative; }
+  .track i { position:absolute; inset:0 auto 0 0; background:var(--accent); border-radius:4px; }
+  .track b { position:absolute; top:-3px; width:4px; height:14px; border-radius:2px; background:var(--muted); transform:translateX(-2px); }
+  .track b.sponsored { background:var(--gold); }
+  .badge { position:absolute; top:16px; left:16px; background:var(--panel); border:1px solid var(--line); border-radius:999px;
+           padding:4px 10px; font-size:12px; color:var(--muted); }
+  aside { background:var(--panel); border-left:1px solid var(--line); display:flex; flex-direction:column; min-height:0; }
+  header { padding:16px 18px 12px; }
+  .brand { font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); font-weight:700; }
+  h1 { font-size:18px; margin:2px 0 4px; }
+  .muted { color:var(--muted); font-size:12px; }
+  .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:0 18px 14px; border-bottom:1px solid var(--line); }
+  button, select { font:inherit; border:1px solid var(--line); background:var(--raised); color:var(--text); border-radius:10px; padding:7px 12px; cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+  label.chk { display:flex; gap:6px; align-items:center; color:var(--muted); font-size:12px; }
+  .now { margin:14px 18px; padding:14px; border-radius:14px; background:var(--accent-soft); }
+  .now.idle { background:var(--raised); }
+  .now .kicker { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--accent); font-weight:700; }
+  .now .t { font-weight:650; font-size:16px; margin:2px 0 8px; }
+  .now .tr { max-height:140px; overflow:auto; font-size:13.5px; }
+  .now .ap { height:4px; background:rgba(0,0,0,.08); border-radius:2px; margin-top:10px; overflow:hidden; }
+  .now .ap i { display:block; height:100%; width:0; background:var(--accent); }
+  ol { list-style:none; margin:0; padding:0 0 12px; overflow:auto; flex:1; border-top:1px solid var(--line); }
+  li { display:grid; grid-template-columns: 34px 1fr auto; gap:10px; align-items:center; padding:10px 18px; cursor:pointer; border-bottom:1px solid var(--line); }
+  li:hover { background:var(--raised); }
+  li .n { width:28px; height:28px; border-radius:50%; display:grid; place-items:center; font-weight:700; font-size:12px; color:#fff; }
+  li .ti { font-weight:550; }
+  li .sub { font-size:12px; color:var(--muted); }
+  li .d { font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  li.playing { background:var(--accent-soft); }
+  li.done { opacity:.5; }
+  .tag { display:inline-block; font-size:11px; padding:0 6px; border-radius:8px; border:1px solid var(--line); margin-right:4px; }
+  .tag.sponsored { border-color:var(--gold); color:var(--gold); font-weight:600; }
+  .ask { margin:14px 18px 0; padding:14px; border-radius:14px; border:1px solid var(--line); background:var(--raised); }
+  .ask .row { display:flex; gap:10px; align-items:center; }
+  .mic { width:56px; height:56px; border-radius:50%; border:0; background:var(--accent); color:#fff; font-size:24px; display:grid; place-items:center;
+         box-shadow:0 4px 14px rgba(217,72,15,.35); flex:none; padding:0; }
+  .mic.rec { background:#c92a2a; animation:pulse 1.1s infinite; }
+  .mic.busy { background:var(--muted); box-shadow:none; cursor:wait; }
+  @keyframes pulse { 0%{ box-shadow:0 0 0 0 rgba(201,42,42,.55);} 70%{ box-shadow:0 0 0 16px rgba(201,42,42,0);} 100%{ box-shadow:0 0 0 0 rgba(201,42,42,0);} }
+  .ask .status { font-weight:600; }
+  .ask .hint { font-size:12px; color:var(--muted); }
+  .convo { margin-top:10px; display:flex; flex-direction:column; gap:8px; max-height:190px; overflow:auto; }
+  .convo .q, .convo .a { padding:8px 10px; border-radius:10px; font-size:13.5px; }
+  .convo .q { background:var(--panel); border:1px solid var(--line); align-self:flex-end; max-width:90%; }
+  .convo .a { background:var(--accent-soft); max-width:95%; }
+  .convo .meta { font-size:11px; color:var(--muted); margin-top:2px; }
+  @media (max-width: 860px) { .app { grid-template-columns:1fr; grid-template-rows:55vh auto; height:auto; } aside { border-left:0; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="mapwrap">
+    <div id="map"></div>
+    <div class="badge" id="mapBadge">Loading map…</div>
+    <div class="hud"><div class="km" id="pos">km 0.0</div><div class="track" id="track"><i id="fill"></i></div><div class="muted" id="eta"></div></div>
+  </div>
+  <aside>
+    <header>
+      <div class="brand">Musafir · trip demo</div>
+      <h1 id="title"></h1>
+      <div class="muted" id="meta"></div>
+    </header>
+    <div class="controls">
+      <button class="primary" id="play">▶ Start drive</button>
+      <button id="reset">↺ Reset</button>
+      <select id="speed" title="Simulation speed"><option value="30">30×</option><option value="60" selected>60×</option><option value="120">120×</option><option value="300">300×</option></select>
+      <label class="chk"><input type="checkbox" id="hold" checked> Slow down during stories</label>
+    </div>
+    <div class="ask">
+      <div class="row">
+        <button class="mic" id="mic" title="Tap to talk, tap again to send">🎤</button>
+        <div style="flex:1">
+          <div class="status" id="askStatus">Ask Musafir</div>
+          <div class="hint" id="askHint">Tap the mic, ask your question, tap again. "What's coming up next?", "Where should we stop for food?"</div>
+        </div>
+        <select id="askLang" title="Language you speak in">
+          <option value="kn-IN">ಕನ್ನಡ</option><option value="en-IN">English</option><option value="hi-IN">हिन्दी</option><option value="hi-en">Hinglish</option>
+        </select>
+      </div>
+      <div class="convo" id="convo"></div>
+    </div>
+    <div class="now idle" id="now">
+      <div class="kicker" id="nowKicker">Ready</div>
+      <div class="t" id="nowTitle">Press "Start drive"</div>
+      <div class="tr" id="nowText">Each story plays when the car enters its trigger circle. Click a stop to jump there.</div>
+      <div class="ap"><i id="audioFill"></i></div>
+    </div>
+    <ol id="list"></ol>
+  </aside>
+</div>
+<audio id="audio" preload="none"></audio>
+<script>
+const DATA = __DATA__;
+const COLORS = { "trip-intro":"#6b665e", "town-welcome":"#2f9e44", story:"#d9480f", episode:"#c2255c", food:"#e67700", "long-form":"#0b7285", sponsored:"#c98a00" };
+const LABEL = { "trip-intro":"Trip intro", "town-welcome":"Town welcome", story:"Story", episode:"Episode", food:"Food stop", "long-form":"Long story", sponsored:"Sponsored" };
+
+// ---- route geometry ----
+function decode(str) {
+  const pts = []; let i = 0, lat = 0, lng = 0;
+  while (i < str.length) {
+    for (const axis of [0, 1]) {
+      let result = 0, shift = 0, b;
+      do { b = str.charCodeAt(i++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+      const d = result & 1 ? ~(result >> 1) : result >> 1;
+      if (axis === 0) lat += d; else lng += d;
+    }
+    pts.push({ lat: lat / 1e5, lng: lng / 1e5 });
+  }
+  return pts;
+}
+const R = 6371000, rad = (d) => d * Math.PI / 180;
+function hav(a, b) { const dLat = rad(b.lat-a.lat), dLng = rad(b.lng-a.lng); const h = Math.sin(dLat/2)**2 + Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLng/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
+function bearing(a, b) { const y = Math.sin(rad(b.lng-a.lng))*Math.cos(rad(b.lat)); const x = Math.cos(rad(a.lat))*Math.sin(rad(b.lat)) - Math.sin(rad(a.lat))*Math.cos(rad(b.lat))*Math.cos(rad(b.lng-a.lng)); return (Math.atan2(y, x)*180/Math.PI + 360) % 360; }
+const pts = decode(DATA.polyline);
+const cum = [0]; for (let k = 1; k < pts.length; k++) cum.push(cum[k-1] + hav(pts[k-1], pts[k]));
+const total = cum[cum.length-1];
+function at(m) {
+  m = Math.max(0, Math.min(total, m));
+  let lo = 0, hi = cum.length - 1; while (hi - lo > 1) { const mid = (lo+hi) >> 1; if (cum[mid] <= m) lo = mid; else hi = mid; }
+  const t = (m - cum[lo]) / ((cum[hi] - cum[lo]) || 1);
+  return { p: { lat: pts[lo].lat + (pts[hi].lat-pts[lo].lat)*t, lng: pts[lo].lng + (pts[hi].lng-pts[lo].lng)*t }, heading: bearing(pts[lo], pts[hi]) };
+}
+
+// ---- map adapters: Google Maps first, OpenStreetMap (Leaflet) as fallback ----
+const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+let mapApi = null;
+function googleAdapter() {
+  const g = google.maps;
+  const darkStyle = [
+    { elementType:"geometry", stylers:[{ color:"#1d1c1a" }] }, { elementType:"labels.text.fill", stylers:[{ color:"#a39d93" }] },
+    { elementType:"labels.text.stroke", stylers:[{ color:"#1d1c1a" }] }, { featureType:"road", elementType:"geometry", stylers:[{ color:"#34312c" }] },
+    { featureType:"road.highway", elementType:"geometry", stylers:[{ color:"#4a453e" }] }, { featureType:"water", elementType:"geometry", stylers:[{ color:"#0f1416" }] },
+    { featureType:"poi", stylers:[{ visibility:"off" }] }, { featureType:"transit", stylers:[{ visibility:"off" }] },
+  ];
+  const map = new g.Map(document.getElementById("map"), { disableDefaultUI:true, zoomControl:true, mapTypeControl:true, styles: dark ? darkStyle : [{ featureType:"poi.business", stylers:[{ visibility:"off" }] }] });
+  new g.Polyline({ path: pts, strokeColor:"#d9480f", strokeWeight:5, strokeOpacity:.9, map });
+  const bounds = new g.LatLngBounds(); pts.forEach((p) => bounds.extend(p)); map.fitBounds(bounds, 40);
+  const info = new g.InfoWindow();
+  const car = new g.Marker({ position: pts[0], map, zIndex: 999,
+    icon: { path: g.SymbolPath.FORWARD_CLOSED_ARROW, scale: 6, fillColor: dark ? "#ffffff" : "#1f1d1a", fillOpacity: 1, strokeColor: "#d9480f", strokeWeight: 2, rotation: 0 } });
+  return {
+    name: "Google Maps",
+    addStop(it, n, onClick) {
+      const c = COLORS[it.type] || "#d9480f";
+      new g.Circle({ center: it, radius: Math.max(it.radiusM, 350), strokeColor: c, strokeWeight: 2, fillColor: c, fillOpacity: .15, map, clickable: false });
+      const m = new g.Marker({ position: it, map, label: { text: String(n), color: "#fff", fontWeight: "700", fontSize: "12px" },
+        icon: { path: g.SymbolPath.CIRCLE, scale: 12, fillColor: c, fillOpacity: 1, strokeColor: "#fff", strokeWeight: 2 } });
+      m.addListener("click", () => { info.setContent(`<b>${escapeHtml(it.title)}</b><br>${LABEL[it.type] || it.type} · km ${(it.routeDistanceM/1000).toFixed(1)}`); info.open({ map, anchor: m }); onClick(); });
+    },
+    moveCar(p, heading, follow) { const icon = car.getIcon(); icon.rotation = heading; car.setIcon(icon); car.setPosition(p); if (follow) map.panTo(p); },
+  };
+}
+function leafletAdapter() {
+  const map = L.map("map", { zoomControl: true });
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap contributors", maxZoom: 19 }).addTo(map);
+  const line = L.polyline(pts.map((p) => [p.lat, p.lng]), { color: "#d9480f", weight: 5, opacity: .9 }).addTo(map);
+  map.fitBounds(line.getBounds(), { padding: [30, 30] });
+  const car = L.circleMarker([pts[0].lat, pts[0].lng], { radius: 9, color: "#d9480f", weight: 3, fillColor: "#1f1d1a", fillOpacity: 1 }).addTo(map);
+  return {
+    name: "OpenStreetMap",
+    addStop(it, n, onClick) {
+      const c = COLORS[it.type] || "#d9480f";
+      L.circle([it.lat, it.lng], { radius: Math.max(it.radiusM, 350), color: c, weight: 2, fillOpacity: .15 }).addTo(map);
+      L.marker([it.lat, it.lng], { icon: L.divIcon({ className: "", html: `<div style="width:24px;height:24px;border-radius:50%;background:${c};color:#fff;border:2px solid #fff;display:grid;place-items:center;font:700 12px system-ui">${n}</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }) })
+        .addTo(map).bindTooltip(escapeHtml(it.title)).on("click", onClick);
+    },
+    moveCar(p, _h, follow) { car.setLatLng([p.lat, p.lng]); if (follow) map.panTo([p.lat, p.lng], { animate: false }); },
+  };
+}
+function loadLeaflet() {
+  if (mapApi) return;
+  const css = document.createElement("link"); css.rel = "stylesheet"; css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; document.head.appendChild(css);
+  const s = document.createElement("script"); s.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+  s.onload = () => { document.getElementById("map").innerHTML = ""; start(leafletAdapter()); }; document.head.appendChild(s);
+}
+window.gm_authFailure = () => { mapApi = null; document.getElementById("mapBadge").textContent = "Google Maps key not enabled for the Maps JavaScript API, using OpenStreetMap"; loadLeaflet(); };
+window.initGoogle = () => { try { start(googleAdapter()); } catch (e) { console.error(e); loadLeaflet(); } };
+setTimeout(() => { if (!mapApi) loadLeaflet(); }, 8000);
+
+// ---- UI + simulation ----
+function escapeHtml(s) { return String(s).replace(/[&<>"]/g, (ch) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[ch])); }
+const $ = (id) => document.getElementById(id);
+$("title").textContent = `${DATA.origin} → ${DATA.destination}`;
+$("meta").textContent = `${(DATA.distanceM/1000).toFixed(1)} km · ${Math.round(DATA.durationS/60)} min · ${DATA.language} · voice ${DATA.voice} · ${DATA.items.length} stops`;
+DATA.items.forEach((it) => { const b = document.createElement("b"); b.style.left = (100*it.routeDistanceM/total) + "%"; if (it.type === "sponsored") b.className = "sponsored"; $("track").appendChild(b); });
+DATA.items.forEach((it, idx) => {
+  const c = COLORS[it.type] || "#d9480f";
+  const li = document.createElement("li");
+  li.innerHTML = `<div class="n" style="background:${c}">${idx+1}</div>
+    <div><div class="ti">${escapeHtml(it.title)}</div><div class="sub">km ${(it.routeDistanceM/1000).toFixed(1)} ·
+      <span class="tag ${it.type === "sponsored" ? "sponsored" : ""}">${it.type === "sponsored" ? "Sponsored · " + escapeHtml(it.sponsor || "") : LABEL[it.type] || it.type}</span>
+      ${it.side !== "none" ? `<span class="tag">on your ${it.side}</span>` : ""}</div></div>
+    <div class="d">${Math.round(it.durationS)} s</div>`;
+  li.onclick = () => jumpTo(idx);
+  $("list").appendChild(li); it.li = li;
+});
+
+const audio = $("audio");
+let pos = 0, running = false, last = 0, current = -1;
+const queue = [], fired = new Set();
+function start(adapter) {
+  mapApi = adapter;
+  $("mapBadge").textContent = adapter.name;
+  DATA.items.forEach((it, idx) => adapter.addStop(it, idx + 1, () => jumpTo(idx)));
+  draw(false);
+}
+function setNow(kicker, title, text, active) { $("nowKicker").textContent = kicker; $("nowTitle").textContent = title; $("nowText").textContent = text; $("now").classList.toggle("idle", !active); }
+function playItem(idx) {
+  const it = DATA.items[idx];
+  if (current >= 0) DATA.items[current].li.classList.remove("playing");
+  current = idx; it.li.classList.add("playing"); it.li.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  setNow(it.type === "sponsored" ? "Sponsored · " + (it.sponsor || "") : `Now playing · ${LABEL[it.type] || it.type}${it.side !== "none" ? " · on your " + it.side : ""}`, it.title, it.transcript, true);
+  audio.src = it.url; audio.play().catch(() => {});
+}
+audio.addEventListener("timeupdate", () => { $("audioFill").style.width = audio.duration ? (100*audio.currentTime/audio.duration) + "%" : "0"; });
+audio.addEventListener("ended", () => {
+  if (current >= 0) { DATA.items[current].li.classList.remove("playing"); DATA.items[current].li.classList.add("done"); }
+  current = -1; $("audioFill").style.width = "0";
+  if (queue.length) playItem(queue.shift()); else setNow("Driving", "On the road…", "The next story starts at its trigger circle.", false);
+});
+function enqueue(idx) { if (fired.has(idx)) return; fired.add(idx); if (current < 0) playItem(idx); else queue.push(idx); }
+function jumpTo(idx) {
+  pos = Math.max(0, DATA.items[idx].routeDistanceM - 1); queue.length = 0; audio.pause(); current = -1;
+  DATA.items.forEach((x, k) => { x.li.classList.remove("playing", "done"); if (k < idx) { fired.add(k); x.li.classList.add("done"); } else fired.delete(k); });
+  draw(true); enqueue(idx);
+}
+function draw(follow) {
+  const { p, heading } = at(pos);
+  if (mapApi) mapApi.moveCar(p, heading, follow);
+  $("pos").textContent = `km ${(pos/1000).toFixed(1)} / ${(total/1000).toFixed(1)}`;
+  $("fill").style.width = (100*pos/total).toFixed(2) + "%";
+  const leftMin = Math.round((total - pos) / (DATA.distanceM / DATA.durationS) / 60);
+  $("eta").textContent = `${leftMin} min to go`;
+}
+let frame = 0;
+function tick(t) {
+  if (!running) return;
+  const dt = last ? Math.min(0.25, (t - last) / 1000) : 0; last = t;
+  let mult = Number($("speed").value);
+  if ($("hold").checked && current >= 0) mult = Math.min(mult, 3);
+  pos = Math.min(total, pos + (DATA.distanceM / DATA.durationS) * mult * dt);
+  DATA.items.forEach((it, idx) => { if (!fired.has(idx) && pos >= it.routeDistanceM) enqueue(idx); });
+  draw(++frame % 30 === 0);
+  if (pos >= total && current < 0 && !queue.length) { running = false; $("play").textContent = "▶ Start drive"; setNow("Arrived", DATA.destination, "Trip complete.", false); return; }
+  requestAnimationFrame(tick);
+}
+$("play").onclick = (e) => {
+  running = !running; e.target.textContent = running ? "❚❚ Pause" : "▶ Resume";
+  if (running) { last = 0; if (current >= 0) audio.play().catch(() => {}); requestAnimationFrame(tick); } else audio.pause();
+};
+// ---- live mode: record → 16 kHz WAV → POST /ask → play the spoken answer ----
+$("askLang").value = DATA.language;
+const answerAudio = new Audio();
+const turns = [];
+let recorder = null, chunks = [], recTimer = null, storyWasPlaying = false, busy = false;
+function askState(status, hint, cls) { $("askStatus").textContent = status; if (hint !== undefined) $("askHint").textContent = hint; $("mic").className = "mic" + (cls ? " " + cls : ""); }
+function addTurn(cls, text, meta) {
+  const d = document.createElement("div"); d.className = cls; d.textContent = text;
+  if (meta) { const m = document.createElement("div"); m.className = "meta"; m.textContent = meta; d.appendChild(m); }
+  $("convo").appendChild(d); $("convo").scrollTop = $("convo").scrollHeight;
+}
+async function toWav16k(blob) {
+  const buf = await blob.arrayBuffer();
+  const ctx = new AudioContext(); const decoded = await ctx.decodeAudioData(buf); ctx.close();
+  const rate = 16000, length = Math.ceil(decoded.duration * rate);
+  const off = new OfflineAudioContext(1, length, rate);
+  const src = off.createBufferSource(); src.buffer = decoded; src.connect(off.destination); src.start();
+  const pcm = (await off.startRendering()).getChannelData(0);
+  const out = new DataView(new ArrayBuffer(44 + pcm.length * 2));
+  const w = (o, s) => { for (let i = 0; i < s.length; i++) out.setUint8(o + i, s.charCodeAt(i)); };
+  w(0, "RIFF"); out.setUint32(4, 36 + pcm.length * 2, true); w(8, "WAVE"); w(12, "fmt "); out.setUint32(16, 16, true);
+  out.setUint16(20, 1, true); out.setUint16(22, 1, true); out.setUint32(24, rate, true); out.setUint32(28, rate * 2, true);
+  out.setUint16(32, 2, true); out.setUint16(34, 16, true); w(36, "data"); out.setUint32(40, pcm.length * 2, true);
+  for (let i = 0; i < pcm.length; i++) out.setInt16(44 + i * 2, Math.max(-1, Math.min(1, pcm[i])) * 0x7fff, true);
+  return { bytes: new Uint8Array(out.buffer), seconds: decoded.duration };
+}
+function toBase64(bytes) { let s = ""; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s); }
+async function startRecording() {
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); }
+  catch { askState("Microphone blocked", "Allow microphone access for localhost in the browser and try again."); return; }
+  storyWasPlaying = !audio.paused; audio.pause(); answerAudio.pause();
+  chunks = []; recorder = new MediaRecorder(stream);
+  recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+  recorder.onstop = () => { stream.getTracks().forEach((t) => t.stop()); send(new Blob(chunks, { type: recorder.mimeType })); };
+  recorder.start();
+  askState("Listening… tap to send", "Speak now (up to 20 seconds).", "rec");
+  recTimer = setTimeout(() => recorder && recorder.state === "recording" && recorder.stop(), 20000);
+}
+async function send(blob) {
+  clearTimeout(recTimer); busy = true; askState("Thinking…", "Speech to text → Gemini → Girish's voice", "busy");
+  try {
+    const { bytes, seconds } = await toWav16k(blob);
+    if (seconds < 0.6) throw new Error("That was too short. Hold the mic a little longer.");
+    const { p } = at(pos);
+    const t0 = performance.now();
+    const res = await fetch("/ask", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ audioBase64: toBase64(bytes), lat: p.lat, lng: p.lng, history: turns, language: $("askLang").value }) });
+    const json = await res.json();
+    if (!json.success) {
+      const msg = json.error.code === "NOTHING_HEARD" ? "Sorry, I didn't catch that. Try again." : `${json.error.code}: ${json.error.message}`;
+      throw new Error(msg);
+    }
+    const r = json.data; const ms = Math.round(performance.now() - t0);
+    addTurn("q", r.transcript, `you · km ${(pos/1000).toFixed(1)}`);
+    addTurn("a", r.answerText, `Musafir · ${r.voice} · stt ${r.timingsMs.stt} / llm ${r.timingsMs.llm} / tts ${r.timingsMs.tts} ms · ${(ms/1000).toFixed(1)} s round trip`);
+    turns.push({ q: r.transcript, a: r.answerText });
+    askState("Speaking…", "Tap the mic to ask another question.", "");
+    answerAudio.src = "data:audio/mpeg;base64," + r.audio.base64;
+    answerAudio.onended = () => { askState("Ask Musafir", "Tap the mic for a follow-up question."); if (storyWasPlaying) audio.play().catch(() => {}); };
+    await answerAudio.play();
+  } catch (e) {
+    askState("Ask Musafir", e.message || String(e), "");
+    if (storyWasPlaying) audio.play().catch(() => {});
+  } finally { busy = false; if ($("mic").classList.contains("busy")) $("mic").className = "mic"; }
+}
+$("mic").onclick = () => {
+  if (busy) return;
+  if (recorder && recorder.state === "recording") recorder.stop(); else startRecording();
+};
+
+$("reset").onclick = () => {
+  running = false; pos = 0; queue.length = 0; fired.clear(); audio.pause(); current = -1;
+  DATA.items.forEach((x) => x.li.classList.remove("playing", "done"));
+  $("play").textContent = "▶ Start drive"; setNow("Ready", 'Press "Start drive"', "Each story plays when the car enters its trigger circle.", false); draw(true);
+};
+</script>
+<script async src="https://maps.googleapis.com/maps/api/js?key=__GOOGLE_KEY__&callback=initGoogle&loading=async"></script>
+</body>
+</html>
