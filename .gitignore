@@ -77,3 +77,6 @@ Thumbs.db
 
 # Spike outputs (generated audio etc.)
 backend/spikes/out/
+
+# Generated assets (voice demos etc.) - distributed via storage, not git
+backend/generated/

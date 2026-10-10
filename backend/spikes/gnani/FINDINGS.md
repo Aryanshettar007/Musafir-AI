@@ -69,6 +69,8 @@ round-trip similarity (1.00 = perfect; most misses are just "two" → "2" from S
 - **Every voice is intelligible in every language** — a voice's "recommended language" is about accent/naturalness,
   not whether it can speak the language. So the user can be offered any voice for any language; defaults should be
   chosen by ear. Samples: `out/voices/<Voice>-<en|kn|kanglish|hi>.mp3`.
+- **Listening verdict (user):** Deepak, Girish and Nalini sound good. Kavin and Kaveri don't, and Saanvi is the worst.
+  These three are the defaults.
 - **Abbreviations break:** "two km" was spoken/heard as "ಟೂ ಕುಮಾರಿ" with *every* voice. Scripts must spell out
   units and abbreviations ("kilometres"), same as numbers-as-words.
 
@@ -79,6 +81,7 @@ round-trip similarity (1.00 = perfect; most misses are just "two" → "2" from S
 4. **STT `language_code` should be the user's selected language**, not `en-IN`: a Kanglish speaker transcribed as `kn-IN` came out accurate (Kannada script); as `en-IN` it was garbled. Gemini reads Kannada script fine, so this is OK downstream.
 5. **The `bitrate` field is ignored** — every mp3 came back at 128 kbps (measured with `duration.ts`). Earlier size→duration estimates in this note assumed 64 kbps and were wrong by 2×; corrected above.
 6. **"Evon" is not in the Gnani docs** (searched the full llms.txt index). The only LLM-related thing is the Agent Builder platform (`/Platform/Get_LLM_Models`), which is a telephony-agent product. → Treat Gemini as the LLM unless the hackathon organisers point to an Evon API.
+8. **Only ONE in-flight request per API key.** Parallel calls get `429 RATE_LIMITED: "Only 1 active request is allowed at a time"` (found while generating 126 voice demos, 2026-10-10). Likely a plan/tier limit; ask Gnani for higher concurrency. Until then: a single server-side queue for all Gnani calls, with interactive Q&A prioritised over background trip narration.
 7. **TTS REST has an undocumented ~2 000-char limit per request** and reports it as a generic 500. Always chunk on sentence boundaries (≤1 800 chars) — the narration service must do this for every story, not just long ones.
 
 ## Not yet tested

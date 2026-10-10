@@ -46,12 +46,19 @@ npx tsx spikes/<name>/<script>.ts   # run a spike probe
 ```
 
 ## Gnani gotchas (from spike 1, see backend/spikes/gnani/FINDINGS.md)
+- Default voices (user's choice by ear): male **Deepak** (main male voice: English, Hindi, Hinglish) and **Girish** (Kannada/Kanglish), female **Nalini** (all). Don't default to Saanvi or Kavin.
 - TTS: `POST https://api.vachana.ai/api/v1/tts/inference`, model `timbre-v2.5`, use **mp3 at 48 kHz** (24 kHz mp3 intermittently 500s).
 - STT: `POST https://api.vachana.ai/stt/v3`, **max 30 s audio** (docs wrongly say 60). Use the user's language code, not `en-IN`.
 - Retry 5xx — Gnani returns transient "technical difficulties" errors.
 - mp3 is always 128 kbps (the `bitrate` field is ignored) ≈ 15.6 KB per second of audio.
 - Scripts must spell out numbers AND abbreviations/units ("kilometres", not "km" — every voice mispronounces it).
+- **Only ONE in-flight Gnani request per API key** (429 RATE_LIMITED otherwise). Route every Gnani call through the single priority queue; never fire them in parallel.
 - TTS REST fails (generic 500) above ~2 000 chars per request — always chunk scripts on sentence boundaries (≤1 800 chars) and concatenate the mp3s.
+
+## Maps / Wikipedia gotchas (from spike 3, see backend/spikes/maps/FINDINGS.md)
+- Env var `GOOGLE_MAPS_API_KEY`. Routes API + Places API (New): the `X-Goog-FieldMask` header is mandatory and sets the billing SKU — request only the fields you need.
+- Google Maps Platform terms limit caching Places content: persist `place_id`, not names/ratings/reviews, long term.
+- Wikipedia API: send a descriptive User-Agent with a contact URL (generic UAs get 429), call sequentially, retry 429.
 
 ## Gemini gotchas (from spike 2, see backend/spikes/gemini/FINDINGS.md)
 - SDK `@google/genai`; env var `GEMINI_API_KEY`. Stories: `gemini-3.8-flash` (thinking `LOW` — it rejects `MINIMAL`). Q&A: `gemini-3.5-flash-lite`.

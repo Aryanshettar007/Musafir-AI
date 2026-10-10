@@ -43,7 +43,7 @@ offline mode, and culturally grounded content.
 └───────────────┬───────────────────────────────────────────────────────▲────────────┘
                 │ HTTPS (Firebase ID token)                              │ pack + audio
 ┌───────────────▼────────────────────── Backend (Express + TS) ─────────┴────────────┐
-│  /trips   /trips/:id/pack   /ask   /me   /places                                     │
+│  /trips   /trips/:id/pack   /ask   /me   /voices   /places                           │
 │                                                                                     │
 │  Trip pipeline:  Route ─▶ Discover places ─▶ Rank ─▶ Retrieve facts ─▶ Write story │
 │                  (Maps)    (Maps Places)     (interests) (RAG)        (Gemini)       │
@@ -67,12 +67,12 @@ A trip pack is a manifest plus audio files. The app needs nothing else to run a 
   "tripId": "trp_…",
   "version": 3,
   "language": "kn-IN",
-  "voice": "Saanvi",
+  "voice": "Nalini",
   "route": { "polyline": "encoded…", "distanceM": 145000, "durationS": 10800 },
   "items": [
     {
       "id": "itm_…",
-      "type": "story",               // story | city-welcome | food | featured | song-info | trip-intro
+      "type": "story",               // story | city-welcome | food | featured | music-break | trip-intro
       "placeId": "plc_…",
       "title": "Srirangapatna Fort",
       "trigger": {
@@ -82,7 +82,7 @@ A trip pack is a manifest plus audio files. The app needs nothing else to run a 
       },
       "side": "right",                    // computed (D3)
       "priority": 80,                     // ranking score; higher wins on conflict
-      "audio": { "url": "https://…/stories/plc_…/kn-IN/Saanvi/v1.mp3", "durationS": 60, "bytes": 937000 },
+      "audio": { "url": "https://…/stories/plc_…/kn-IN/Nalini/v1.mp3", "durationS": 60, "bytes": 937000 },
       "transcript": "…"                   // for captions / accessibility / debugging
     }
   ],
@@ -97,7 +97,7 @@ is mid-way when the place is nearest. The backend computes a default; the app ad
 ## 5. Components
 
 ### 5.1 Mobile app (teammate, `App/`)
-- **Screens** (from sketch): Login → Onboarding (name, gender, language, interests, connect Spotify/Maps later)
+- **Screens** (from sketch): Login → Onboarding (name, gender, language, interests, narrator voice, music access permission)
   → Tabs: **Home / Where To?** (source + destination; language, voice and interests
   pre-filled from the profile but changeable for this trip; solo/group, mood, recent trips), **Trip**
   (map + now-playing + upcoming), **Profile**.
@@ -115,18 +115,35 @@ is mid-way when the place is nearest. The backend computes a default; the app ad
 - **Design rules:** light/dark only, no purple/blue, no text chatbot.
 
 ### 5.1a Narrator voice selection
-- **Onboarding** asks narrator gender (M/F). Together with the language, that picks a default voice:
+**Users can pick any of the 42 Gnani voices.** The defaults below only cover users who don't choose one.
+
+- **Picker flow, two steps (gender first, then voice):**
+  1. **Choose Male or Female.**
+  2. **Choose a voice within that gender.** The list shows only that gender's voices (15 male, 27 female in Timbre
+     v2.5). The default for their language (table below) is pre-selected and pinned at the top with a
+     "Recommended" tag, followed by the rest. **Every voice has a ▶ "Try" button** that plays a short sample in the
+     user's selected language, so they can listen before choosing.
+  - Switching gender jumps to that gender's default voice. Picking a voice saves it, and they can try as many as they like.
+- **Onboarding** runs this flow. The result is saved as `users.voice` (with `users.voiceGender`), their profile default.
 
   | Language | Male | Female |
   |---|---|---|
-  | Kannada / Kanglish | Kavin | Nalini |
-  | English | Girish | Nalini |
+  | Kannada / Kanglish | Girish | Nalini |
+  | English | Deepak | Nalini |
   | Hindi / Hinglish | Deepak | Nalini |
 
-  This is the user's choice (Kavin/Girish male, Nalini female). Spike 1 showed every Gnani voice is intelligible in
-  every language, so the table is a taste decision and lives in config, not code.
-- **Where To?** shows the chosen voice with "Change voice". The picker lists recommended voices for the language
-  first, then all 42 Timbre voices, each with a ▶ preview. Previews are pre-generated once as static mp3s.
+  Chosen by ear after the voice-matrix test: **Deepak, Girish and Nalini** sounded best. Kavin and Saanvi were
+  rejected (Saanvi sounded worst). Spike 1 showed every Gnani voice is intelligible in every language, so this is
+  a taste decision and lives in config, not code.
+- **Where To?** pre-fills the profile voice and has a "Change voice" option for this trip only. The profile default
+  can be changed any time in **Profile**.
+- **One shared picker component** runs the same Male/Female → voice → ▶ Try flow in Onboarding, Where To? and
+  Profile. Voices not tuned for the selected language get a small "best for <language>" hint, but are never blocked.
+- **Backend:** `GET /voices?language=kn-IN&gender=male` returns the catalogue
+  `{ name, gender, nativeLanguage, recommended, previewUrl }[]` from a config file, with the recommended voice for
+  that language and gender first. Previews are pre-generated once
+  per voice × language (42 × 5 short clips, about 30 MB in total) and stored in object storage. Requests that take a
+  voice (`POST /trips`, `PATCH /me`) validate it against the catalogue.
 - **Voice is fixed per trip:** the pack audio is rendered in that voice. Changing it is free before the trip starts;
   mid-trip it applies only to newly generated content (or needs a re-download).
 - **Voice Q&A replies use the trip's voice**, so it feels like one narrator.
@@ -150,34 +167,45 @@ backend/src/
   jobs/          tripBuild.job.ts (async pack generation)
 ```
 
-### 5.3 Trip generation pipeline 🔬 (Maps + Gemini spikes)
+### 5.3 Trip generation pipeline (informed by spikes 1–3)
 1. **Route:** Google Routes API, source→destination → polyline, distance, duration.
-2. **Discover:** find candidate places near the route. Options to compare in the Maps spike: Places API (New)
-   Text Search with search-along-route, or Nearby Search at sampled points every ~5–10 km. Categories: historic
-   sites, landmarks, temples, towns/cities, nature, notable food, featured businesses (from our DB).
-3. **Rank & thin:** score = interest match × prominence (rating, review count, Wikipedia presence) × proximity
-   to route. Enforce spacing (no two stories within ~2–3 min of driving) and a target density (e.g. one per
-   8–15 min). Always include city/town welcomes.
-4. **Retrieve facts (RAG):** for each place, fetch Wikipedia/Wikivoyage summary plus Places details plus our
+2. **Discover** (spike 3: about 16 Places calls plus about 15 Wikipedia calls per route, a few seconds in total):
+   - **Places Nearby Search** every ~15 km (r ≈ 8 km) for culture, nature and temple types. This gave the best
+     recall (10/13 known stops).
+   - **Places Text Search along the route** for **food** ("famous local restaurants").
+   - **Wikipedia geosearch** for **towns** ("Welcome to Channapatna") and as the fact source. Google doesn't return towns.
+   - Featured businesses from our DB.
+3. **Pre-filter (deterministic):** ≤ 5 km off route, minimum review count, story/food types, **chain dedupe** (one
+   Maddur Tiffany's, not three), **cluster detection** (Srirangapatna = 5 sights within 5 km → one episode), and
+   no item inside the first/last ~15 km of city unless it is very prominent. This leaves about 40–60 candidates.
+4. **Curate (Gemini, one call):** from the candidates, the user's interests and the trip duration, pick and order the
+   episodes: clusters become one longer episode, long empty stretches (e.g. 28 km Mandya → Srirangapatna) become
+   long-form regional stories, and towns get welcomes. Target density is about one item per 8–15 min, with
+   spacing ≥ 3 min. Geometry (side, distance, trigger point) stays deterministic (D3).
+5. **Retrieve facts (RAG):** for each place, fetch Wikipedia/Wikivoyage summary plus Places details plus our
    curated notes. Store them as `place.facts[]` with sources. Embeddings/vector search come later, only if needed:
    per-place retrieval is a keyed lookup, not a search problem.
-5. **Write story (Gemini `gemini-3.8-flash`, thinking LOW):** a prompt with facts, language, persona
+6. **Write story (Gemini `gemini-3.8-flash`, thinking LOW):** a prompt with facts, language, persona
    ("RJ-style narrator"), side of road, user interests, and a **per-language word budget**. For 60 s that is about
    en 190 / kn 115 / Kanglish 145 / hi 170 / Hinglish 175 words; the model's own duration estimate is useless.
    Output is structured JSON: `{ title, script, factsUsed[] }`. Write numbers as words (Gnani recommendation).
    Validate with the schema (zod), a **Unicode script-range check** (no Telugu characters in Kannada, etc.), and length.
    Kanglish = Kannada script + Latin-script English words, which is what Gnani reads best (spike 2).
    Spell out abbreviations and units ("kilometres", not "km"). Every voice reads "km" wrongly.
-6. **Narrate (Gnani TTS):** Timbre v2.5, mp3 at 48 kHz (always 128 kbps, ≈15.6 KB/s). Retry 5xx. About 5–6 s
+7. **Narrate (Gnani TTS):** Timbre v2.5, mp3 at 48 kHz (always 128 kbps, ≈15.6 KB/s). Retry 5xx. About 5–6 s
    per 60 s story (spike 1). Measure the real duration from the mp3 for the pack manifest.
    **Always chunk** the script on sentence boundaries (≤1 800 chars). The REST endpoint fails above about 2 000 chars.
    Narrate chunks in parallel and concatenate the mp3s into one file per story. A 5-minute "episode" took about
    25 s sequentially (spike 1, long-form).
-7. **Store:** upload mp3 to object storage, save a `Story` doc (cache key from D2), assemble the pack.
+8. **Store:** upload mp3 to object storage, save a `Story` doc (cache key from D2), assemble the pack.
 
 **Runs async:** `POST /trips` creates the trip and returns `202 { tripId, status: "building" }`. The app polls
 `GET /trips/:id` (or uses SSE) for progress. Items become playable as they finish, so the first stories can be
-ready before the whole pack is. Concurrency is limited per provider (e.g. 4 Gemini + 4 Gnani in flight).
+ready before the whole pack is. Concurrency is limited per provider. **Gnani allows only ONE in-flight request per
+API key**, so all Gnani calls (TTS and STT) go through **one server-side priority queue**: interactive Q&A and
+RJ links first, background trip narration after, in ≤1 800-char chunks so an interactive request waits at most one
+chunk. A new 40-story trip needs about 4 min of TTS; cached stories (D2) and pre-built demo routes avoid that wait.
+Users never supply their own keys. Ask Gnani (hackathon organisers) to raise the limit.
 
 ### 5.4 Voice Q&A
 `POST /ask` (multipart: audio, tripId, lat, lng, heading, language):
@@ -193,14 +221,50 @@ places, facts) → Gemini answer (short, spoken style, ≤3 sentences) → TTS �
 **Offline:** Q&A needs the network. When offline, the app plays a pre-generated "I'll answer once we're back in
 coverage" clip, and can still answer "what's next?" from the local pack.
 
-### 5.5 Auth 🔬
-Firebase Auth (email/password) on the client. The backend verifies the Firebase ID token in middleware
-(`firebase-admin`) and upserts a `User` by `firebaseUid`. Profile and preferences live in MongoDB.
+### 5.4a Musafir Radio (music between stories)
+**Decision (2026-10-10): no music API.** Musafir doesn't stream music. It works with **whatever music app the user
+already plays** (JioSaavn, Spotify, YouTube Music, Apple Music, Gaana) through the system media controls, the ones
+shown in the notification bar and lock screen. Spotify was dropped: Premium-only control and a 5-user cap for apps
+in development mode. Other services have no usable API. Research: `backend/spikes/music/FINDINGS.md`.
+
+**Android (main path):** a native module (Expo development build) uses `MediaSessionManager.getActiveSessions()` with
+a `NotificationListenerService`. The user grants **Notification access** once, in onboarding. The app can then:
+- read **now playing** (title, artist, album, playing/paused) from any music app
+- **pause / play / skip** through that app's `MediaController.TransportControls`
+
+**iOS (fallback):** iOS doesn't let apps read or control other apps' playback. Musafir only **ducks or pauses** other
+audio while it speaks (`expo-audio` `interruptionMode: 'duckOthers' | 'doNotMix'`) and uses RJ lines that don't name
+songs. Resume behaviour after our audio ends must be checked on a device.
+
+**Flow while driving** (trip player in the app):
+```
+music playing (any app)        ── next pack item ≥ ~3 min away: let it play
+next item approaching (~30 s before trigger) ─▶ pause music app (Android) / duck (iOS)
+RJ link (+ "that was <song> by <artist>" on Android) ─▶ story ─▶ resume music
+every 2–3 songs in a long gap ─▶ short RJ link over a pause ("you're listening to … — Mandya in twelve minutes")
+```
+
+**Backend's part:**
+- **Pre-generated generic RJ links in the pack** ("music break!", "back to your music", "next stop in ten
+  minutes…"). These work offline. Pack item type `music-break` marks long gaps where music is expected.
+- **`POST /rj/link`** `{ tripId, style, nowPlaying?: {title, artist}, nextItemId?, minutesToNext? }` returns
+  `{ text, audioUrl }`: an online, song-aware RJ link (Gemini flash-lite + Gnani in the trip voice, ~3 s). Song
+  names come from the device, never from a music API. The app falls back to a generic pack link when offline or on
+  timeout.
+- User setting `musicMode: "rj" | "duck-only" | "off"`.
+
+**Risks to check:** Google Play's policy on the Notification Listener permission (needs a clear in-app disclosure),
+and how each music app reacts to external pause/resume (verify on device: JioSaavn, Spotify, YT Music).
+
+### 5.5 Auth
+Firebase Auth is set up by the teammate in the app. The backend verifies the Firebase ID token in middleware
+(`firebase-admin`, needs the Firebase **project ID**) and upserts a `User` by `firebaseUid`. Profile and
+preferences live in MongoDB.
 
 ### 5.6 Data model (MongoDB Atlas)
 | Collection | Key fields | Notes |
 |---|---|---|
-| `users` | firebaseUid, name, gender, language, voice, interests[], heardPlaceIds[] | `language`/`voice`/`interests` are the **defaults** set at signup |
+| `users` | firebaseUid, name, gender, language, voiceGender, voice, interests[], musicMode, heardPlaceIds[] | `language`/`voice`/`interests` are the **defaults** set at signup |
 | `places` | googlePlaceId, name, location (GeoJSON, 2dsphere), category, facts[{text, source}], prominence, featured? | Shared cache across trips |
 | `stories` | placeId, language, voice, variant, script, audio{url, durationS, bytes}, model versions | Unique index on cache key (D2) |
 | `trips` | userId, source, destination, route{polyline,…}, prefs{language, voice, interests[], mood, group}, status, items[], packVersion | `prefs` is a snapshot taken at trip start (profile defaults or per-trip overrides) |
@@ -243,7 +307,8 @@ verify in a short hosting spike:
 | **4. Accounts & onboarding** | Firebase auth, profile, interests, language, voice | Personalised stories differ by interest |
 | **5. Offline polish** | Full pre-download, resume, storage mgmt, offline fallbacks | Airplane-mode drive in the video |
 | **6. Hosting & demo** | Deploy, seed popular routes, record video | Hosted link + video |
-| Later | Featured businesses, local music/song-info, group/mood modes, Spotify, voice cloning, creator story packs, state tourism | Pitch slides |
+| **3b. Musafir Radio** | Android media-session module (app), generic RJ links in packs + `/rj/link` (backend) | JioSaavn/YT Music plays, Musafir pauses it for a story and names the song |
+| Later | Featured businesses, group/mood modes, voice cloning, creator story packs, state tourism | Pitch slides |
 
 **Demo-video tip:** a "simulated drive" mode that replays a recorded GPS track at 10–20× speed makes the
 video easy to shoot and reliable. Build it as part of slice 2.
@@ -251,8 +316,9 @@ video easy to shoot and reliable. Build it as part of slice 2.
 ## 8. Open questions
 1. **Hosting:** Express on a Node host + R2 (A) vs Cloudflare Workers (B)? → hosting spike.
 2. **Evon:** not in Gnani's docs. Is it a separate hackathon API? If it's an LLM, compare it against Gemini.
-3. **Places source quality:** does Google Places surface good *historic/cultural* spots along Indian highways, or
-   do we need Wikipedia geosearch / a curated seed list for the demo routes? → Maps spike.
+3. ~~Places source quality~~ → resolved in spike 3: use Places Nearby + Text Search (food) + Wikipedia (towns, facts).
+   Still open: **Google Maps Platform caching terms** (store `place_id`, not Places content; build packs from our
+   own Wikipedia-sourced content), and verifying left/right on a map (`out/maps/trip.geojson`).
 4. ~~Gemini model choice~~ → resolved in spike 2: flash for stories, flash-lite for Q&A.
    Still open: behaviour for small places with thin Wikipedia pages, and cost per trip pack.
 5. **Story language style:** pure Kannada vs Kanglish by default? Probably a user setting ("Mixed / Pure").
@@ -264,6 +330,7 @@ video easy to shoot and reliable. Build it as part of slice 2.
 |---|---|---|
 | Gnani TTS/STT | ✅ Done | All target languages work; ~10× real time; mp3 48 kHz @128 kbps (~37 MB / 40-story pack); STT ≤30 s; retry 5xx. See `backend/spikes/gnani/FINDINGS.md` |
 | Gemini | ✅ Done | flash writes excellent grounded stories in all 5 styles; flash-lite breaks Kannada but is fast for Q&A (~3.5 s end to end); quota is the main risk. See `backend/spikes/gemini/FINDINGS.md` |
-| Google Maps (Routes + Places) | ⏳ | |
-| Auth (Firebase) | ⏳ | |
+| Google Maps (Routes + Places) | ✅ Done | Route in 0.5 s; Nearby Search best recall (10/13), Text Search best for food, Wikipedia needed for towns; a simple ranking already gives a decent 19-item trip. Needs chain dedupe, clustering and a Gemini curator. See `backend/spikes/maps/FINDINGS.md` |
+| Music | ✅ Decided | No music API (Spotify: Premium + 5 users; JioSaavn/Gaana/Wynk/YT Music: no usable API). Control the user's own music app through Android media sessions; duck on iOS. See `backend/spikes/music/FINDINGS.md` |
+| Auth (Firebase) | ✅ Teammate | Done in the app; backend only verifies ID tokens |
 | Hosting | ⏳ | |

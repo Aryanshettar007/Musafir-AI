@@ -19,15 +19,15 @@ export type LanguageStyle = "en-IN" | "kn-IN" | "kn-mixed" | "hi-IN" | "hi-en";
 
 // How each style should be written so Gnani TTS (see spikes/gnani/FINDINGS.md) reads it well.
 export const LANGUAGE_GUIDE: Record<LanguageStyle, { tts: string; voice: string; guide: string }> = {
-  "en-IN": { tts: "en-IN", voice: "Kaveri", guide: "Warm Indian English." },
+  "en-IN": { tts: "en-IN", voice: "Deepak", guide: "Warm Indian English." },
   "kn-IN": {
     tts: "kn-IN",
-    voice: "Saanvi",
+    voice: "Nalini",
     guide: "Natural spoken Kannada in Kannada script, the way a Bengaluru radio jockey talks - not bookish or formal.",
   },
   "kn-mixed": {
     tts: "kn-IN",
-    voice: "Saanvi",
+    voice: "Nalini",
     guide:
       "Kanglish: everyday Kannada in Kannada script, mixed with common English words (fort, history, famous, " +
       "important, left, right, km) written in Latin script, exactly how young Bengaluru people speak.",
@@ -35,7 +35,7 @@ export const LANGUAGE_GUIDE: Record<LanguageStyle, { tts: string; voice: string;
   "hi-IN": { tts: "hi-IN", voice: "Nalini", guide: "Natural spoken Hindi in Devanagari script." },
   "hi-en": {
     tts: "hi-en",
-    voice: "Poorvi",
+    voice: "Deepak",
     guide: "Hinglish written fully in Latin script (romanised Hindi mixed with English), casual and friendly.",
   },
 };
@@ -112,7 +112,7 @@ export async function wikipediaFacts(title: string, maxChars = 5000): Promise<st
   const url =
     "https://en.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&format=json&redirects=1&titles=" +
     encodeURIComponent(title);
-  const res = await fetch(url, { headers: { "User-Agent": "MusafirAI-spike/0.1 (hackathon prototype)" } });
+  const res = await fetch(url, { headers: { "User-Agent": "MusafirAI/0.1 (https://github.com/Aryanshettar007/Musafir-AI)" } });
   if (!res.ok) throw new Error(`Wikipedia ${res.status}`);
   const data = (await res.json()) as { query: { pages: Record<string, { extract?: string }> } };
   const extract = Object.values(data.query.pages)[0]?.extract ?? "";
