@@ -33,7 +33,7 @@ Architecture and roadmap: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Read i
 ## Product constraints
 - No text chatbot UI — interaction is voice + GPS. Voice Q&A is allowed.
 - Theme: light and dark mode only. No purple or blue themes.
-- Indian languages first: Kannada, Hindi, English, and code-mixed (Kanglish / Hinglish).
+- Languages = the 11 Gnani Timbre v2.5 languages (`backend/src/catalog/languages.ts`): en-IN, hi-IN, hi-en (Hinglish), kn-IN, ta-IN, te-IN, ml-IN, mr-IN, bn-IN, gu-IN, pa-IN. Don't add languages Gnani can't narrate.
 
 ## Commands (backend)
 ```bash
@@ -41,12 +41,13 @@ cd backend
 npm install
 npm run dev              # tsx watch src/index.ts
 npm run build            # tsc
-npx tsc --noEmit         # typecheck
+npm run typecheck        # src + tests
+npm test                 # vitest (API tests use an in-memory MongoDB)
 npx tsx spikes/<name>/<script>.ts   # run a spike probe
 ```
 
 ## Gnani gotchas (from spike 1, see backend/spikes/gnani/FINDINGS.md)
-- Default voices (user's choice by ear): male **Deepak** (main male voice: English, Hindi, Hinglish) and **Girish** (Kannada/Kanglish), female **Nalini** (all). Don't default to Saanvi or Kavin.
+- Default voices (user's choice by ear): male **Deepak** (main male voice: English, Hindi, Hinglish) and **Girish** (Kannada), female **Nalini** (all). Don't default to Saanvi or Kavin.
 - TTS: `POST https://api.vachana.ai/api/v1/tts/inference`, model `timbre-v2.5`, use **mp3 at 48 kHz** (24 kHz mp3 intermittently 500s).
 - STT: `POST https://api.vachana.ai/stt/v3`, **max 30 s audio** (docs wrongly say 60). Use the user's language code, not `en-IN`.
 - Retry 5xx — Gnani returns transient "technical difficulties" errors.

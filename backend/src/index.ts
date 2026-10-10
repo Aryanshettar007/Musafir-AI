@@ -1,46 +1,26 @@
-import dotenv from "dotenv";
-dotenv.config();
-
-import express, { Application, Request, Response } from "express";
-import cors from "cors";
+import { env } from "./config/env";
 import { connectDB } from "./config/db";
-
-const app: Application = express();
-const PORT = process.env.PORT || 3000;
-
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Routes
-app.get("/", (_req: Request, res: Response) => {
-  res.json({
-    success: true,
-    message: "Musafir AI Backend API is running",
-    timestamp: new Date().toISOString(),
-  });
-});
-
-app.get("/health", (_req: Request, res: Response) => {
-  res.status(200).json({
-    status: "UP",
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
-  });
-});
+import { createStorage } from "./config/storage";
+import { createApp } from "./app";
+import { firebaseTokenVerifier } from "./clients/firebase";
 
 const startServer = async () => {
   try {
     // Connect to MongoDB
     await connectDB();
 
-    app.listen(PORT, () => {
-      console.log(`[Server] Server is running on port ${PORT}`);
-      console.log(`[Server] API available at http://localhost:${PORT}`);
+    const app = createApp({
+      verifyIdToken: firebaseTokenVerifier(env.FIREBASE_PROJECT_ID),
+      storage: createStorage(env),
+      corsOrigins: env.CORS_ORIGINS?.split(",").map((o) => o.trim()).filter(Boolean),
     });
-  } catch (error: any) {
-    console.error(`[Server Error] Server failed to start: ${error.message || error}`);
+
+    app.listen(env.PORT, () => {
+      console.log(`[Server] Server is running on port ${env.PORT}`);
+      console.log(`[Server] API available at http://localhost:${env.PORT}`);
+    });
+  } catch (error: unknown) {
+    console.error(`[Server Error] Server failed to start: ${error instanceof Error ? error.message : error}`);
     process.exit(1);
   }
 };
