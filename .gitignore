@@ -74,3 +74,6 @@ Thumbs.db
 # Temporary & local files
 *.tmp
 *.temp
+
+# Spike outputs (generated audio etc.)
+backend/spikes/out/

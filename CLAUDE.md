@@ -1,0 +1,51 @@
+# Musafir-AI
+
+Voice-first AI road-trip companion — "Netflix for Road Trips". The app follows the user's GPS along a route and
+automatically plays short audio stories (history, culture, food, local businesses) in their language, and lets them
+ask questions by voice. Built for the Gnani hackathon: **voice and Indian languages are the product**.
+
+Architecture and roadmap: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Read it before making design decisions.
+
+## Repo layout
+- `backend/` — Express + TypeScript API, MongoDB Atlas (Mongoose). Owned by Aryan.
+- `App/` — Expo / React Native app (Expo Router). Owned by a teammate. Follow `App/AGENTS.md` for anything in `App/`.
+- `backend/spikes/` — throwaway API experiments + `FINDINGS.md` per spike. Never import spike code into `src/`.
+- `docs/` — architecture, specs, plans.
+- `reference/` — original idea sketches.
+
+## Git rules — MUST follow
+- **Never `git commit` or `git push` without asking the user first and getting an explicit yes.** Every time — approval for one commit does not carry over to the next.
+- **Never add Claude attribution** to commits or PRs: no `Co-Authored-By: Claude ...` trailer, no "Generated with Claude Code" line. The user is the sole author.
+- Work on feature branches (`feature/<topic>`), never directly on `main`. `git pull` before branching.
+- Never commit secrets. `.env` files are gitignored; add new variables to `backend/.env.example` with an empty value.
+
+## Engineering practices
+- TypeScript everywhere, `strict` mode. No `any` in product code — model external API responses with types and validate them at the boundary (e.g. zod).
+- Small, single-purpose modules with clear interfaces: routes → controllers → services → clients. External APIs (Gnani, Gemini, Google Maps) each live behind their own client module so they can be mocked and swapped.
+- All secrets and config come from environment variables, read and validated in one config module. API keys stay on the server — never ship them to the app.
+- Every external call has a timeout, retries with exponential backoff on 5xx/429, and typed error handling. Never swallow errors; log with context.
+- Validate every request body/query/param. Return consistent JSON errors: `{ success: false, error: { code, message } }`.
+- Write tests for services and pure logic (route geometry, trigger/geofence logic, ranking). Test-first for new logic where practical.
+- Run typecheck (`npx tsc --noEmit`) and tests before saying work is done. Report failures honestly.
+- Keep it simple (YAGNI): build the current slice, not imagined future features.
+- Match the surrounding code's style and naming; keep comments for the non-obvious "why".
+
+## Product constraints
+- No text chatbot UI — interaction is voice + GPS. Voice Q&A is allowed.
+- Theme: light and dark mode only. No purple or blue themes.
+- Indian languages first: Kannada, Hindi, English, and code-mixed (Kanglish / Hinglish).
+
+## Commands (backend)
+```bash
+cd backend
+npm install
+npm run dev              # tsx watch src/index.ts
+npm run build            # tsc
+npx tsc --noEmit         # typecheck
+npx tsx spikes/<name>/<script>.ts   # run a spike probe
+```
+
+## Gnani gotchas (from spike 1, see backend/spikes/gnani/FINDINGS.md)
+- TTS: `POST https://api.vachana.ai/api/v1/tts/inference`, model `timbre-v2.5`, use **mp3 at 48 kHz** (24 kHz mp3 intermittently 500s).
+- STT: `POST https://api.vachana.ai/stt/v3`, **max 30 s audio** (docs wrongly say 60). Use the user's language code, not `en-IN`.
+- Retry 5xx — Gnani returns transient "technical difficulties" errors.
