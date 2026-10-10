@@ -44,6 +44,8 @@ npm run build            # tsc
 npm run typecheck        # src + tests
 npm test                 # vitest (API tests use an in-memory MongoDB)
 npx tsx spikes/<name>/<script>.ts   # run a spike probe
+npx tsx scripts/build-trip.ts --from "Bengaluru" --to "Mysore Palace" --language kn-IN --voice Girish   # real trip
+npx tsx scripts/demo/server.ts      # local map + live-mode demo at http://localhost:5050
 ```
 
 ## Gnani gotchas (from spike 1, see backend/spikes/gnani/FINDINGS.md)
@@ -62,7 +64,7 @@ npx tsx spikes/<name>/<script>.ts   # run a spike probe
 - Wikipedia API: send a descriptive User-Agent with a contact URL (generic UAs get 429), call sequentially, retry 429.
 
 ## Gemini gotchas (from spike 2, see backend/spikes/gemini/FINDINGS.md)
-- SDK `@google/genai`; env var `GEMINI_API_KEY`. Stories: `gemini-3.8-flash` (thinking `LOW` — it rejects `MINIMAL`). Q&A: `gemini-3.5-flash-lite`.
+- SDK `@google/genai`; env var `GEMINI_API_KEY`. **Free tier only, no Pro, no paid plan (decided 2026-10-10).** Use `gemini-3.5-flash-lite` for everything; fall back to `gemini-3.8-flash` (thinking `LOW`, it rejects `MINIMAL`) when lite fails. Free-tier flash = 5 requests/min per model; Pro = 0.
 - Use `responseMimeType: "application/json"` + `responseJsonSchema: z.toJSONSchema(schema)`, then validate with zod.
 - flash-lite can leak Telugu characters into Kannada — always validate the Unicode script of generated text.
 - Control length with per-language word budgets, not the model's duration estimate.

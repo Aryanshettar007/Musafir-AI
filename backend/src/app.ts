@@ -1,5 +1,5 @@
 import cors from "cors";
-import express, { type Application, type Request, type Response } from "express";
+import express, { type Application, type Request, type Response, type Router } from "express";
 import type { VerifyIdToken } from "./clients/firebase";
 import type { Storage } from "./clients/storage";
 import { requireAuth } from "./middleware/auth";
@@ -11,10 +11,12 @@ export interface AppOptions {
   verifyIdToken: VerifyIdToken;
   storage: Storage;
   corsOrigins?: string[];
+  // Feature routers, mounted behind auth after the built-in routes. Multipart parsing (multer) is per route.
+  routers?: Array<{ path: string; router: Router }>;
 }
 
 // Builds the Express app without connecting to anything, so tests can pass a fake token verifier.
-export function createApp({ verifyIdToken, storage, corsOrigins }: AppOptions): Application {
+export function createApp({ verifyIdToken, storage, corsOrigins, routers }: AppOptions): Application {
   const app = express();
 
   app.use(cors(corsOrigins?.length ? { origin: corsOrigins } : undefined));
@@ -46,6 +48,7 @@ export function createApp({ verifyIdToken, storage, corsOrigins }: AppOptions): 
   app.use(requireAuth(verifyIdToken));
   app.use(catalogRoutes(storage));
   app.use("/me", meRoutes);
+  for (const { path, router } of routers ?? []) app.use(path, router);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

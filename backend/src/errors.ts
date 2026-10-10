@@ -4,6 +4,8 @@ export class AppError extends Error {
     readonly status: number,
     readonly code: string,
     message: string,
+    // Extra machine-readable context for the app, e.g. { tripId } on TRIP_IN_PROGRESS.
+    readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "AppError";

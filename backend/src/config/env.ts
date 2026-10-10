@@ -1,8 +1,8 @@
 import "dotenv/config";
 import { z } from "zod";
+import { LANGUAGE_IDS, type LanguageId } from "../catalog/languages";
 
-// Every env var the server reads, validated once at startup. Spike-only keys (Gnani, Gemini, Maps) join here
-// when the pipeline code that needs them lands.
+// Every env var the server reads, validated once at startup.
 const EnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(3000),
@@ -26,6 +26,25 @@ const EnvSchema = z.object({
   S3_SECRET_ACCESS_KEY: z.string().optional(),
   // Lifetime of signed download URLs. S3 caps presigned URLs at 7 days.
   AUDIO_URL_TTL_SECONDS: z.coerce.number().int().min(60).max(604_800).default(604_800),
+  // Third-party API keys. They stay on the server.
+  GOOGLE_MAPS_API_KEY: z.string().min(1),
+  GEMINI_API_KEY: z.string().min(1),
+  GNANI_API_KEY: z.string().min(1),
+  // Gemini free tier: limits are per model, so each model gets its own requests-per-minute limiter.
+  GEMINI_CONCURRENCY: z.coerce.number().int().min(1).default(2),
+  GEMINI_LITE_RPM: z.coerce.number().int().min(1).default(10),
+  GEMINI_FLASH_RPM: z.coerce.number().int().min(1).default(5),
+  // Languages that skip flash-lite and go straight to flash (comma-separated language ids).
+  GEMINI_FLASH_LANGUAGES: z
+    .string()
+    .default("")
+    .transform((v) => v.split(",").map((l) => l.trim()).filter(Boolean))
+    .pipe(z.array(z.enum(LANGUAGE_IDS)))
+    .transform((l): LanguageId[] => l),
+  TRIPS_PER_DAY: z.coerce.number().int().min(1).default(10),
+  MAX_ROUTE_KM: z.coerce.number().positive().default(1200),
+  // Wikimedia policy: generic user agents get 429'd; identify the app with a contact URL.
+  WIKIPEDIA_USER_AGENT: z.string().min(1).default("MusafirAI/0.1 (https://github.com/Aryanshettar007/Musafir-AI)"),
 }).superRefine((e, ctx) => {
   if (e.STORAGE_DRIVER !== "s3") return;
   for (const key of ["S3_ENDPOINT", "S3_REGION", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"] as const) {
