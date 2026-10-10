@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "623421286127",
+    "project_id": "musafir-ai-a7114",
+    "storage_bucket": "musafir-ai-a7114.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:623421286127:android:d3c49764ab8b840d649d1a",
+        "android_client_info": {
+          "package_name": "com.musafir.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCU4dEPe7vjyDj5ToGSLWQkj8Iv9GOrkIs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
