@@ -1,16 +1,20 @@
 {
   "expo": {
-    "name": "App",
-    "slug": "App",
+    "name": "Musafir AI",
+    "slug": "musafir-ai",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "musafir",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "bundleIdentifier": "com.musafir.app",
+      "icon": "./assets/expo.icon",
+      "googleServicesFile": "./src/config/GoogleService-Info.plist"
     },
     "android": {
+      "package": "com.musafir.app",
+      "googleServicesFile": "./src/config/google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -31,6 +35,14 @@
           "backgroundColor": "#208AEF",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "enableSceneSupport": true
+          }
         }
       ]
     ],
