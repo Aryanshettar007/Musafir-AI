@@ -1,7 +1,7 @@
 # Musafir-AI — Architecture Plan
 
-> **Status: Draft v0.1 (2026-10-10), for review.** Built from the idea write-up, the sketches in `reference/`, and
-> spike 1 (Gnani). Sections marked 🔬 depend on spikes not yet run (Gemini, Maps, auth, hosting) and will be
+> **Status: Draft v0.2 (2026-10-10), for review.** Built from the idea write-up, the sketches in `reference/`,
+> spike 1 (Gnani) and spike 2 (Gemini). Sections marked 🔬 depend on spikes not yet run (Gemini, Maps, auth, hosting) and will be
 > revised once those findings land. Each build slice still gets its own spec → plan → implementation.
 
 ---
@@ -82,11 +82,11 @@ A trip pack is a manifest plus audio files. The app needs nothing else to run a 
       },
       "side": "right",                    // computed (D3)
       "priority": 80,                     // ranking score; higher wins on conflict
-      "audio": { "url": "https://…/stories/plc_…/kn-IN/Saanvi/v1.mp3", "durationS": 74, "bytes": 593000 },
+      "audio": { "url": "https://…/stories/plc_…/kn-IN/Saanvi/v1.mp3", "durationS": 60, "bytes": 937000 },
       "transcript": "…"                   // for captions / accessibility / debugging
     }
   ],
-  "totalBytes": 21400000
+  "totalBytes": 37500000
 }
 ```
 
@@ -98,7 +98,8 @@ is mid-way when the place is nearest. The backend computes a default; the app ad
 
 ### 5.1 Mobile app (teammate, `App/`)
 - **Screens** (from sketch): Login → Onboarding (name, gender, language, interests, connect Spotify/Maps later)
-  → Tabs: **Home / Where To?** (source + destination, language, voice, solo/group, mood, recent trips), **Trip**
+  → Tabs: **Home / Where To?** (source + destination; language, voice and interests
+  pre-filled from the profile but changeable for this trip; solo/group, mood, recent trips), **Trip**
   (map + now-playing + upcoming), **Profile**.
 - **Location:** `expo-location` with background updates via `expo-task-manager`. Needs a development build,
   not Expo Go. 🔬 Verify the Expo SDK API in the versioned docs (see `App/AGENTS.md`).
@@ -112,6 +113,25 @@ is mid-way when the place is nearest. The backend computes a default; the app ad
   Playback always reads local files when present and streams from URLs otherwise.
 - **Voice ask:** push-to-talk button. Record ≤25 s (Gnani STT limit is 30 s), upload to `/ask`, play the reply.
 - **Design rules:** light/dark only, no purple/blue, no text chatbot.
+
+### 5.1a Narrator voice selection
+- **Onboarding** asks narrator gender (M/F). Together with the language, that picks a default voice:
+
+  | Language | Male | Female |
+  |---|---|---|
+  | Kannada / Kanglish | Kavin | Nalini |
+  | English | Girish | Nalini |
+  | Hindi / Hinglish | Deepak | Nalini |
+
+  This is the user's choice (Kavin/Girish male, Nalini female). Spike 1 showed every Gnani voice is intelligible in
+  every language, so the table is a taste decision and lives in config, not code.
+- **Where To?** shows the chosen voice with "Change voice". The picker lists recommended voices for the language
+  first, then all 42 Timbre voices, each with a ▶ preview. Previews are pre-generated once as static mp3s.
+- **Voice is fixed per trip:** the pack audio is rendered in that voice. Changing it is free before the trip starts;
+  mid-trip it applies only to newly generated content (or needs a re-download).
+- **Voice Q&A replies use the trip's voice**, so it feels like one narrator.
+- The Gnani API has no "prompt": the voice is chosen with the `voice` + `language` (+ `speed`) parameters, and
+  tone/personality come from the Gemini-written script.
 
 ### 5.2 Backend API (Aryan, `backend/`)
 Layering: `routes → controllers → services → clients`, config in one validated module.
@@ -141,10 +161,18 @@ backend/src/
 4. **Retrieve facts (RAG):** for each place, fetch Wikipedia/Wikivoyage summary plus Places details plus our
    curated notes. Store them as `place.facts[]` with sources. Embeddings/vector search come later, only if needed:
    per-place retrieval is a keyed lookup, not a search problem.
-5. **Write story (Gemini):** a prompt with facts, language, persona ("RJ-style narrator"), side of road, user
-   interests, target length (~45–90 s ≈ 120–220 words). Output is structured JSON: `{ title, script, factsUsed[] }`.
-   Write numbers as words (Gnani recommendation). Generate natively in the target language, including code-mixed styles.
-6. **Narrate (Gnani TTS):** Timbre v2.5, mp3 at 48 kHz. Retry 5xx. About 4 s per 90 s story (spike 1).
+5. **Write story (Gemini `gemini-3.8-flash`, thinking LOW):** a prompt with facts, language, persona
+   ("RJ-style narrator"), side of road, user interests, and a **per-language word budget**. For 60 s that is about
+   en 190 / kn 115 / Kanglish 145 / hi 170 / Hinglish 175 words; the model's own duration estimate is useless.
+   Output is structured JSON: `{ title, script, factsUsed[] }`. Write numbers as words (Gnani recommendation).
+   Validate with the schema (zod), a **Unicode script-range check** (no Telugu characters in Kannada, etc.), and length.
+   Kanglish = Kannada script + Latin-script English words, which is what Gnani reads best (spike 2).
+   Spell out abbreviations and units ("kilometres", not "km"). Every voice reads "km" wrongly.
+6. **Narrate (Gnani TTS):** Timbre v2.5, mp3 at 48 kHz (always 128 kbps, ≈15.6 KB/s). Retry 5xx. About 5–6 s
+   per 60 s story (spike 1). Measure the real duration from the mp3 for the pack manifest.
+   **Always chunk** the script on sentence boundaries (≤1 800 chars). The REST endpoint fails above about 2 000 chars.
+   Narrate chunks in parallel and concatenate the mp3s into one file per story. A 5-minute "episode" took about
+   25 s sequentially (spike 1, long-form).
 7. **Store:** upload mp3 to object storage, save a `Story` doc (cache key from D2), assemble the pack.
 
 **Runs async:** `POST /trips` creates the trip and returns `202 { tripId, status: "building" }`. The app polls
@@ -154,9 +182,14 @@ ready before the whole pack is. Concurrency is limited per provider (e.g. 4 Gemi
 ### 5.4 Voice Q&A
 `POST /ask` (multipart: audio, tripId, lat, lng, heading, language):
 STT (Prisma, user's language code) → build context (current position, the next/previous few pack items, nearby
-places, facts) → Gemini answer (short, spoken style, ≤40 s) → TTS → return `{ transcript, answerText, audioUrl }`.
-Latency budget: STT ~0.5 s + Gemini ~1–2 s + TTS ~1.5 s ≈ **3–4 s**. If that feels slow, switch the reply to
-Gnani's streaming TTS (SSE).
+places, facts) → Gemini answer (short, spoken style, ≤3 sentences) → TTS → return `{ transcript, answerText, audioUrl }`.
+- **Model: `gemini-3.5-flash-lite`** (thinking MINIMAL). It answers in 1.1–1.5 s, versus 2.7–9.7 s for flash.
+  Kannada-script answers go through the same script check, with a fallback to flash.
+- Measured budget: STT ~0.5 s + LLM ~1.3 s + TTS ~1.7 s ≈ **3.5 s**. If that feels slow, stream the reply
+  (Gemini streaming + Gnani SSE TTS).
+- The answer schema includes `missingData` (`none | nearby_places | route_info | general_knowledge`). When it is
+  `nearby_places`, the server fetches places from Maps and asks again, so the model never guesses restaurants
+  (verified in spike 2).
 **Offline:** Q&A needs the network. When offline, the app plays a pre-generated "I'll answer once we're back in
 coverage" clip, and can still answer "what's next?" from the local pack.
 
@@ -167,10 +200,10 @@ Firebase Auth (email/password) on the client. The backend verifies the Firebase 
 ### 5.6 Data model (MongoDB Atlas)
 | Collection | Key fields | Notes |
 |---|---|---|
-| `users` | firebaseUid, name, gender, language, voice, interests[], heardPlaceIds[] | |
+| `users` | firebaseUid, name, gender, language, voice, interests[], heardPlaceIds[] | `language`/`voice`/`interests` are the **defaults** set at signup |
 | `places` | googlePlaceId, name, location (GeoJSON, 2dsphere), category, facts[{text, source}], prominence, featured? | Shared cache across trips |
 | `stories` | placeId, language, voice, variant, script, audio{url, durationS, bytes}, model versions | Unique index on cache key (D2) |
-| `trips` | userId, source, destination, route{polyline,…}, prefs, status, items[], packVersion | Items reference stories |
+| `trips` | userId, source, destination, route{polyline,…}, prefs{language, voice, interests[], mood, group}, status, items[], packVersion | `prefs` is a snapshot taken at trip start (profile defaults or per-trip overrides) |
 | `businesses` (later) | placeId, plan, pitch, active window, impressions | Revenue: featured discoveries |
 
 ### 5.7 Object storage
@@ -190,6 +223,8 @@ verify in a short hosting spike:
 - **Errors:** typed errors per client (`GnaniError`, `GeminiError`, …) mapped to `{ success:false, error:{code,message} }`.
   Pipeline steps are idempotent and retryable per item, so one failed story doesn't fail the trip.
 - **Resilience:** timeouts on every external call, exponential backoff on 5xx/429, per-provider concurrency limits.
+  Both Gnani (500 "technical difficulties") and Gemini (503 "high demand", 429 quota) fail transiently in practice.
+- **Quota:** a billing-enabled Gemini key is required before slice 1. The current key hits 429 after about 15 calls.
 - **Cost control:** story cache (D2), cap items per trip, and rate-limit `/trips` and `/ask` per user.
 - **Observability:** structured logs with `tripId`/`requestId`, and per-step timing (useful for the demo too).
 - **Security:** keys server-side only, Firebase token verification, request validation (zod), CORS restricted
@@ -218,7 +253,8 @@ video easy to shoot and reliable. Build it as part of slice 2.
 2. **Evon:** not in Gnani's docs. Is it a separate hackathon API? If it's an LLM, compare it against Gemini.
 3. **Places source quality:** does Google Places surface good *historic/cultural* spots along Indian highways, or
    do we need Wikipedia geosearch / a curated seed list for the demo routes? → Maps spike.
-4. **Gemini model choice + JSON reliability in Kannada/code-mixed output** → Gemini spike.
+4. ~~Gemini model choice~~ → resolved in spike 2: flash for stories, flash-lite for Q&A.
+   Still open: behaviour for small places with thin Wikipedia pages, and cost per trip pack.
 5. **Story language style:** pure Kannada vs Kanglish by default? Probably a user setting ("Mixed / Pure").
 6. **Offline map tiles:** is audio-only offline enough for v1 (recommended), or do we need an offline map?
 7. **Real-world STT in a noisy car:** record and test (see spike 1 "Not yet tested").
@@ -226,8 +262,8 @@ video easy to shoot and reliable. Build it as part of slice 2.
 ## 9. Spike status
 | Spike | Status | Key result |
 |---|---|---|
-| Gnani TTS/STT | ✅ Done | All target languages work; ~4 s per 90 s story; mp3 48 kHz; STT ≤30 s; retry 5xx. See `backend/spikes/gnani/FINDINGS.md` |
-| Gemini | ⏳ Next | |
+| Gnani TTS/STT | ✅ Done | All target languages work; ~10× real time; mp3 48 kHz @128 kbps (~37 MB / 40-story pack); STT ≤30 s; retry 5xx. See `backend/spikes/gnani/FINDINGS.md` |
+| Gemini | ✅ Done | flash writes excellent grounded stories in all 5 styles; flash-lite breaks Kannada but is fast for Q&A (~3.5 s end to end); quota is the main risk. See `backend/spikes/gemini/FINDINGS.md` |
 | Google Maps (Routes + Places) | ⏳ | |
 | Auth (Firebase) | ⏳ | |
 | Hosting | ⏳ | |

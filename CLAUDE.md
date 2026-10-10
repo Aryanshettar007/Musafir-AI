@@ -49,3 +49,13 @@ npx tsx spikes/<name>/<script>.ts   # run a spike probe
 - TTS: `POST https://api.vachana.ai/api/v1/tts/inference`, model `timbre-v2.5`, use **mp3 at 48 kHz** (24 kHz mp3 intermittently 500s).
 - STT: `POST https://api.vachana.ai/stt/v3`, **max 30 s audio** (docs wrongly say 60). Use the user's language code, not `en-IN`.
 - Retry 5xx — Gnani returns transient "technical difficulties" errors.
+- mp3 is always 128 kbps (the `bitrate` field is ignored) ≈ 15.6 KB per second of audio.
+- Scripts must spell out numbers AND abbreviations/units ("kilometres", not "km" — every voice mispronounces it).
+- TTS REST fails (generic 500) above ~2 000 chars per request — always chunk scripts on sentence boundaries (≤1 800 chars) and concatenate the mp3s.
+
+## Gemini gotchas (from spike 2, see backend/spikes/gemini/FINDINGS.md)
+- SDK `@google/genai`; env var `GEMINI_API_KEY`. Stories: `gemini-3.8-flash` (thinking `LOW` — it rejects `MINIMAL`). Q&A: `gemini-3.5-flash-lite`.
+- Use `responseMimeType: "application/json"` + `responseJsonSchema: z.toJSONSchema(schema)`, then validate with zod.
+- flash-lite can leak Telugu characters into Kannada — always validate the Unicode script of generated text.
+- Control length with per-language word budgets, not the model's duration estimate.
+- Retry 429/503 with backoff; quota is tight on the free tier.
