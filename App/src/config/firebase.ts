@@ -1,4 +1,7 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
+// @ts-expect-error getReactNativePersistence exists in React Native bundle of firebase/auth
+import { getReactNativePersistence } from 'firebase/auth';
 import {
   initializeAuth,
   getAuth,
@@ -26,11 +29,18 @@ export const firebaseConfig = {
 // Initialize or reuse Firebase App
 const app: FirebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize or reuse Auth with platform-appropriate persistence
+// Initialize or reuse Auth with platform-appropriate persistence (AsyncStorage on native, localStorage on web)
 let auth: Auth;
 try {
+  const persistence =
+    Platform.OS === 'web'
+      ? browserLocalPersistence
+      : typeof getReactNativePersistence === 'function'
+      ? getReactNativePersistence(AsyncStorage)
+      : inMemoryPersistence;
+
   auth = initializeAuth(app, {
-    persistence: Platform.OS === 'web' ? browserLocalPersistence : inMemoryPersistence,
+    persistence,
   });
 } catch {
   auth = getAuth(app);

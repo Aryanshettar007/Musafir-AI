@@ -1,30 +1,31 @@
-import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MultiSelect, Select } from '@/components/ui/select';
+import { auth } from '@/config/firebase';
 import {
   GENDERS,
   INTERESTS,
   PREFERRED_LANGUAGES,
 } from '@/constants/onboarding';
+import { useAuth } from '@/context/auth-context';
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const { user } = useAuth();
 
   const [name, setName] = useState('');
   const [gender, setGender] = useState('Male');
@@ -34,7 +35,26 @@ export default function OnboardingScreen() {
     'Adventure & Trekking',
     'Food & Culinary',
   ]);
-  const [isSpotifyConnected, setIsSpotifyConnected] = useState(false);
+
+  // Log Firebase ID Token as soon as the Onboarding screen mounts
+  useEffect(() => {
+    const logIdToken = async () => {
+      try {
+        const currentUser = user || auth.currentUser;
+        if (currentUser) {
+          const token = await currentUser.getIdToken();
+          console.log('[Onboarding Screen Mount] Firebase UID:', currentUser.uid);
+          console.log('[Onboarding Screen Mount] Firebase ID Token:\n', token);
+        } else {
+          console.log('[Onboarding Screen Mount] No authenticated user found.');
+        }
+      } catch (err) {
+        console.error('[Onboarding Screen Mount] Error fetching Firebase ID Token:', err);
+      }
+    };
+
+    logIdToken();
+  }, [user]);
 
   const toggleInterest = (interest: string) => {
     setSelectedInterests((prev) =>
@@ -44,7 +64,34 @@ export default function OnboardingScreen() {
     );
   };
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
+    let idToken: string | null = null;
+    try {
+      const currentUser = user || auth.currentUser;
+      if (currentUser) {
+        idToken = await currentUser.getIdToken();
+      }
+    } catch (err) {
+      console.warn('[Onboarding Complete] Error fetching Firebase ID Token:', err);
+    }
+
+    const onboardingData = {
+      name: name.trim(),
+      gender,
+      age: age.trim(),
+      preferredAudio: preferredLanguage,
+      interests: selectedInterests,
+    };
+
+    try {
+      await AsyncStorage.setItem('@musafir_user_profile', JSON.stringify(onboardingData));
+    } catch (storageErr) {
+      console.warn('[Onboarding Complete] Error saving to AsyncStorage:', storageErr);
+    }
+
+    console.log('[Onboarding Completed] User Profile Data:', onboardingData);
+    console.log('[Onboarding Completed] Firebase ID Token:\n', idToken);
+
     router.replace('/(tabs)');
   };
 
@@ -118,33 +165,6 @@ export default function OnboardingScreen() {
                   onToggle={toggleInterest}
                 />
 
-                {/* Connect Spotify Button */}
-                <View style={styles.sectionGroup}>
-                  <ThemedText type="small" style={styles.sectionLabel}>
-                    Music & Vibes
-                  </ThemedText>
-                  <Pressable
-                    onPress={() => setIsSpotifyConnected(!isSpotifyConnected)}
-                    style={({ pressed }) => [
-                      styles.spotifyButton,
-                      isSpotifyConnected && styles.spotifyButtonConnected,
-                      pressed && styles.pressed,
-                    ]}>
-                    <Image
-                      source={require('@/assets/images/spotify-logo.png')}
-                      style={styles.spotifyLogo}
-                      contentFit="contain"
-                    />
-                    <Text
-                      style={[
-                        styles.spotifyText,
-                        isSpotifyConnected && styles.spotifyTextConnected,
-                      ]}>
-                      {isSpotifyConnected ? 'Spotify Connected ✓' : 'Connect Spotify'}
-                    </Text>
-                  </Pressable>
-                </View>
-
                 {/* Actions */}
                 <Button
                   variant="default"
@@ -212,44 +232,6 @@ const styles = StyleSheet.create({
   },
   fields: {
     gap: 16,
-  },
-  sectionGroup: {
-    gap: 6,
-  },
-  sectionLabel: {
-    fontWeight: '500',
-    fontSize: 14,
-  },
-  spotifyButton: {
-    height: 44,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#1DB954',
-    backgroundColor: '#1DB95415',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    paddingHorizontal: 16,
-  },
-  spotifyButtonConnected: {
-    backgroundColor: '#1DB95428',
-    borderColor: '#1DB954',
-  },
-  spotifyLogo: {
-    width: 22,
-    height: 22,
-  },
-  spotifyText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1DB954',
-  },
-  spotifyTextConnected: {
-    fontWeight: '700',
-  },
-  pressed: {
-    opacity: 0.8,
   },
   submitButton: {
     marginTop: 8,
