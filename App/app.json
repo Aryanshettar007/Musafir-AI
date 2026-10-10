@@ -10,11 +10,24 @@
     "ios": {
       "bundleIdentifier": "com.musafir.app",
       "icon": "./assets/expo.icon",
-      "googleServicesFile": "./src/config/GoogleService-Info.plist"
+      "googleServicesFile": "./src/config/GoogleService-Info.plist",
+      "infoPlist": {
+        "UIBackgroundModes": ["location", "audio"],
+        "NSLocationWhenInUseUsageDescription": "Musafir AI uses your location to discover nearby travel highlights and trigger audio guides.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Musafir AI needs background location access to trigger audio stories automatically as you travel."
+      }
     },
     "android": {
       "package": "com.musafir.app",
       "googleServicesFile": "./src/config/google-services.json",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -43,6 +56,14 @@
           "ios": {
             "enableSceneSupport": true
           }
+        }
+      ],
+      "expo-audio",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Musafir AI needs background location access to trigger audio stories automatically as you travel.",
+          "isAndroidBackgroundLocationEnabled": true
         }
       ]
     ],
