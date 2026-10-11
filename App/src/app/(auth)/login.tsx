@@ -15,6 +15,7 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/auth-context';
+import { syncUserSignIn } from '@/services/user-service';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -39,7 +40,15 @@ export default function LoginScreen() {
       setLoading(true);
       setErrorMessage(null);
       await signInWithEmail(email, password);
-      router.replace('/(onboarding)');
+
+      // Send request to backend with Firebase ID token (GET /me)
+      const syncResult = await syncUserSignIn();
+
+      if (syncResult.hasProfile) {
+        router.replace('/(tabs)');
+      } else {
+        router.replace('/(onboarding)');
+      }
     } catch (err: any) {
       setErrorMessage(err.message || 'Login failed. Please check your credentials.');
     } finally {

@@ -22,6 +22,7 @@ import * as Location from 'expo-location';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { api, BACKEND_URL } from '@/services/api';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -290,6 +291,49 @@ export default function HomeScreen() {
       tension: 48,
     }).start();
   };
+
+  // Server Health State
+  const [serverHealth, setServerHealth] = useState<'checking' | 'online' | 'offline'>('checking');
+
+  const checkServerHealth = async (showFeedback = false) => {
+    try {
+      if (showFeedback) {
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+      const res = await api.checkHealth();
+      if (res && res.status === 'UP') {
+        setServerHealth('online');
+        if (showFeedback) {
+          Alert.alert(
+            'Server Connected',
+            `Musafir AI Backend is UP.\nUptime: ${Math.round(res.uptime || 0)}s`
+          );
+        }
+      } else {
+        setServerHealth('offline');
+        if (showFeedback) {
+          Alert.alert('Server Status', 'Backend responded with an unexpected status.');
+        }
+      }
+    } catch {
+      setServerHealth('offline');
+      if (showFeedback) {
+        Alert.alert(
+          'Server Offline',
+          `Could not connect to the backend at ${BACKEND_URL}.\n\nMake sure your backend server is running.`
+        );
+      }
+    }
+  };
+
+  // Poll server health on mount and every 20 seconds
+  useEffect(() => {
+    checkServerHealth();
+    const interval = setInterval(() => {
+      checkServerHealth();
+    }, 20000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Fetch initial GPS location on mount
   useEffect(() => {
@@ -666,13 +710,15 @@ export default function HomeScreen() {
 
         {/* TOP FLOATING BRAND BAR */}
         <SafeAreaView edges={['top']} style={styles.floatingTopBar}>
-          <View
-            style={[
+          <Pressable
+            onPress={() => checkServerHealth(true)}
+            style={({ pressed }) => [
               styles.brandPill,
               {
                 backgroundColor: colors.floatingPill,
                 borderColor: colors.floatingPillBorder,
                 borderWidth: isDark ? 1 : 0,
+                opacity: pressed ? 0.8 : 1,
               },
             ]}>
             <View
@@ -683,29 +729,64 @@ export default function HomeScreen() {
               <Ionicons name="navigate" size={13} color={isDark ? '#000000' : '#FFFFFF'} />
             </View>
             <Text style={[styles.brandText, { color: colors.text }]}>Musafir</Text>
-            <View style={styles.statusDot} />
-            <Text style={[styles.statusText, { color: colors.textSecondary }]}>Ready</Text>
-          </View>
+            <View
+              style={[
+                styles.statusDot,
+                {
+                  backgroundColor:
+                    serverHealth === 'online'
+                      ? '#34C759'
+                      : serverHealth === 'checking'
+                      ? '#FF9500'
+                      : '#FF3B30',
+                },
+              ]}
+            />
+            <Text
+              style={[
+                styles.statusText,
+                {
+                  color:
+                    serverHealth === 'online'
+                      ? colors.textSecondary
+                      : serverHealth === 'checking'
+                      ? '#FF9500'
+                      : '#FF3B30',
+                },
+              ]}>
+              {serverHealth === 'online'
+                ? 'Ready'
+                : serverHealth === 'checking'
+                ? 'Connecting...'
+                : 'Offline'}
+            </Text>
+          </Pressable>
         </SafeAreaView>
 
         {/* FLOATING RE-CENTER BUTTON */}
-        <Pressable
-          style={({ pressed }) => [
-            styles.recenterButton,
-            {
-              backgroundColor: colors.recenterBtn,
-              borderColor: colors.cardBorder,
-              borderWidth: isDark ? 1 : 0,
-            },
-            pressed && styles.buttonPressed,
-          ]}
-          onPress={handleRecenter}>
-          {isLoadingLocation ? (
-            <ActivityIndicator size="small" color={colors.recenterIcon} />
-          ) : (
-            <Ionicons name="locate" size={20} color={colors.recenterIcon} />
-          )}
-        </Pressable>
+        <Animated.View
+          style={[
+            styles.recenterButtonWrapper,
+            { bottom: Animated.add(sheetHeight, 14) },
+          ]}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.recenterButton,
+              {
+                backgroundColor: colors.recenterBtn,
+                borderColor: colors.cardBorder,
+                borderWidth: isDark ? 1 : 0,
+              },
+              pressed && styles.buttonPressed,
+            ]}
+            onPress={handleRecenter}>
+            {isLoadingLocation ? (
+              <ActivityIndicator size="small" color={colors.recenterIcon} />
+            ) : (
+              <Ionicons name="locate" size={20} color={colors.recenterIcon} />
+            )}
+          </Pressable>
+        </Animated.View>
       </View>
 
       {/* DRAGGABLE THEMED BOTTOM SHEET */}
@@ -715,7 +796,6 @@ export default function HomeScreen() {
           {
             height: sheetHeight,
             backgroundColor: colors.sheetBg,
-            borderColor: colors.cardBorder,
           },
         ]}>
         {/* DRAG HANDLE ZONE */}
@@ -941,9 +1021,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   mapContainer: {
-    flex: 1,
-    width: '100%',
-    position: 'relative',
+    ...StyleSheet.absoluteFill,
   },
 
   // Floating Top Musafir Brand Bar
@@ -992,11 +1070,13 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // Re-center button
-  recenterButton: {
+  // Re-center button wrapper & button
+  recenterButtonWrapper: {
     position: 'absolute',
-    bottom: 24,
     right: 16,
+    zIndex: 25,
+  },
+  recenterButton: {
     width: 46,
     height: 46,
     borderRadius: 23,
@@ -1007,7 +1087,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 6,
     elevation: 5,
-    zIndex: 10,
   },
 
   // Markers
@@ -1076,18 +1155,19 @@ const styles = StyleSheet.create({
 
   // Bottom Sheet Container
   sheetContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     width: '100%',
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: -5 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 12,
-    overflow: 'hidden',
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    elevation: 16,
+    zIndex: 20,
   },
   dragHandleZone: {
     width: '100%',

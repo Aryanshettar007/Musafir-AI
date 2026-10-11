@@ -166,8 +166,12 @@ describe("catalog", () => {
       gender: "female",
       recommended: true,
       demoUrl: "https://cdn.example/voice-demos/hi-IN/Nalini.mp3?sig=test",
+      avatarUrl: "https://cdn.example/voice-avatars/Nalini.webp?sig=test",
     });
     expect(res.body.data.find((v: { name: string }) => v.name === "Ambuja").demoUrl).toBeNull();
+    expect(res.body.data.find((v: { name: string }) => v.name === "Ambuja").avatarUrl).toBe(
+      "https://cdn.example/voice-avatars/Ambuja.webp?sig=test",
+    );
   });
 
   it("unknown routes return the standard 404 shape", async () => {
