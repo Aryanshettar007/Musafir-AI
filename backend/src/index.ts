@@ -1,3 +1,4 @@
+import os from "os";
 import { env } from "./config/env";
 import { connectDB } from "./config/db";
 import { createStorage } from "./config/storage";
@@ -14,6 +15,18 @@ import { createAskService } from "./services/ask/ask.service";
 import { createSponsorAds } from "./services/sponsor/sponsorAds";
 import { createSponsorProvider } from "./services/sponsor/sponsorProvider";
 import { createTripBuilder } from "./services/trip";
+
+const getLocalIpAddress = (): string | undefined => {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name] || []) {
+      if (iface.family === "IPv4" && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  return undefined;
+};
 
 const startServer = async () => {
   try {
@@ -58,9 +71,13 @@ const startServer = async () => {
       ],
     });
 
-    app.listen(env.PORT, () => {
+    app.listen(env.PORT, "0.0.0.0", () => {
+      const localIp = getLocalIpAddress();
       console.log(`[Server] Server is running on port ${env.PORT}`);
-      console.log(`[Server] API available at http://localhost:${env.PORT}`);
+      console.log(`[Server] Local API:   http://localhost:${env.PORT}`);
+      if (localIp) {
+        console.log(`[Server] Network API: http://${localIp}:${env.PORT}`);
+      }
     });
 
     // Trips still marked "building" (server restarted mid-build) carry on in the background.

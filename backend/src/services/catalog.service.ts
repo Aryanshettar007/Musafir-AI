@@ -22,6 +22,7 @@ export interface VoiceDto {
   recommended: boolean;
   // null when no clip has been uploaded for this voice and language yet.
   demoUrl: string | null;
+  avatarUrl: string | null;
 }
 
 // Voices for the picker: recommended first, then alphabetical.
@@ -29,6 +30,7 @@ export function buildVoiceList(
   language: LanguageId,
   gender: VoiceGender | undefined,
   demoUrls: ReadonlyMap<string, string>,
+  avatarUrls: ReadonlyMap<string, string> = new Map(),
 ): VoiceDto[] {
   return VOICES.filter((v) => !gender || v.gender === gender)
     .map((v) => ({
@@ -36,6 +38,7 @@ export function buildVoiceList(
       gender: v.gender,
       recommended: isRecommended(v.name, language),
       demoUrl: demoUrls.get(v.name) ?? null,
+      avatarUrl: avatarUrls.get(v.name) ?? null,
     }))
     .sort((a, b) => Number(b.recommended) - Number(a.recommended) || a.name.localeCompare(b.name));
 }
@@ -43,5 +46,13 @@ export function buildVoiceList(
 export async function listVoices(language: LanguageId, gender: VoiceGender | undefined, storage: Storage): Promise<VoiceDto[]> {
   const demos = await VoiceDemo.find({ language, ...(gender && { gender }) }, { voice: 1, storageKey: 1 }).lean();
   const urls = new Map(await Promise.all(demos.map(async (d) => [d.voice, await storage.url(d.storageKey)] as const)));
-  return buildVoiceList(language, gender, urls);
+
+  const matchingVoices = VOICES.filter((v) => !gender || v.gender === gender);
+  const avatarUrls = new Map(
+    await Promise.all(
+      matchingVoices.map(async (v) => [v.name, await storage.url(`voice-avatars/${v.name}.webp`)] as const)
+    )
+  );
+
+  return buildVoiceList(language, gender, urls, avatarUrls);
 }

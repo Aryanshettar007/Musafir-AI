@@ -16,6 +16,7 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/auth-context';
+import { syncUserSignIn } from '@/services/user-service';
 
 export default function SignUpScreen() {
   const router = useRouter();
@@ -52,6 +53,10 @@ export default function SignUpScreen() {
       setLoading(true);
       setErrorMessage(null);
       await signUpWithEmail(email, password);
+
+      // Send request to backend with Firebase ID token
+      await syncUserSignIn();
+
       router.replace('/(onboarding)');
     } catch (err: any) {
       setErrorMessage(err.message || 'Registration failed. Please try again.');

@@ -9,16 +9,15 @@ export type Gender = (typeof GENDERS)[number];
 export const PREFERRED_LANGUAGES = [
   'English',
   'Hindi',
-  'Spanish',
-  'French',
-  'German',
-  'Arabic',
-  'Japanese',
-  'Mandarin',
-  'Italian',
-  'Portuguese',
-  'Russian',
+  'Hinglish (Hindi + English)',
+  'Kannada',
+  'Tamil',
+  'Telugu',
+  'Malayalam',
+  'Marathi',
   'Bengali',
+  'Gujarati',
+  'Punjabi',
 ] as const;
 
 export type PreferredLanguage = (typeof PREFERRED_LANGUAGES)[number];
