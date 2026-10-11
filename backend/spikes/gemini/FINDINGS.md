@@ -11,6 +11,11 @@
 - `gemini-3.8-flash` does **not** accept `thinkingLevel: MINIMAL` (400). Use `LOW`.
 - Our key is on a quota-limited tier: `gemini-3.1-pro-preview` → 429 every time; `gemini-3.8-flash` also hit 429
   after ~15 calls in a few minutes, and 503 "high demand" occasionally.
+- **Re-checked 2026-10-10 with `quota-probe.ts`: the key is on the FREE tier.** `gemini-3.8-flash` = **5 requests
+  per minute** (429 on the 7th call in 22 s, quota `GenerateRequestsPerMinutePerProjectPerModel-FreeTier`, value 5,
+  `retryDelay` 44 s). `gemini-3.1-pro` free limit = **0** (not available on free keys at all). flash-lite gave a
+  503 "high demand" after 6 calls (Google-side load, not quota). Daily limits aren't returned by the API; see
+  https://aistudio.google.com/rate-limit. Fix: link a billing account in AI Studio (Tier 1, instant, no minimum).
 
 ## Story writing — one real place (Srirangapatna), facts = 5 000 chars of Wikipedia, target 75 s
 
