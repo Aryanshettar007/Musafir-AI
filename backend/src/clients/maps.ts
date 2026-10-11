@@ -15,9 +15,18 @@ export interface GPlace {
 
 type Waypoint = LatLng | { placeId: string };
 
+export interface RouteOption {
+  id: string;
+  distanceM: number;
+  durationS: number;
+  description: string;
+  polyline: string;
+}
+
 export interface MapsClient {
   // null = Google found no drivable route.
   computeRoute(req: { origin: Waypoint; destination: Waypoint }): Promise<{ distanceM: number; durationS: number; polyline: string } | null>;
+  computeRoutes(req: { origin: Waypoint; destination: Waypoint }): Promise<RouteOption[]>;
   searchNearby(req: { center: LatLng; radiusM: number; includedTypes: string[]; maxResults?: number }): Promise<GPlace[]>;
   searchText(req: {
     query: string;
@@ -34,7 +43,7 @@ export interface MapsClient {
 // The X-Goog-FieldMask header is mandatory and sets the billing SKU: ask only for what we use (no rating or
 // editorialSummary, which move the call to a pricier SKU).
 const PLACE_FIELDS = ["id", "displayName", "location", "primaryType", "types", "userRatingCount"].map((f) => `places.${f}`);
-const ROUTE_MASK = "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline";
+const ROUTE_MASK = "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline,routes.description";
 
 const RawPlace = z.object({
   id: z.string(),
@@ -49,7 +58,14 @@ const PlacesResponse = z.object({ places: z.array(RawPlace).optional(), nextPage
 
 const RoutesResponse = z.object({
   routes: z
-    .array(z.object({ distanceMeters: z.number().optional(), duration: z.string(), polyline: z.object({ encodedPolyline: z.string() }) }))
+    .array(
+      z.object({
+        distanceMeters: z.number().optional(),
+        duration: z.string(),
+        description: z.string().optional(),
+        polyline: z.object({ encodedPolyline: z.string() }),
+      })
+    )
     .optional(),
 });
 
@@ -137,6 +153,28 @@ export function mapsClient(cfg: { apiKey: string }): MapsClient {
   }
 
   return {
+    async computeRoutes({ origin, destination }) {
+      const r = await post(
+        "https://routes.googleapis.com/directions/v2:computeRoutes",
+        ROUTE_MASK,
+        {
+          origin: waypoint(origin),
+          destination: waypoint(destination),
+          travelMode: "DRIVE",
+          computeAlternativeRoutes: true,
+        },
+        RoutesResponse,
+      );
+      if (!r.routes || r.routes.length === 0) return [];
+      return r.routes.map((route, idx) => ({
+        id: `route_${idx}`,
+        distanceM: route.distanceMeters ?? 0,
+        durationS: parseInt(route.duration, 10),
+        description: route.description || (idx === 0 ? "Fastest route" : `Alternative route ${idx}`),
+        polyline: route.polyline.encodedPolyline,
+      }));
+    },
+
     async computeRoute({ origin, destination }) {
       const r = await post(
         "https://routes.googleapis.com/directions/v2:computeRoutes",

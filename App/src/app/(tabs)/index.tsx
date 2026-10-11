@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -20,9 +20,28 @@ import { Image as ExpoImage } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import MapView, { Marker, Polyline } from 'react-native-maps';
+import { useRouter } from 'expo-router';
+import * as Crypto from 'expo-crypto';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { api, BACKEND_URL } from '@/services/api';
+import {
+  getRecentTrips,
+  startTrip,
+  previewRoutes,
+  decodePolyline,
+  PlaceSuggestion,
+  TripSummary,
+  RouteOption,
+} from '@/services/trip-service';
+import {
+  SourceDestinationSearch,
+  SourceDestinationSearchRef,
+  LocationPoint,
+} from '@/components/source-destination-search';
+import { AudioLanguageSheetModal } from '@/components/ui/audio-language-sheet';
+import { mapLanguage, mapLanguageToLabel, updateProfileOnBackend } from '@/services/user-service';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -31,6 +50,34 @@ const MIN_SHEET_HEIGHT = 280;
 const COLLAPSED_SHEET_HEIGHT = Math.min(SCREEN_HEIGHT * 0.52, 440);
 const EXPANDED_SHEET_HEIGHT = Math.min(SCREEN_HEIGHT * 0.85, 720);
 
+// Calculates map center latitude offset so the location marker sits in the visual center
+// of the visible map area above the collapsed bottom sheet.
+function getVisibleCenterLatitude(
+  latitude: number,
+  latitudeDelta: number,
+  sheetHeightPx: number = COLLAPSED_SHEET_HEIGHT
+): number {
+  const offsetRatio = sheetHeightPx / (2 * SCREEN_HEIGHT);
+  return latitude - latitudeDelta * offsetRatio;
+}
+
+// Calculates representative coordinate along route to display floating badge
+function getRouteBadgeCoord(
+  points: { latitude: number; longitude: number }[],
+  routeIndex: number,
+  totalRoutes: number
+): { latitude: number; longitude: number } | null {
+  if (!points || points.length === 0) return null;
+  if (totalRoutes <= 1) {
+    return points[Math.floor(points.length * 0.5)];
+  }
+  // Offset badge placement along route paths so multiple routes don't overlap badges
+  const fractions = [0.46, 0.56, 0.38, 0.64];
+  const fraction = fractions[routeIndex % fractions.length];
+  const idx = Math.min(Math.max(Math.floor(points.length * fraction), 0), points.length - 1);
+  return points[idx];
+}
+
 // Default fallback coordinates (Bengaluru central location)
 const DEFAULT_COORDS = {
   latitude: 12.9716,
@@ -38,16 +85,6 @@ const DEFAULT_COORDS = {
   latitudeDelta: 0.04,
   longitudeDelta: 0.04,
 };
-
-interface RecentPlace {
-  id: string;
-  title: string;
-  address: string;
-  distance: string;
-  icon: 'time-outline' | 'airplane-outline' | 'briefcase-outline' | 'business-outline' | 'cafe-outline';
-  latitude: number;
-  longitude: number;
-}
 
 interface CreatorPack {
   id: string;
@@ -59,11 +96,7 @@ interface CreatorPack {
   category: string;
 }
 
-interface LocationPoint {
-  text: string;
-  coords: { latitude: number; longitude: number } | null;
-  isGps: boolean;
-}
+
 
 const CREATOR_PACKS: CreatorPack[] = [
   {
@@ -113,77 +146,46 @@ const CREATOR_PACKS: CreatorPack[] = [
   },
 ];
 
-const RECENT_DESTINATIONS: RecentPlace[] = [
-  {
-    id: '1',
-    title: "Kempegowda Int'l Airport (BLR)",
-    address: 'KIAL Rd, Devanahalli, Bengaluru',
-    distance: '34 km',
-    icon: 'airplane-outline',
-    latitude: 13.1986,
-    longitude: 77.7066,
-  },
-  {
-    id: '2',
-    title: 'Indiranagar 100ft Road',
-    address: '12th Main Rd, HAL 2nd Stage',
-    distance: '4.8 km',
-    icon: 'time-outline',
-    latitude: 12.9784,
-    longitude: 77.6408,
-  },
-  {
-    id: '3',
-    title: 'UB City',
-    address: '24, Vittal Mallya Rd, KG Halli',
-    distance: '2.1 km',
-    icon: 'business-outline',
-    latitude: 12.9719,
-    longitude: 77.5956,
-  },
-  {
-    id: '4',
-    title: 'Koramangala 4th Block',
-    address: '80 Feet Rd, ST Bed, Koramangala',
-    distance: '6.5 km',
-    icon: 'cafe-outline',
-    latitude: 12.9345,
-    longitude: 77.6264,
-  },
-  {
-    id: '5',
-    title: 'Work (Tech Park)',
-    address: 'Outer Ring Rd, Bellandur',
-    distance: '11.2 km',
-    icon: 'briefcase-outline',
-    latitude: 12.926,
-    longitude: 77.6762,
-  },
-  {
-    id: '6',
-    title: 'Bangalore Palace',
-    address: 'Vasanth Nagar, Bengaluru',
-    distance: '3.9 km',
-    icon: 'business-outline',
-    latitude: 12.9988,
-    longitude: 77.5921,
-  },
-  {
-    id: '7',
-    title: 'Lalbagh Botanical Garden',
-    address: 'Mavalli, Bengaluru',
-    distance: '4.5 km',
-    icon: 'time-outline',
-    latitude: 12.9507,
-    longitude: 77.5848,
-  },
-];
+
 
 export default function HomeScreen() {
   const scheme = useColorScheme();
   const isDark = scheme === 'dark';
+  const router = useRouter();
 
   const mapRef = useRef<MapView>(null);
+
+  // Selected place suggestions (destination & source)
+  const [selectedSuggestion, setSelectedSuggestion] = useState<PlaceSuggestion | null>(null);
+  const [selectedSourceSuggestion, setSelectedSourceSuggestion] = useState<PlaceSuggestion | null>(null);
+  const searchRef = useRef<SourceDestinationSearchRef>(null);
+
+  // Alternative Route Options state
+  const [availableRoutes, setAvailableRoutes] = useState<RouteOption[]>([]);
+  const [selectedRouteIndex, setSelectedRouteIndex] = useState<number>(0);
+  const [isLoadingRoutes, setIsLoadingRoutes] = useState<boolean>(false);
+
+  // Synchronized refs to guarantee access to the newest values across closures
+  const availableRoutesRef = useRef<RouteOption[]>([]);
+  availableRoutesRef.current = availableRoutes;
+  const selectedRouteIndexRef = useRef<number>(0);
+  selectedRouteIndexRef.current = selectedRouteIndex;
+
+  // Decoded coordinates cache for all available route polylines
+  const decodedPointsMap = React.useMemo(() => {
+    const map: Record<string, { latitude: number; longitude: number }[]> = {};
+    for (const r of availableRoutes) {
+      map[r.id] = decodePolyline(r.polyline);
+    }
+    return map;
+  }, [availableRoutes]);
+
+  // Recent trips from server
+  const [recentTrips, setRecentTrips] = useState<TripSummary[]>([]);
+  const [isLoadingRecent, setIsLoadingRecent] = useState(false);
+
+  // Trip start loading
+  const [isStartingTrip, setIsStartingTrip] = useState(false);
 
   // Theme-tailored Color Palette
   const colors = {
@@ -228,6 +230,12 @@ export default function HomeScreen() {
   // Toggle view all recent destinations
   const [showAllDestinations, setShowAllDestinations] = useState<boolean>(false);
 
+  // User Audio Preferences
+  const [preferredAudio, setPreferredAudio] = useState<string>('English');
+  const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
+  const [voice, setVoice] = useState<string>('Nalini');
+  const [isAudioModalVisible, setIsAudioModalVisible] = useState<boolean>(false);
+
   // DRAGGABLE SHEET ANIMATION & PAN RESPONDER
   const sheetHeight = useRef(new Animated.Value(COLLAPSED_SHEET_HEIGHT)).current;
   const currentHeightRef = useRef<number>(COLLAPSED_SHEET_HEIGHT);
@@ -237,6 +245,8 @@ export default function HomeScreen() {
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dy) > 4,
       onPanResponderGrant: () => {
+        Keyboard.dismiss();
+        searchRef.current?.dismissSuggestions();
         sheetHeight.stopAnimation((val) => {
           currentHeightRef.current = val;
         });
@@ -335,6 +345,171 @@ export default function HomeScreen() {
     return () => clearInterval(interval);
   }, []);
 
+  // Load recent trips from server
+  const loadRecentTrips = useCallback(async () => {
+    try {
+      setIsLoadingRecent(true);
+      const trips = await getRecentTrips(10);
+      setRecentTrips(trips);
+    } catch {
+      // Silently fail — not critical
+    } finally {
+      setIsLoadingRecent(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadRecentTrips();
+  }, [loadRecentTrips]);
+
+  // Load user audio preferences from local storage on mount
+  useEffect(() => {
+    async function loadAudioPreferences() {
+      try {
+        const raw = await AsyncStorage.getItem('@musafir_user_profile');
+        if (raw) {
+          const data = JSON.parse(raw);
+          if (data.preferredAudio) setPreferredAudio(mapLanguageToLabel(data.preferredAudio));
+          if (data.voiceGender) setVoiceGender(data.voiceGender);
+          if (data.voice) setVoice(data.voice);
+        }
+      } catch {
+        // Non-critical background read
+      }
+    }
+    loadAudioPreferences();
+  }, []);
+
+  // Expand bottom sheet when user focuses on either source or destination input
+  const handleFocusField = useCallback(() => {
+    if (currentHeightRef.current < EXPANDED_SHEET_HEIGHT - 30) {
+      currentHeightRef.current = EXPANDED_SHEET_HEIGHT;
+      Animated.spring(sheetHeight, {
+        toValue: EXPANDED_SHEET_HEIGHT,
+        useNativeDriver: false,
+        friction: 8,
+        tension: 48,
+      }).start();
+    }
+  }, [sheetHeight]);
+
+  // Select a source autocomplete suggestion
+  const handleSelectSourceSuggestion = useCallback((suggestion: PlaceSuggestion) => {
+    setSelectedSourceSuggestion(suggestion);
+    setSourcePoint({ text: suggestion.primaryText, coords: null, isGps: false });
+  }, []);
+
+  // Select a destination autocomplete suggestion
+  const handleSelectDestinationSuggestion = useCallback((suggestion: PlaceSuggestion) => {
+    setSelectedSuggestion(suggestion);
+    setDestinationPoint({ text: suggestion.primaryText, coords: null, isGps: false });
+  }, []);
+
+  // Handle route selection (via card or map polyline tap)
+  const handleSelectRoute = useCallback(
+    (index: number) => {
+      Haptics.selectionAsync();
+      setSelectedRouteIndex(index);
+      selectedRouteIndexRef.current = index;
+      const routes = availableRoutesRef.current.length > 0 ? availableRoutesRef.current : availableRoutes;
+      const route = routes[index];
+      if (route) {
+        const points = decodedPointsMap[route.id] || decodePolyline(route.polyline);
+        if (points.length > 0) {
+          const destCoord = points[points.length - 1];
+          setDestinationPoint((prev) => ({ ...prev, coords: destCoord }));
+          mapRef.current?.fitToCoordinates(points, {
+            edgePadding: { top: 90, right: 60, bottom: 260, left: 60 },
+            animated: true,
+          });
+        }
+      }
+    },
+    [availableRoutes, decodedPointsMap]
+  );
+
+  // Start trip via POST /trips
+  const handleStartTrip = useCallback(async () => {
+    if (!selectedSuggestion) {
+      Alert.alert('Choose a destination', 'Pick a destination from the suggestions first.');
+      return;
+    }
+    const origin = selectedSourceSuggestion
+      ? { placeId: selectedSourceSuggestion.placeId, label: selectedSourceSuggestion.primaryText }
+      : sourcePoint.isGps && deviceGpsCoords
+      ? { lat: deviceGpsCoords.latitude, lng: deviceGpsCoords.longitude, label: 'Current location' }
+      : sourcePoint.coords
+      ? { lat: sourcePoint.coords.latitude, lng: sourcePoint.coords.longitude, label: sourcePoint.text }
+      : null;
+
+    if (!origin) {
+      Alert.alert('No starting point', 'Enable GPS or choose a starting location.');
+      return;
+    }
+
+    try {
+      setIsStartingTrip(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      const currentIndex = selectedRouteIndexRef.current;
+      const currentRoutes = availableRoutesRef.current.length > 0 ? availableRoutesRef.current : availableRoutes;
+      const chosenRoute = currentRoutes[currentIndex];
+      console.log(`[handleStartTrip] Starting trip with route #${currentIndex}:`, chosenRoute?.description, chosenRoute?.distanceM);
+      const { tripId } = await startTrip({
+        origin,
+        destination: { placeId: selectedSuggestion.placeId, label: selectedSuggestion.primaryText },
+        selectedRoute: chosenRoute
+          ? {
+              polyline: chosenRoute.polyline,
+              distanceM: chosenRoute.distanceM,
+              durationS: chosenRoute.durationS,
+              description: chosenRoute.description,
+            }
+          : undefined,
+        prefs: {
+          language: mapLanguage(preferredAudio),
+          voiceGender,
+          voice,
+        },
+      });
+      router.push(`/trip/${tripId}`);
+    } catch (err: any) {
+      const code = err?.response?.data?.error?.code ?? '';
+      const details = err?.response?.data?.error?.details;
+      if (code === 'TRIP_IN_PROGRESS' && details?.tripId) {
+        Alert.alert(
+          'Trip In Progress',
+          'You have a trip already being built. Opening it now.',
+          [{ text: 'Open', onPress: () => router.push(`/trip/${details.tripId}`) }]
+        );
+      } else if (code === 'TRIP_LIMIT_REACHED') {
+        Alert.alert('Limit Reached', 'You have started too many trips today. Try again later.');
+      } else if (code === 'ROUTE_NOT_FOUND') {
+        Alert.alert('No Route', 'Could not find a drivable route to that destination.');
+      } else if (code === 'ROUTE_TOO_LONG') {
+        Alert.alert('Route Too Long', 'That destination is more than 1,200 km away.');
+      } else if (code === 'PROFILE_NOT_FOUND') {
+        router.replace('/(onboarding)');
+      } else if (code === 'UPSTREAM_UNAVAILABLE') {
+        Alert.alert('Service Unavailable', 'Our routing service is temporarily down. Please try again.');
+      } else {
+        Alert.alert('Could not start trip', err?.message ?? 'Something went wrong. Please try again.');
+      }
+    } finally {
+      setIsStartingTrip(false);
+    }
+  }, [
+    selectedSuggestion,
+    selectedSourceSuggestion,
+    sourcePoint,
+    deviceGpsCoords,
+    availableRoutes,
+    selectedRouteIndex,
+    preferredAudio,
+    voiceGender,
+    voice,
+    router,
+  ]);
+
   // Fetch initial GPS location on mount
   useEffect(() => {
     fetchCurrentLocation();
@@ -389,7 +564,7 @@ export default function HomeScreen() {
 
       mapRef.current?.animateToRegion(
         {
-          latitude: current.latitude,
+          latitude: getVisibleCenterLatitude(current.latitude, 0.018),
           longitude: current.longitude,
           latitudeDelta: 0.018,
           longitudeDelta: 0.018,
@@ -411,7 +586,7 @@ export default function HomeScreen() {
     if (deviceGpsCoords) {
       mapRef.current?.animateToRegion(
         {
-          latitude: deviceGpsCoords.latitude,
+          latitude: getVisibleCenterLatitude(deviceGpsCoords.latitude, 0.015, currentHeightRef.current),
           longitude: deviceGpsCoords.longitude,
           latitudeDelta: 0.015,
           longitudeDelta: 0.015,
@@ -437,6 +612,7 @@ export default function HomeScreen() {
       return;
     }
 
+    setSelectedSourceSuggestion(null);
     const nextSource: LocationPoint = {
       text: deviceGpsAddress,
       coords: deviceGpsCoords,
@@ -446,13 +622,14 @@ export default function HomeScreen() {
 
     if (deviceGpsCoords && destinationPoint.coords) {
       mapRef.current?.fitToCoordinates([deviceGpsCoords, destinationPoint.coords], {
-        edgePadding: { top: 90, right: 60, bottom: 90, left: 60 },
+        edgePadding: { top: 90, right: 60, bottom: 280, left: 60 },
         animated: true,
       });
     } else if (deviceGpsCoords) {
       mapRef.current?.animateToRegion(
         {
-          ...deviceGpsCoords,
+          latitude: getVisibleCenterLatitude(deviceGpsCoords.latitude, 0.015, currentHeightRef.current),
+          longitude: deviceGpsCoords.longitude,
           latitudeDelta: 0.015,
           longitudeDelta: 0.015,
         },
@@ -475,6 +652,7 @@ export default function HomeScreen() {
       return;
     }
 
+    setSelectedSuggestion(null);
     const nextDest: LocationPoint = {
       text: deviceGpsAddress,
       coords: deviceGpsCoords,
@@ -484,13 +662,14 @@ export default function HomeScreen() {
 
     if (sourcePoint.coords && deviceGpsCoords) {
       mapRef.current?.fitToCoordinates([sourcePoint.coords, deviceGpsCoords], {
-        edgePadding: { top: 90, right: 60, bottom: 90, left: 60 },
+        edgePadding: { top: 90, right: 60, bottom: 280, left: 60 },
         animated: true,
       });
     } else if (deviceGpsCoords) {
       mapRef.current?.animateToRegion(
         {
-          ...deviceGpsCoords,
+          latitude: getVisibleCenterLatitude(deviceGpsCoords.latitude, 0.015, currentHeightRef.current),
+          longitude: deviceGpsCoords.longitude,
           latitudeDelta: 0.015,
           longitudeDelta: 0.015,
         },
@@ -511,9 +690,14 @@ export default function HomeScreen() {
     // Direct clean swap of both states
     const newSource = { ...destinationPoint };
     const newDestination = { ...sourcePoint };
+    const prevSourceSug = selectedSourceSuggestion;
+    const prevDestSug = selectedSuggestion;
 
     setSourcePoint(newSource);
     setDestinationPoint(newDestination);
+    setSelectedSourceSuggestion(prevDestSug);
+    setSelectedSuggestion(prevSourceSug);
+    setAvailableRoutes([]);
 
     // Reframe map camera to the new route
     if (newSource.coords && newDestination.coords) {
@@ -542,42 +726,20 @@ export default function HomeScreen() {
     }
   };
 
-  // Select a destination from recent places
-  const handleSelectDestination = (place: RecentPlace) => {
-    Haptics.selectionAsync();
-    Keyboard.dismiss();
-
-    // Prevent selecting the same place as source
-    const placeCoords = { latitude: place.latitude, longitude: place.longitude };
-    if (
-      sourcePoint.coords &&
-      Math.abs(sourcePoint.coords.latitude - place.latitude) < 0.0001 &&
-      Math.abs(sourcePoint.coords.longitude - place.longitude) < 0.0001
-    ) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      Alert.alert(
-        'Same Location',
-        `"${place.title}" is already selected as your starting point.`
-      );
-      return;
-    }
-
-    const nextDestination: LocationPoint = {
-      text: place.title,
-      coords: placeCoords,
+  // Clear source input
+  const handleClearSource = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSourcePoint({
+      text: '',
+      coords: null,
       isGps: false,
-    };
-    setDestinationPoint(nextDestination);
-
-    if (sourcePoint.coords) {
-      mapRef.current?.fitToCoordinates([sourcePoint.coords, placeCoords], {
-        edgePadding: { top: 90, right: 60, bottom: 90, left: 60 },
-        animated: true,
-      });
-    } else {
+    });
+    setSelectedSourceSuggestion(null);
+    setAvailableRoutes([]);
+    if (destinationPoint.coords) {
       mapRef.current?.animateToRegion(
         {
-          ...placeCoords,
+          ...destinationPoint.coords,
           latitudeDelta: 0.018,
           longitudeDelta: 0.018,
         },
@@ -594,6 +756,8 @@ export default function HomeScreen() {
       coords: null,
       isGps: false,
     });
+    setSelectedSuggestion(null);
+    setAvailableRoutes([]);
     if (sourcePoint.coords) {
       mapRef.current?.animateToRegion(
         {
@@ -623,6 +787,71 @@ export default function HomeScreen() {
     }
   };
 
+  // Automatically fetch route alternatives when both source and destination are set
+  useEffect(() => {
+    let isCancelled = false;
+
+    if (!selectedSuggestion) {
+      setAvailableRoutes([]);
+      return;
+    }
+
+    const origin = selectedSourceSuggestion
+      ? { placeId: selectedSourceSuggestion.placeId }
+      : sourcePoint.coords
+      ? { lat: sourcePoint.coords.latitude, lng: sourcePoint.coords.longitude }
+      : sourcePoint.isGps && deviceGpsCoords
+      ? { lat: deviceGpsCoords.latitude, lng: deviceGpsCoords.longitude }
+      : null;
+
+    if (!origin) return;
+
+    async function loadRoutes() {
+      try {
+        setIsLoadingRoutes(true);
+        const routes = await previewRoutes({
+          origin: origin!,
+          destination: { placeId: selectedSuggestion!.placeId },
+        });
+        if (isCancelled) return;
+        setAvailableRoutes(routes);
+        setSelectedRouteIndex(0);
+
+        if (routes.length > 0 && routes[0].polyline) {
+          const points = decodePolyline(routes[0].polyline);
+          if (points.length > 0) {
+            setDestinationPoint((prev) => ({ ...prev, coords: points[points.length - 1] }));
+            setSourcePoint((prev) => (prev.isGps ? prev : { ...prev, coords: points[0] }));
+            mapRef.current?.fitToCoordinates(points, {
+              edgePadding: { top: 90, right: 60, bottom: 260, left: 60 },
+              animated: true,
+            });
+          }
+        }
+      } catch (err) {
+        if (!isCancelled) {
+          console.warn('Could not preview routes:', err);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingRoutes(false);
+        }
+      }
+    }
+
+    loadRoutes();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [
+    selectedSuggestion,
+    selectedSourceSuggestion,
+    sourcePoint.coords,
+    sourcePoint.isGps,
+    deviceGpsCoords,
+  ]);
+
   // Handle Creator Pack preview tap
   const handleCreatorPackPress = (pack: CreatorPack) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -633,15 +862,18 @@ export default function HomeScreen() {
   };
 
   const currentRegion = {
-    latitude: sourcePoint.coords?.latitude ?? deviceGpsCoords?.latitude ?? DEFAULT_COORDS.latitude,
+    latitude: getVisibleCenterLatitude(
+      sourcePoint.coords?.latitude ?? deviceGpsCoords?.latitude ?? DEFAULT_COORDS.latitude,
+      DEFAULT_COORDS.latitudeDelta
+    ),
     longitude: sourcePoint.coords?.longitude ?? deviceGpsCoords?.longitude ?? DEFAULT_COORDS.longitude,
     latitudeDelta: DEFAULT_COORDS.latitudeDelta,
     longitudeDelta: DEFAULT_COORDS.longitudeDelta,
   };
 
-  const displayedDestinations = showAllDestinations
-    ? RECENT_DESTINATIONS
-    : RECENT_DESTINATIONS.slice(0, 3);
+  const displayedTrips = showAllDestinations
+    ? recentTrips
+    : recentTrips.slice(0, 3);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -653,14 +885,18 @@ export default function HomeScreen() {
           initialRegion={currentRegion}
           showsUserLocation={false}
           showsCompass={false}
-          showsMyLocationButton={false}>
+          showsMyLocationButton={false}
+          onPress={() => {
+            Keyboard.dismiss();
+            searchRef.current?.dismissSuggestions();
+          }}>
           {/* SOURCE MARKER */}
           {sourcePoint.coords && (
             <Marker
               coordinate={sourcePoint.coords}
               title={sourcePoint.text || 'Starting point'}
               anchor={{ x: 0.5, y: sourcePoint.isGps ? 0.5 : 1 }}
-              centerOffset={{ x: 0, y: sourcePoint.isGps ? 0 : -19 }}>
+              centerOffset={{ x: 0, y: 0 }}>
               {sourcePoint.isGps ? (
                 <View style={styles.pickupMarkerOuter}>
                   <View style={styles.pickupMarkerInner} />
@@ -682,7 +918,7 @@ export default function HomeScreen() {
               coordinate={destinationPoint.coords}
               title={destinationPoint.text || 'Destination'}
               anchor={{ x: 0.5, y: destinationPoint.isGps ? 0.5 : 1 }}
-              centerOffset={{ x: 0, y: destinationPoint.isGps ? 0 : -19 }}>
+              centerOffset={{ x: 0, y: 0 }}>
               {destinationPoint.isGps ? (
                 <View style={styles.pickupMarkerOuter}>
                   <View style={styles.pickupMarkerInner} />
@@ -698,14 +934,108 @@ export default function HomeScreen() {
             </Marker>
           )}
 
-          {/* ROUTE POLYLINE */}
-          {sourcePoint.coords && destinationPoint.coords && (
+          {/* ROUTE ALTERNATIVES POLYLINES (BACKGROUND / UNSELECTED) */}
+          {availableRoutes.map((route, index) => {
+            if (index === selectedRouteIndex) return null;
+            const points = decodedPointsMap[route.id] || [];
+            if (points.length === 0) return null;
+            return (
+              <Polyline
+                key={route.id}
+                coordinates={points}
+                strokeColor={isDark ? '#7BAAF7' : '#8AB4F8'}
+                strokeWidth={5}
+                zIndex={2}
+                tappable={true}
+                onPress={() => {
+                  handleSelectRoute(index);
+                }}
+              />
+            );
+          })}
+
+          {/* SELECTED ACTIVE ROUTE POLYLINE (ON TOP) */}
+          {availableRoutes.length > 0 && availableRoutes[selectedRouteIndex] && (
+            <Polyline
+              key={`selected_${availableRoutes[selectedRouteIndex].id}`}
+              coordinates={decodedPointsMap[availableRoutes[selectedRouteIndex].id] || []}
+              strokeColor="#1A73E8"
+              strokeWidth={6}
+              zIndex={10}
+            />
+          )}
+
+          {/* FALLBACK STRAIGHT LINE IF NO ROUTES LOADED YET */}
+          {availableRoutes.length === 0 && sourcePoint.coords && destinationPoint.coords && (
             <Polyline
               coordinates={[sourcePoint.coords, destinationPoint.coords]}
               strokeColor="#1A73E8"
-              strokeWidth={5}
+              strokeWidth={4}
             />
           )}
+
+          {/* FLOATING ROUTE DURATION & DISTANCE BADGES ON THE MAP */}
+          {availableRoutes.map((route, index) => {
+            const points = decodedPointsMap[route.id] || [];
+            if (points.length === 0) return null;
+            const badgeCoord = getRouteBadgeCoord(points, index, availableRoutes.length);
+            if (!badgeCoord) return null;
+
+            const isSelected = index === selectedRouteIndex;
+            const durationMin = Math.max(1, Math.round(route.durationS / 60));
+            const distanceKm = (route.distanceM / 1000).toFixed(1);
+
+            return (
+              <Marker
+                key={`badge_${route.id}`}
+                coordinate={badgeCoord}
+                anchor={{ x: 0.5, y: 0.5 }}
+                zIndex={isSelected ? 50 : 30}
+                tracksViewChanges={false}
+                onPress={() => handleSelectRoute(index)}>
+                <View
+                  style={[
+                    styles.mapRouteBadge,
+                    isSelected
+                      ? styles.mapRouteBadgeSelected
+                      : [
+                          styles.mapRouteBadgeUnselected,
+                          {
+                            backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
+                            borderColor: isDark ? '#7BAAF7' : '#93C5FD',
+                          },
+                        ],
+                  ]}>
+                  <Ionicons
+                    name="car"
+                    size={12}
+                    color={isSelected ? '#FFFFFF' : isDark ? '#93C5FD' : '#1A73E8'}
+                  />
+                  <Text
+                    style={[
+                      styles.mapRouteBadgeDuration,
+                      { color: isSelected ? '#FFFFFF' : isDark ? '#F1F5F9' : '#1E293B' },
+                    ]}>
+                    {durationMin} min
+                  </Text>
+                  <Text
+                    style={[
+                      styles.mapRouteBadgeDot,
+                      { color: isSelected ? 'rgba(255,255,255,0.7)' : colors.textSecondary },
+                    ]}>
+                    •
+                  </Text>
+                  <Text
+                    style={[
+                      styles.mapRouteBadgeDistance,
+                      { color: isSelected ? 'rgba(255,255,255,0.9)' : colors.textSecondary },
+                    ]}>
+                    {distanceKm} km
+                  </Text>
+                </View>
+              </Marker>
+            );
+          })}
         </MapView>
 
         {/* TOP FLOATING BRAND BAR */}
@@ -763,6 +1093,70 @@ export default function HomeScreen() {
           </Pressable>
         </SafeAreaView>
 
+        {/* FLOATING ROUTE SUMMARY BAR ON MAP */}
+        {availableRoutes.length > 0 && availableRoutes[selectedRouteIndex] && (
+          <Animated.View
+            style={[
+              styles.floatingRouteBarWrapper,
+              { bottom: Animated.add(sheetHeight, 14) },
+            ]}>
+            <Pressable
+              onPress={() => {
+                if (availableRoutes.length > 1) {
+                  const nextIdx = (selectedRouteIndex + 1) % availableRoutes.length;
+                  handleSelectRoute(nextIdx);
+                }
+              }}
+              style={({ pressed }) => [
+                styles.floatingRouteBar,
+                {
+                  backgroundColor: colors.sheetBg,
+                  borderColor: colors.cardBorder,
+                  borderWidth: isDark ? 1 : 0,
+                },
+                pressed && styles.buttonPressed,
+              ]}>
+              <View style={styles.floatingRouteBarLeft}>
+                <View
+                  style={[
+                    styles.floatingRouteBarIconCircle,
+                    { backgroundColor: isDark ? '#1E293B' : '#EBF3FF' },
+                  ]}>
+                  <Ionicons name="navigate" size={13} color="#1A73E8" />
+                </View>
+                <View style={styles.floatingRouteBarTexts}>
+                  <View style={styles.floatingRouteBarMainRow}>
+                    <Text style={[styles.floatingRouteBarDuration, { color: colors.text }]}>
+                      {Math.max(1, Math.round(availableRoutes[selectedRouteIndex].durationS / 60))} min
+                    </Text>
+                    <Text style={[styles.floatingRouteBarDistance, { color: colors.textSecondary }]}>
+                      • {(availableRoutes[selectedRouteIndex].distanceM / 1000).toFixed(1)} km
+                    </Text>
+                  </View>
+                  {availableRoutes[selectedRouteIndex].description ? (
+                    <Text
+                      style={[styles.floatingRouteBarDesc, { color: colors.textSecondary }]}
+                      numberOfLines={1}>
+                      via {availableRoutes[selectedRouteIndex].description}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+              {availableRoutes.length > 1 && (
+                <View
+                  style={[
+                    styles.floatingRouteCountPill,
+                    { backgroundColor: isDark ? '#222328' : '#F2F2F7' },
+                  ]}>
+                  <Text style={[styles.floatingRouteCountText, { color: colors.accent }]}>
+                    Option {selectedRouteIndex + 1}/{availableRoutes.length}
+                  </Text>
+                </View>
+              )}
+            </Pressable>
+          </Animated.View>
+        )}
+
         {/* FLOATING RE-CENTER BUTTON */}
         <Animated.View
           style={[
@@ -809,160 +1203,144 @@ export default function HomeScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.scrollContent}>
-          {/* SEARCH INPUT CARD WITH SWAP BUTTON */}
-          <View style={[styles.searchCard, { backgroundColor: colors.surfaceAlt }]}>
-            {/* ROUTE CONNECTOR ICONS */}
-            <View style={styles.connectorContainer}>
-              <View style={[styles.originDot, { backgroundColor: colors.originDot }]} />
-              <View style={[styles.connectorLine, { backgroundColor: colors.divider }]} />
-              <View style={[styles.destinationSquare, { backgroundColor: colors.destSquare }]} />
+          {/* SOURCE-DESTINATION SEARCH COMPONENT */}
+          <SourceDestinationSearch
+            ref={searchRef}
+            sourcePoint={sourcePoint}
+            destinationPoint={destinationPoint}
+            deviceGpsCoords={deviceGpsCoords}
+            preferredAudio={preferredAudio}
+            voice={voice}
+            onPressAudioPreference={() => setIsAudioModalVisible(true)}
+            onSourceTextChange={(text) => {
+              setSelectedSourceSuggestion(null);
+              setSourcePoint({ text, coords: null, isGps: false });
+            }}
+            onDestinationTextChange={(text) => {
+              setSelectedSuggestion(null);
+              setDestinationPoint({ text, coords: null, isGps: false });
+            }}
+            onSelectSourceSuggestion={handleSelectSourceSuggestion}
+            onSelectDestinationSuggestion={handleSelectDestinationSuggestion}
+            onSetSourceToGps={handleSetSourceToGps}
+            onSetDestinationToGps={handleSetDestinationToGps}
+            onClearSource={handleClearSource}
+            onClearDestination={handleClearDestination}
+            onSwapLocations={handleSwapLocations}
+            onFocusField={handleFocusField}
+          />
+
+          {/* ROUTE LOADING STATE */}
+          {isLoadingRoutes && (
+            <View style={[styles.routeLoadingCard, { backgroundColor: colors.surfaceAlt }]}>
+              <ActivityIndicator size="small" color={colors.accent} />
+              <Text style={[styles.routeLoadingText, { color: colors.textSecondary }]}>
+                Finding best routes...
+              </Text>
             </View>
+          )}
 
-            {/* INPUT FIELDS */}
-            <View style={styles.inputsColumn}>
-              {/* SOURCE / STARTING LOCATION ROW */}
-              <View style={styles.inputRow}>
-                <TextInput
-                  style={[styles.textInput, { color: colors.text }]}
-                  value={sourcePoint.text}
-                  onChangeText={(text) => {
-                    setSourcePoint({
-                      text,
-                      coords: null,
-                      isGps: false,
-                    });
-                  }}
-                  placeholder="Choose starting point"
-                  placeholderTextColor={colors.placeholder}
-                  returnKeyType="done"
-                />
-                {!sourcePoint.isGps && (
-                  <Pressable
-                    hitSlop={8}
-                    style={[
-                      styles.inputActionBtn,
-                      { backgroundColor: isDark ? '#2E3036' : '#EAEAEA' },
-                    ]}
-                    onPress={handleSetSourceToGps}>
-                    <Ionicons name="navigate-circle-outline" size={17} color={colors.accent} />
-                    <Text style={[styles.resetGpsText, { color: colors.accent }]}>GPS</Text>
-                  </Pressable>
-                )}
-              </View>
-
-              <View style={[styles.inputDivider, { backgroundColor: colors.divider }]} />
-
-              {/* DESTINATION / WHERE TO ROW */}
-              <View style={styles.inputRow}>
-                <TextInput
-                  style={[styles.textInput, styles.destinationInputText, { color: colors.text }]}
-                  value={destinationPoint.text}
-                  onChangeText={(text) => {
-                    setDestinationPoint({
-                      text,
-                      coords: null,
-                      isGps: false,
-                    });
-                  }}
-                  placeholder="Where to?"
-                  placeholderTextColor={colors.placeholder}
-                  returnKeyType="search"
-                />
-                {!destinationPoint.isGps && (
-                  <Pressable
-                    hitSlop={8}
-                    style={[
-                      styles.inputActionBtn,
-                      { backgroundColor: isDark ? '#2E3036' : '#EAEAEA' },
-                    ]}
-                    onPress={handleSetDestinationToGps}>
-                    <Ionicons name="navigate-circle-outline" size={17} color={colors.accent} />
-                    <Text style={[styles.resetGpsText, { color: colors.accent }]}>GPS</Text>
-                  </Pressable>
-                )}
-                {destinationPoint.text.length > 0 && (
-                  <Pressable
-                    hitSlop={8}
-                    style={[styles.inputActionBtn, { marginLeft: 4 }]}
-                    onPress={handleClearDestination}>
-                    <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
-                  </Pressable>
-                )}
-              </View>
-            </View>
-
-            {/* SWAP SOURCE & DESTINATION BUTTON */}
+          {/* START TRIP BUTTON */}
+          {selectedSuggestion && (
             <Pressable
               style={({ pressed }) => [
-                styles.swapButton,
-                {
-                  backgroundColor: isDark ? '#2B2D33' : '#FFFFFF',
-                  borderColor: colors.divider,
-                },
+                styles.startTripButton,
                 pressed && styles.buttonPressed,
+                isStartingTrip && { opacity: 0.7 },
               ]}
-              hitSlop={8}
-              onPress={handleSwapLocations}>
-              <Ionicons name="swap-vertical" size={18} color={colors.text} />
+              onPress={handleStartTrip}
+              disabled={isStartingTrip}>
+              {isStartingTrip ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="navigate" size={18} color="#FFFFFF" />
+                  <Text style={styles.startTripText}>Start Trip</Text>
+                </>
+              )}
             </Pressable>
-          </View>
+          )}
 
-          {/* RECENT DESTINATIONS SECTION */}
+          {/* RECENT TRIPS SECTION */}
           <View style={styles.recentSection}>
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                Recent Destinations
+                Recent Trips
               </Text>
-              <Pressable
-                hitSlop={8}
-                style={({ pressed }) => [styles.viewAllButton, pressed && styles.buttonPressed]}
-                onPress={toggleViewAllDestinations}>
-                <Text style={[styles.viewAllText, { color: colors.accent }]}>
-                  {showAllDestinations ? 'Show Less' : 'View All'}
-                </Text>
-                <Ionicons
-                  name={showAllDestinations ? 'chevron-up' : 'chevron-forward'}
-                  size={14}
-                  color={colors.accent}
-                />
-              </Pressable>
+              {recentTrips.length > 3 && (
+                <Pressable
+                  hitSlop={8}
+                  style={({ pressed }) => [styles.viewAllButton, pressed && styles.buttonPressed]}
+                  onPress={toggleViewAllDestinations}>
+                  <Text style={[styles.viewAllText, { color: colors.accent }]}>
+                    {showAllDestinations ? 'Show Less' : 'View All'}
+                  </Text>
+                  <Ionicons
+                    name={showAllDestinations ? 'chevron-up' : 'chevron-forward'}
+                    size={14}
+                    color={colors.accent}
+                  />
+                </Pressable>
+              )}
             </View>
 
-            {displayedDestinations.map((item) => {
-              const isSelected =
-                destinationPoint.coords &&
-                Math.abs(destinationPoint.coords.latitude - item.latitude) < 0.0001 &&
-                Math.abs(destinationPoint.coords.longitude - item.longitude) < 0.0001;
+            {isLoadingRecent && (
+              <View style={styles.emptyState}>
+                <ActivityIndicator size="small" color={colors.textSecondary} />
+              </View>
+            )}
+
+            {!isLoadingRecent && recentTrips.length === 0 && (
+              <View style={styles.emptyState}>
+                <Ionicons name="map-outline" size={28} color={colors.placeholder} />
+                <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
+                  No trips yet — start one above!
+                </Text>
+              </View>
+            )}
+
+            {displayedTrips.map((trip) => {
+              const km = trip.route?.distanceM
+                ? `${(trip.route.distanceM / 1000).toFixed(0)} km`
+                : '';
+              const mins = trip.route?.durationS
+                ? trip.route.durationS < 3600
+                  ? `${Math.round(trip.route.durationS / 60)} min`
+                  : `${(trip.route.durationS / 3600).toFixed(1)} h`
+                : '';
+              const statusColor =
+                trip.status === 'ready'
+                  ? '#34C759'
+                  : trip.status === 'building'
+                  ? '#FF9500'
+                  : '#FF3B30';
 
               return (
                 <Pressable
-                  key={item.id}
+                  key={trip.id}
                   style={({ pressed }) => [
                     styles.recentRow,
                     { borderBottomColor: colors.rowBorder },
-                    isSelected && [
-                      styles.recentRowSelected,
-                      { backgroundColor: colors.rowSelected },
-                    ],
                     pressed && styles.recentRowPressed,
                   ]}
-                  onPress={() => handleSelectDestination(item)}>
+                  onPress={() => router.push(`/trip/${trip.id}`)}>
                   <View style={[styles.iconCircle, { backgroundColor: colors.surfaceAlt }]}>
-                    <Ionicons name={item.icon} size={18} color={colors.text} />
+                    <Ionicons name="navigate-outline" size={18} color={colors.text} />
                   </View>
                   <View style={styles.placeDetails}>
                     <Text style={[styles.placeTitle, { color: colors.text }]} numberOfLines={1}>
-                      {item.title}
+                      {trip.destination.label}
                     </Text>
                     <Text
                       style={[styles.placeAddress, { color: colors.textSecondary }]}
                       numberOfLines={1}>
-                      {item.address}
+                      {trip.origin.label}
                     </Text>
                   </View>
                   <View style={styles.distanceBadge}>
+                    <View style={[styles.statusDotSmall, { backgroundColor: statusColor }]} />
                     <Text style={[styles.distanceText, { color: colors.textSecondary }]}>
-                      {item.distance}
+                      {km}{km && mins ? ' · ' : ''}{mins}
                     </Text>
                     <MaterialIcons name="chevron-right" size={20} color={colors.placeholder} />
                   </View>
@@ -1010,8 +1388,40 @@ export default function HomeScreen() {
               ))}
             </ScrollView>
           </View>
+
+
         </ScrollView>
       </Animated.View>
+
+      {/* AUDIO LANGUAGE & VOICE SELECTION MODAL */}
+      <AudioLanguageSheetModal
+        visible={isAudioModalVisible}
+        onClose={() => setIsAudioModalVisible(false)}
+        initialLanguage={preferredAudio}
+        initialGender={voiceGender}
+        initialVoice={voice}
+        onApply={async (selection) => {
+          setPreferredAudio(selection.language);
+          setVoiceGender(selection.voiceGender);
+          setVoice(selection.voice);
+          setIsAudioModalVisible(false);
+
+          try {
+            const raw = await AsyncStorage.getItem('@musafir_user_profile');
+            const existing = raw ? JSON.parse(raw) : {};
+            const updated = {
+              ...existing,
+              preferredAudio: selection.language,
+              voiceGender: selection.voiceGender,
+              voice: selection.voice,
+            };
+            await AsyncStorage.setItem('@musafir_user_profile', JSON.stringify(updated));
+            updateProfileOnBackend(updated).catch(() => {});
+          } catch (err) {
+            console.warn('[HomeScreen] Failed to save updated audio preference:', err);
+          }
+        }}
+      />
     </View>
   );
 }
@@ -1064,6 +1474,12 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: '#34C759',
     marginLeft: 2,
+  },
+  statusDotSmall: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 4,
   },
   statusText: {
     fontSize: 12,
@@ -1190,88 +1606,43 @@ const styles = StyleSheet.create({
   },
 
   // Uber Style Search Card with Swap Button
-  searchCard: {
-    flexDirection: 'row',
-    borderRadius: 16,
-    paddingVertical: 10,
-    paddingLeft: 12,
-    paddingRight: 10,
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  connectorContainer: {
-    alignItems: 'center',
-    width: 20,
-    marginRight: 10,
-    paddingVertical: 10,
-  },
-  originDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  connectorLine: {
-    width: 1.5,
-    height: 28,
-    marginVertical: 4,
-  },
-  destinationSquare: {
-    width: 9,
-    height: 9,
-    borderRadius: 2,
-  },
-  inputsColumn: {
-    flex: 1,
-    gap: 2,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 36,
-  },
-  textInput: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '500',
-    paddingVertical: 2,
-  },
-  destinationInputText: {
-    fontWeight: '600',
-  },
-  inputActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 12,
-  },
-  resetGpsText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  inputDivider: {
-    height: StyleSheet.hairlineWidth,
-    marginVertical: 4,
-  },
 
-  // Swap Button
-  swapButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+
+  // Start trip button
+  startTripButton: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    marginLeft: 8,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
+    gap: 8,
+    backgroundColor: '#007AFF',
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginTop: 12,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  startTripText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: -0.3,
   },
 
-  // Recent Destinations Section
+  // Empty state
+  emptyState: {
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 24,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+
+  // Recent Trips Section
   recentSection: {
     marginTop: 4,
   },
@@ -1382,5 +1753,119 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     letterSpacing: -0.2,
+  },
+
+  // Route selection & loading
+  routeLoadingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 10,
+  },
+  routeLoadingText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  // Floating Route Badges on Map
+  mapRouteBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.32,
+    shadowRadius: 5,
+    elevation: 8,
+  },
+  mapRouteBadgeSelected: {
+    backgroundColor: '#1A73E8',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  mapRouteBadgeUnselected: {
+    borderWidth: 1.5,
+  },
+  mapRouteBadgeDuration: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  mapRouteBadgeDot: {
+    fontSize: 10,
+  },
+  mapRouteBadgeDistance: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+
+  // Floating Route Info Bar above bottom sheet
+  floatingRouteBarWrapper: {
+    position: 'absolute',
+    left: 16,
+    right: 72,
+    zIndex: 25,
+  },
+  floatingRouteBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  floatingRouteBarLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+    marginRight: 6,
+  },
+  floatingRouteBarIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  floatingRouteBarTexts: {
+    flex: 1,
+  },
+  floatingRouteBarMainRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+  },
+  floatingRouteBarDuration: {
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  floatingRouteBarDistance: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  floatingRouteBarDesc: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 1,
+  },
+  floatingRouteCountPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  floatingRouteCountText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
 });

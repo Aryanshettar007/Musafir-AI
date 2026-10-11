@@ -9,7 +9,11 @@ import { placesRouter } from "./places.routes";
 
 export function tripsRouter(deps: TripServiceDeps): Router {
   const c = tripsController(createTripService(deps));
-  return Router().post("/", c.create).get("/", c.list).get("/:id", c.get);
+  return Router()
+    .post("/preview", c.preview)
+    .post("/", c.create)
+    .get("/", c.list)
+    .get("/:id", c.get);
 }
 
 export interface TripFeatureDeps extends TripServiceDeps {

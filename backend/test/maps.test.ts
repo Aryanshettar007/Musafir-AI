@@ -40,12 +40,27 @@ describe("mapsClient", () => {
     expect(route).toEqual({ distanceM: 138500, durationS: 9060, polyline: "abc" });
     expect(sent[0].url).toBe("https://routes.googleapis.com/directions/v2:computeRoutes");
     expect(sent[0].headers["X-Goog-Api-Key"]).toBe(KEY);
-    expect(sent[0].headers["X-Goog-FieldMask"]).toBe("routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline");
+    expect(sent[0].headers["X-Goog-FieldMask"]).toBe("routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline,routes.description");
     expect(sent[0].body).toEqual({
       origin: { location: { latLng: { latitude: 12.97, longitude: 77.59 } } },
       destination: { placeId: "P1" },
       travelMode: "DRIVE",
     });
+  });
+
+  it("computeRoutes sends computeAlternativeRoutes: true and parses route descriptions", async () => {
+    stubFetch([{
+      json: {
+        routes: [
+          { distanceMeters: 138500, duration: "9060s", polyline: { encodedPolyline: "abc" }, description: "NH 48" },
+          { distanceMeters: 145000, duration: "9600s", polyline: { encodedPolyline: "def" }, description: "SH 17" },
+        ],
+      },
+    }]);
+    const routes = await mapsClient({ apiKey: KEY }).computeRoutes({ origin: { lat: 12.97, lng: 77.59 }, destination: { placeId: "P1" } });
+    expect(routes).toHaveLength(2);
+    expect(routes[0].description).toBe("NH 48");
+    expect(routes[1].description).toBe("SH 17");
   });
 
   it("computeRoute returns null when Google finds no route", async () => {

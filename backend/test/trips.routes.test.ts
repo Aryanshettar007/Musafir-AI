@@ -170,6 +170,42 @@ describe("POST /trips", () => {
     expect(await Trip.countDocuments()).toBe(0);
     expect(start).not.toHaveBeenCalled();
   });
+
+  it("POST /trips/preview returns alternative routes without creating a trip", async () => {
+    maps = fakeMaps({
+      computeRoutes: async () => [
+        { id: "route_0", ...ROUTE, description: "Fastest via NH 44" },
+        { id: "route_1", ...ROUTE, distanceM: 65_000, durationS: 3900, description: "Alternative via Bellary Rd" },
+      ],
+    });
+    const res = await request(app())
+      .post("/trips/preview")
+      .set(authHeader("u1"))
+      .send({ origin: { placeId: "p_origin" }, destination: { placeId: "p_dest" } });
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toHaveLength(2);
+    expect(res.body.data[0].description).toBe("Fastest via NH 44");
+    expect(res.body.data[1].description).toBe("Alternative via Bellary Rd");
+    expect(await Trip.countDocuments()).toBe(0);
+  });
+
+  it("POST /trips accepts selectedRoute and builds the trip with it", async () => {
+    const selectedRoute = {
+      polyline: ROUTE.polyline,
+      distanceM: 55_000,
+      durationS: 3300,
+      description: "Alternative via Bellary Rd",
+    };
+    const res = await request(app())
+      .post("/trips")
+      .set(authHeader("u1"))
+      .send({ ...body, selectedRoute });
+    expect(res.status).toBe(202);
+    const trip = await Trip.findOne({ userId: "u1" });
+    expect(trip?.route?.distanceM).toBe(55_000);
+    expect(trip?.route?.durationS).toBe(3300);
+  });
 });
 
 async function builtTrip() {
