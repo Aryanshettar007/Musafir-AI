@@ -92,6 +92,13 @@ export function fakeGnani(opts: { transcript?: string } = {}): FakeGnani {
 export function fakeMaps(overrides: Partial<MapsClient> = {}): MapsClient {
   return {
     computeRoute: async () => null,
+    computeRoutes: async (req) => {
+      if (overrides.computeRoute) {
+        const r = await overrides.computeRoute(req);
+        return r ? [{ id: "route_0", ...r, description: "Fastest route" }] : [];
+      }
+      return [];
+    },
     searchNearby: async () => [],
     searchText: async () => ({ places: [] }),
     autocomplete: async () => [],

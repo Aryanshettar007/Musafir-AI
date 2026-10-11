@@ -29,10 +29,29 @@ export const CreateTripSchema = z.strictObject({
     z.strictObject({ placeId, label }),
   ]),
   destination: z.strictObject({ placeId, label }),
+  selectedRoute: z
+    .object({
+      id: z.string().optional(),
+      polyline: z.string().min(1),
+      distanceM: z.number().optional(),
+      durationS: z.number().optional(),
+      description: z.string().optional(),
+    })
+    .passthrough()
+    .optional(),
   // Same rules as PATCH /me, applied on top of the user's profile for this trip only.
   prefs: ProfileInputSchema.pick({ language: true, voiceGender: true, voice: true, interests: true, musicMode: true }).optional(),
 });
 export type CreateTripInput = z.infer<typeof CreateTripSchema>;
+
+export const PreviewRoutesSchema = z.strictObject({
+  origin: z.union([
+    z.strictObject({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }),
+    z.strictObject({ placeId }),
+  ]),
+  destination: z.strictObject({ placeId }),
+});
+export type PreviewRoutesInput = z.infer<typeof PreviewRoutesSchema>;
 
 export const ListTripsQuerySchema = z.object({ limit: z.coerce.number().int().min(1).max(50).default(20) });
 
@@ -59,6 +78,19 @@ export function createTripService(deps: TripServiceDeps) {
   const now = deps.now ?? (() => new Date());
 
   return {
+    // Computes alternative routes between origin and destination without creating a trip.
+    async previewRoutes(_identity: Identity, input: PreviewRoutesInput) {
+      const { origin, destination } = input;
+      const routes = await deps.maps.computeRoutes({
+        origin: "placeId" in origin ? { placeId: origin.placeId } : { lat: origin.lat, lng: origin.lng },
+        destination: { placeId: destination.placeId },
+      });
+      if (!routes || routes.length === 0) {
+        throw new AppError(422, "ROUTE_NOT_FOUND", "No drivable route between these places.");
+      }
+      return routes;
+    },
+
     // Validates, computes the route (synchronously, so routing errors come back at once), saves the trip as
     // `building` and hands it to the builder. Returns before anything is written.
     async createTrip(identity: Identity, input: CreateTripInput): Promise<{ tripId: string; status: "building" }> {
@@ -75,12 +107,26 @@ export function createTripService(deps: TripServiceDeps) {
         throw new AppError(429, "TRIP_LIMIT_REACHED", `At most ${deps.limits.tripsPerDay} trips per day. Try again later.`);
       }
 
-      const { origin, destination } = input;
-      const route = await deps.maps.computeRoute({
-        origin: "placeId" in origin ? { placeId: origin.placeId } : { lat: origin.lat, lng: origin.lng },
-        destination: { placeId: destination.placeId },
-      });
-      if (!route) throw new AppError(422, "ROUTE_NOT_FOUND", "No drivable route between these places.");
+      const { origin, destination, selectedRoute } = input;
+      let route: { polyline: string; distanceM: number; durationS: number };
+
+      if (selectedRoute?.polyline) {
+        console.log(`[Trip] Processing user-selected route: "${selectedRoute.description || 'custom'}" (${selectedRoute.distanceM ?? 0}m, ${selectedRoute.durationS ?? 0}s)`);
+        route = {
+          polyline: selectedRoute.polyline,
+          distanceM: selectedRoute.distanceM ?? 0,
+          durationS: selectedRoute.durationS ?? 0,
+        };
+      } else {
+        console.log(`[Trip] No selectedRoute provided by client; computing default route from Google`);
+        const computed = await deps.maps.computeRoute({
+          origin: "placeId" in origin ? { placeId: origin.placeId } : { lat: origin.lat, lng: origin.lng },
+          destination: { placeId: destination.placeId },
+        });
+        if (!computed) throw new AppError(422, "ROUTE_NOT_FOUND", "No drivable route between these places.");
+        route = computed;
+      }
+
       if (route.distanceM > deps.limits.maxRouteKm * 1000) {
         throw new AppError(422, "ROUTE_TOO_LONG", `Trips are limited to ${deps.limits.maxRouteKm} km; this route is ${Math.round(route.distanceM / 1000)} km.`);
       }

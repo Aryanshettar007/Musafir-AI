@@ -14,7 +14,8 @@
       "infoPlist": {
         "UIBackgroundModes": ["location", "audio"],
         "NSLocationWhenInUseUsageDescription": "Musafir AI uses your location to discover nearby travel highlights and trigger audio guides.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Musafir AI needs background location access to trigger audio stories automatically as you travel."
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Musafir AI needs background location access to trigger audio stories automatically as you travel.",
+        "NSMicrophoneUsageDescription": "Musafir AI needs microphone access so you can speak to the narrator and ask questions during your trip."
       }
     },
     "android": {
@@ -26,7 +27,8 @@
         "ACCESS_BACKGROUND_LOCATION",
         "FOREGROUND_SERVICE",
         "FOREGROUND_SERVICE_LOCATION",
-        "FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+        "FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "RECORD_AUDIO"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
