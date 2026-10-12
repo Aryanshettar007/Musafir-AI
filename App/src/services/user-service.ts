@@ -1,4 +1,5 @@
 import { api } from '@/services/api';
+import { AGE_RANGES, type AgeRange } from '@/constants/onboarding';
 
 export interface OnboardingFormValues {
   name?: string;
@@ -13,7 +14,7 @@ export interface OnboardingFormValues {
 export interface BackendProfileInput {
   name?: string;
   gender?: 'male' | 'female' | 'unspecified';
-  age?: number;
+  age?: number | string;
   language?: string;
   interests?: string[];
   musicMode?: 'rj' | 'duck-only' | 'off';
@@ -24,7 +25,7 @@ export interface BackendProfileInput {
 export interface BackendProfile {
   name?: string;
   gender: 'male' | 'female' | 'unspecified';
-  age?: number;
+  age?: number | string;
   language: string;
   voiceGender: 'male' | 'female';
   voice: string;
@@ -101,9 +102,9 @@ export function mapLanguageToLabel(langId?: string): string {
 }
 
 /**
- * Maps UI Interests selection to valid backend Interest IDs.
+ * Normalizes UI Interests selection or legacy storage strings to valid backend Interest IDs.
  */
-function mapInterests(interests?: string[]): string[] {
+export function normalizeInterestIds(interests?: string[]): string[] {
   if (!interests || interests.length === 0) return ['history', 'food'];
 
   const mapping: Record<string, string> = {
@@ -119,7 +120,7 @@ function mapInterests(interests?: string[]): string[] {
     'Road Trips': 'adventure',
     'Budget Backpacking': 'adventure',
     'Luxury & Resorts': 'history',
-    // In case backend IDs were already passed:
+    // Backend IDs directly:
     history: 'history',
     architecture: 'architecture',
     spirituality: 'spirituality',
@@ -131,8 +132,57 @@ function mapInterests(interests?: string[]): string[] {
     cinema: 'cinema',
   };
 
-  const mapped = interests.map((i) => mapping[i] || 'history');
-  return [...new Set(mapped)];
+  const mapped = interests
+    .map((i) => mapping[i])
+    .filter((id): id is string => Boolean(id));
+  return mapped.length > 0 ? [...new Set(mapped)] : ['history', 'food'];
+}
+
+function mapInterests(interests?: string[]): string[] {
+  return normalizeInterestIds(interests);
+}
+
+/**
+ * Maps an age number or ID from backend / storage to the UI display age range.
+ */
+export function mapAgeToRange(age?: number | string): string {
+  if (age === undefined || age === null || age === '') return '';
+  if (typeof age === 'number') {
+    return mapNumberToAgeRange(age);
+  }
+  const clean = age.trim();
+  if (clean === 'under-18' || clean.toLowerCase() === 'under 18') return 'Under 18';
+  if (clean === '65+' || clean === '65-plus') return '65+';
+  const dashReplaced = clean.replace(/\s*[-–]\s*/, ' – ');
+  if ((AGE_RANGES as readonly string[]).includes(dashReplaced)) {
+    return dashReplaced;
+  }
+  const parsed = parseInt(clean, 10);
+  if (!isNaN(parsed) && !clean.includes('–') && !clean.includes('-')) {
+    return mapNumberToAgeRange(parsed);
+  }
+  return clean;
+}
+
+export function mapNumberToAgeRange(num: number): string {
+  if (num < 18) return 'Under 18';
+  if (num <= 24) return '18 – 24';
+  if (num <= 34) return '25 – 34';
+  if (num <= 44) return '35 – 44';
+  if (num <= 54) return '45 – 54';
+  if (num <= 64) return '55 – 64';
+  return '65+';
+}
+
+/**
+ * Maps UI Age Range selection to backend Age Range ID (e.g. '18 – 24' -> '18-24', 'Under 18' -> 'under-18').
+ */
+export function mapAgeRangeToBackend(range?: string): string | number | undefined {
+  if (!range || !range.trim()) return undefined;
+  const clean = range.trim();
+  if (clean === 'Under 18') return 'under-18';
+  if (clean === '65+') return '65+';
+  return clean.replace(/\s*–\s*/, '-');
 }
 
 /**
@@ -151,9 +201,10 @@ export function formatProfileForBackend(form: OnboardingFormValues): BackendProf
   }
 
   if (form.age !== undefined && form.age !== '') {
-    const parsedAge = typeof form.age === 'number' ? form.age : parseInt(form.age, 10);
-    if (!isNaN(parsedAge) && parsedAge >= 1 && parsedAge <= 120) {
-      payload.age = parsedAge;
+    if (typeof form.age === 'number') {
+      payload.age = form.age;
+    } else {
+      payload.age = mapAgeRangeToBackend(form.age);
     }
   }
 

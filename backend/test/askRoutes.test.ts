@@ -97,6 +97,23 @@ describe("POST /ask", () => {
     expect(res.status).toBe(200);
   });
 
+  it("answers an audio question sent as JSON with audioBase64", async () => {
+    const { app } = build();
+    const res = await request(app)
+      .post("/ask")
+      .set(authHeader("u1"))
+      .send({
+        audioBase64: SHORT_MP3.toString("base64"),
+        lat: 12.45,
+        lng: 76.69,
+        history: [{ q: "what is this?", a: "A fort." }],
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.transcript).toBe("ಈ ಕೋಟೆ ಯಾಕೆ ಫೇಮಸ್");
+    expect(res.body.data.answerText).toBe(KN);
+  });
+
   describe("validation", () => {
     it.each([
       ["no audio or text", (r: request.Test) => r.field("lat", "1").field("lng", "1")],

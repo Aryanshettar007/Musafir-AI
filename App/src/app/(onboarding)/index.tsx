@@ -25,6 +25,9 @@ import {
 } from '@/components/ui/sheet-select';
 import { auth } from '@/config/firebase';
 import {
+  AGE_RANGES,
+  DEFAULT_AGE_RANGE,
+  DEFAULT_INTERESTS,
   GENDERS,
   INTERESTS,
 } from '@/constants/onboarding';
@@ -42,13 +45,12 @@ export default function OnboardingScreen() {
 
   const [name, setName] = useState(user?.displayName || '');
   const [gender, setGender] = useState('Male');
-  const [age, setAge] = useState('');
+  const [age, setAge] = useState<string>(DEFAULT_AGE_RANGE);
   const [preferredLanguage, setPreferredLanguage] = useState('English');
   const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
   const [voice, setVoice] = useState('Nalini');
   const [selectedInterests, setSelectedInterests] = useState<string[]>([
-    'Adventure & Trekking',
-    'Food & Culinary',
+    ...DEFAULT_INTERESTS,
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -75,8 +77,7 @@ export default function OnboardingScreen() {
 
   const handleComplete = async () => {
     const trimmedName = name.trim();
-    const trimmedAge = age.trim();
-    const parsedAge = parseInt(trimmedAge, 10);
+    const selectedAge = age.trim();
 
     // Strict validation: ALL fields compulsory
     if (!trimmedName) {
@@ -85,14 +86,8 @@ export default function OnboardingScreen() {
       return;
     }
 
-    if (!trimmedAge) {
-      setValidationError('Please enter your age.');
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      return;
-    }
-
-    if (isNaN(parsedAge) || parsedAge < 1 || parsedAge > 120) {
-      setValidationError('Please enter a valid age between 1 and 120.');
+    if (!selectedAge) {
+      setValidationError('Please select your age range.');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
@@ -132,7 +127,7 @@ export default function OnboardingScreen() {
       const onboardingData = {
         name: trimmedName,
         gender,
-        age: trimmedAge,
+        age: selectedAge,
         preferredAudio: preferredLanguage,
         voiceGender,
         voice,
@@ -216,17 +211,15 @@ export default function OnboardingScreen() {
                   returnKeyType="done"
                 />
 
-                <InputRow
+                <SelectRow
                   label="Age *"
+                  title="Select Age Range"
                   value={age}
-                  onChangeText={(text) => {
-                    setAge(text);
+                  options={AGE_RANGES}
+                  onSelect={(val) => {
+                    setAge(val);
                     if (validationError) setValidationError(null);
                   }}
-                  placeholder="e.g. 24"
-                  keyboardType="numeric"
-                  maxLength={3}
-                  returnKeyType="done"
                 />
 
                 <SelectRow

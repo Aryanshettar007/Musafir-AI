@@ -6,6 +6,19 @@ export const GENDERS = [
 
 export type Gender = (typeof GENDERS)[number];
 
+export const AGE_RANGES = [
+  'Under 18',
+  '18 – 24',
+  '25 – 34',
+  '35 – 44',
+  '45 – 54',
+  '55 – 64',
+  '65+',
+] as const;
+
+export type AgeRange = (typeof AGE_RANGES)[number];
+export const DEFAULT_AGE_RANGE: AgeRange = '18 – 24';
+
 export const PREFERRED_LANGUAGES = [
   'English',
   'Hindi',
@@ -23,18 +36,17 @@ export const PREFERRED_LANGUAGES = [
 export type PreferredLanguage = (typeof PREFERRED_LANGUAGES)[number];
 
 export const INTERESTS = [
-  'Adventure & Trekking',
-  'Heritage & History',
-  'Food & Culinary',
-  'Nature & Wildlife',
-  'Beaches & Islands',
-  'Photography',
-  'Nightlife & Social',
-  'Wellness & Yoga',
-  'Art & Museums',
-  'Road Trips',
-  'Budget Backpacking',
-  'Luxury & Resorts',
+  { id: 'history', value: 'history', label: 'History & Heritage' },
+  { id: 'architecture', value: 'architecture', label: 'Forts & Architecture' },
+  { id: 'spirituality', value: 'spirituality', label: 'Temples & Spirituality' },
+  { id: 'food', value: 'food', label: 'Food & Local Eats' },
+  { id: 'nature', value: 'nature', label: 'Nature & Wildlife' },
+  { id: 'adventure', value: 'adventure', label: 'Adventure & Trekking' },
+  { id: 'art-culture', value: 'art-culture', label: 'Art, Crafts & Museums' },
+  { id: 'legends', value: 'legends', label: 'Myths & Legends' },
+  { id: 'cinema', value: 'cinema', label: 'Cinema & Pop Culture' },
 ] as const;
 
-export type Interest = (typeof INTERESTS)[number];
+export type InterestId = (typeof INTERESTS)[number]['id'];
+export type Interest = InterestId;
+export const DEFAULT_INTERESTS: InterestId[] = ['history', 'food'];

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -26,13 +26,22 @@ import {
 } from '@/components/ui/sheet-select';
 import { auth } from '@/config/firebase';
 import {
+  AGE_RANGES,
+  DEFAULT_INTERESTS,
   GENDERS,
   INTERESTS,
 } from '@/constants/onboarding';
 import { BottomTabInset } from '@/constants/theme';
 import { useAuth } from '@/context/auth-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { updateProfileOnBackend, syncUserSignIn, mapLanguageToLabel } from '@/services/user-service';
+import {
+  updateProfileOnBackend,
+  syncUserSignIn,
+  mapLanguageToLabel,
+  normalizeInterestIds,
+  mapAgeToRange,
+} from '@/services/user-service';
+import { clearAllOfflineTripData, getOfflineStorageUsage } from '@/services/trip-service';
 
 const STORAGE_KEY = '@musafir_user_profile';
 
@@ -50,16 +59,15 @@ export default function SettingsScreen() {
   const [preferredAudio, setPreferredAudio] = useState('English');
   const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
   const [voice, setVoice] = useState('Nalini');
-  const [interests, setInterests] = useState<string[]>([
-    'Adventure & Trekking',
-    'Food & Culinary',
-  ]);
+  const [interests, setInterests] = useState<string[]>([...DEFAULT_INTERESTS]);
 
   // UI state
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isClearingCache, setIsClearingCache] = useState(false);
+  const [offlineStorageText, setOfflineStorageText] = useState<string>('0 B');
 
   // Load existing onboarding / profile data
   useEffect(() => {
@@ -72,11 +80,11 @@ export default function SettingsScreen() {
           else if (user?.displayName) setName(user.displayName);
 
           if (data.gender) setGender(data.gender);
-          if (data.age) setAge(data.age);
+          if (data.age) setAge(mapAgeToRange(data.age));
           if (data.preferredAudio) setPreferredAudio(mapLanguageToLabel(data.preferredAudio));
           if (data.voiceGender) setVoiceGender(data.voiceGender);
           if (data.voice) setVoice(data.voice);
-          if (Array.isArray(data.interests)) setInterests(data.interests);
+          if (Array.isArray(data.interests)) setInterests(normalizeInterestIds(data.interests));
         } else if (user?.displayName) {
           setName(user.displayName);
         }
@@ -86,9 +94,13 @@ export default function SettingsScreen() {
           const backendRes = await syncUserSignIn();
           if (backendRes.hasProfile && backendRes.profile) {
             const p = backendRes.profile;
+            if (p.age !== undefined && p.age !== null) setAge(mapAgeToRange(p.age));
             if (p.language) setPreferredAudio(mapLanguageToLabel(p.language));
             if (p.voiceGender) setVoiceGender(p.voiceGender);
             if (p.voice) setVoice(p.voice);
+            if (Array.isArray(p.interests) && p.interests.length > 0) {
+              setInterests(normalizeInterestIds(p.interests));
+            }
           }
         } catch {
           // Non-critical background sync
@@ -155,12 +167,56 @@ export default function SettingsScreen() {
     );
   };
 
-  // Logout handler with Uber-style confirmation dialog
+  // Calculate storage usage on mount and after actions
+  const refreshStorageUsage = useCallback(async () => {
+    try {
+      const usage = await getOfflineStorageUsage();
+      setOfflineStorageText(usage.formatted);
+    } catch {
+      setOfflineStorageText('0 B');
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshStorageUsage();
+  }, [refreshStorageUsage]);
+
+  // Clear offline storage handler
+  const handleClearOfflinePress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Alert.alert(
+      'Clear Offline Storage',
+      `This will delete all offline audio downloads and cached trips (${offlineStorageText}) from your device.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear Data',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsClearingCache(true);
+              await clearAllOfflineTripData();
+              await refreshStorageUsage();
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              Alert.alert('Storage Cleared', 'Offline trips and audio have been deleted.');
+            } catch (err) {
+              console.error('[Settings] Error clearing offline data:', err);
+              Alert.alert('Error', 'Could not clear offline storage.');
+            } finally {
+              setIsClearingCache(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Logout handler: clears all offline trip data and signs out
   const handleLogoutPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert(
       'Log Out',
-      'Are you sure you want to log out of Musafir AI?',
+      'Are you sure you want to log out? All offline trip data and audio downloads will be cleared from this device.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -169,6 +225,8 @@ export default function SettingsScreen() {
           onPress: async () => {
             try {
               setIsLoggingOut(true);
+              // Clear offline trips, audio downloads, and cached storage on logout
+              await clearAllOfflineTripData();
               await logOut();
               router.replace('/(auth)/login');
             } catch (err) {
@@ -270,14 +328,12 @@ export default function SettingsScreen() {
               returnKeyType="done"
             />
 
-            <InputRow
+            <SelectRow
               label="Age"
+              title="Select Age Range"
               value={age}
-              onChangeText={setAge}
-              placeholder="e.g. 25"
-              keyboardType="numeric"
-              maxLength={3}
-              returnKeyType="done"
+              options={AGE_RANGES}
+              onSelect={setAge}
             />
 
             <SelectRow
@@ -345,26 +401,62 @@ export default function SettingsScreen() {
                 </Text>
               </View>
 
-              {/* Logout Button */}
-              <Pressable
-                onPress={handleLogoutPress}
-                disabled={isLoggingOut}
-                style={({ pressed }) => [
-                  styles.logoutButton,
-                  {
-                    backgroundColor: colors.logoutBg,
-                    opacity: pressed ? 0.8 : 1,
-                  },
-                ]}>
-                {isLoggingOut ? (
-                  <ActivityIndicator size="small" color="#e11900" />
-                ) : (
-                  <View style={styles.logoutContent}>
-                    <Ionicons name="log-out-outline" size={18} color="#e11900" />
-                    <Text style={styles.logoutText}>Log Out</Text>
-                  </View>
-                )}
-              </Pressable>
+              {/* Dual Action Buttons: Clear Offline Storage & Logout next to each other */}
+              <View style={styles.dualButtonsRow}>
+                {/* Clear Offline Storage Button */}
+                <Pressable
+                  onPress={handleClearOfflinePress}
+                  disabled={isClearingCache}
+                  style={({ pressed }) => [
+                    styles.dualButton,
+                    {
+                      backgroundColor: colors.logoutBg,
+                      borderColor: isDark ? '#2A2A2E' : '#E5E5EA',
+                      borderWidth: 1,
+                      opacity: pressed ? 0.75 : 1,
+                    },
+                  ]}>
+                  {isClearingCache ? (
+                    <ActivityIndicator size="small" color={colors.textSecondary} />
+                  ) : (
+                    <View style={styles.dualButtonContent}>
+                      <Ionicons name="trash-outline" size={16} color={colors.textPrimary} />
+                      <Text
+                        style={[styles.dualButtonText, { color: colors.textPrimary }]}
+                        numberOfLines={1}>
+                        Clear ({offlineStorageText})
+                      </Text>
+                    </View>
+                  )}
+                </Pressable>
+
+                {/* Logout Button (differentiated by its red color) */}
+                <Pressable
+                  onPress={handleLogoutPress}
+                  disabled={isLoggingOut}
+                  style={({ pressed }) => [
+                    styles.dualButton,
+                    {
+                      backgroundColor: isDark ? '#2D1414' : '#FEE2E2',
+                      borderColor: isDark ? '#5A2020' : '#FECACA',
+                      borderWidth: 1,
+                      opacity: pressed ? 0.75 : 1,
+                    },
+                  ]}>
+                  {isLoggingOut ? (
+                    <ActivityIndicator size="small" color="#EF4444" />
+                  ) : (
+                    <View style={styles.dualButtonContent}>
+                      <Ionicons name="log-out-outline" size={17} color="#EF4444" />
+                      <Text
+                        style={[styles.dualButtonText, { color: '#EF4444', fontWeight: '700' }]}
+                        numberOfLines={1}>
+                        Log Out
+                      </Text>
+                    </View>
+                  )}
+                </Pressable>
+              </View>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -471,20 +563,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-  logoutButton: {
+  dualButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  dualButton: {
+    flex: 1,
     height: 50,
     borderRadius: 8,
+    paddingHorizontal: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  logoutContent: {
+  dualButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
+    gap: 7,
   },
-  logoutText: {
-    color: '#e11900',
-    fontSize: 15,
+  dualButtonText: {
+    fontSize: 14,
     fontWeight: '600',
+    letterSpacing: -0.2,
   },
 });

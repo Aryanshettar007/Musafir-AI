@@ -169,37 +169,53 @@ export async function startBackgroundGeofencing(items: TripItem[]): Promise<void
       notifyOnExit: false,
     }));
 
-    // 3. Start native geofencing if regions exist and background permission is available
+    // 3. Start native geofencing if supported and permissions granted
     if (regions.length > 0 && hasBgPermission && Platform.OS !== 'web') {
-      const isGeofenceStarted = await Location.hasStartedGeofencingAsync(MUSAFIR_GEOFENCE_TASK);
-      if (isGeofenceStarted) {
-        await Location.stopGeofencingAsync(MUSAFIR_GEOFENCE_TASK);
+      try {
+        const isAvailable = typeof (Location as any).isGeofencingAvailableAsync === 'function'
+          ? await (Location as any).isGeofencingAvailableAsync()
+          : true;
+
+        if (isAvailable) {
+          const isGeofenceStarted = await Location.hasStartedGeofencingAsync(MUSAFIR_GEOFENCE_TASK);
+          if (isGeofenceStarted) {
+            await Location.stopGeofencingAsync(MUSAFIR_GEOFENCE_TASK);
+          }
+          await Location.startGeofencingAsync(MUSAFIR_GEOFENCE_TASK, regions);
+          console.log(`[GeofenceService] Registered ${regions.length} native geofences.`);
+        } else {
+          console.log('[GeofenceService] Native geofencing not available on this device/simulator; using background GPS tracking.');
+        }
+      } catch (geoErr) {
+        console.log('[GeofenceService] Native geofencing skipped (using background GPS updates):', geoErr);
       }
-      await Location.startGeofencingAsync(MUSAFIR_GEOFENCE_TASK, regions);
-      console.log(`[GeofenceService] Registered ${regions.length} native geofences.`);
     }
 
     // 4. Start background location service on iOS/Android
     if (hasBgPermission && Platform.OS !== 'web') {
-      const isLocStarted = await Location.hasStartedLocationUpdatesAsync(MUSAFIR_LOCATION_TASK);
-      if (isLocStarted) {
-        await Location.stopLocationUpdatesAsync(MUSAFIR_LOCATION_TASK);
+      try {
+        const isLocStarted = await Location.hasStartedLocationUpdatesAsync(MUSAFIR_LOCATION_TASK);
+        if (isLocStarted) {
+          await Location.stopLocationUpdatesAsync(MUSAFIR_LOCATION_TASK);
+        }
+        await Location.startLocationUpdatesAsync(MUSAFIR_LOCATION_TASK, {
+          accuracy: Location.Accuracy.High,
+          distanceInterval: 15,
+          timeInterval: 3000,
+          showsBackgroundLocationIndicator: true,
+          foregroundService: {
+            notificationTitle: 'Musafir AI',
+            notificationBody: 'Automatic travel story geofencing active along route',
+            notificationColor: '#007AFF',
+          },
+        });
+        console.log('[GeofenceService] Background location tracking started.');
+      } catch (locErr) {
+        console.log('[GeofenceService] Background location updates skipped:', locErr);
       }
-      await Location.startLocationUpdatesAsync(MUSAFIR_LOCATION_TASK, {
-        accuracy: Location.Accuracy.High,
-        distanceInterval: 15,
-        timeInterval: 3000,
-        showsBackgroundLocationIndicator: true,
-        foregroundService: {
-          notificationTitle: 'Musafir AI',
-          notificationBody: 'Automatic travel story geofencing active along route',
-          notificationColor: '#007AFF',
-        },
-      });
-      console.log('[GeofenceService] Background location tracking started.');
     }
   } catch (err) {
-    console.warn('[GeofenceService] Failed to start native background geofences:', err);
+    console.warn('[GeofenceService] Background setup note:', err);
   }
 }
 

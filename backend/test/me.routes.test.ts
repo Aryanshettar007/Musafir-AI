@@ -94,6 +94,12 @@ describe("PUT /me", () => {
     expect(res.body.data).toMatchObject({ language: "en-IN", voice: "Deepak", interests: ["history", "food"] });
   });
 
+  it("accepts an age range like 18-24", async () => {
+    const res = await request(app).put("/me").set(as("u1")).send({ age: "18-24" });
+    expect(res.status).toBe(201);
+    expect(res.body.data.age).toBe("18-24");
+  });
+
   it("replaces an existing profile (200) and clears fields left out", async () => {
     await request(app).put("/me").set(as("u1")).send({ name: "Aryan", age: 22 });
     const res = await request(app).put("/me").set(as("u1")).send({ language: "hi-IN" });

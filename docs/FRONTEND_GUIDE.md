@@ -200,17 +200,17 @@ food?", "ಈ fort ಯಾಕೆ famous?".
 - Languages: only the 11 from `GET /catalog`.
 
 ## 8. Build checklist
-- [ ] `api()` helper + base URL config
-- [ ] `GET /me` routing after login; onboarding from `/catalog` + voice picker + music mode; `PUT /me`
-- [ ] Settings on `GET /me` / `PATCH /me`
-- [ ] Destination search on `/places/autocomplete` with session token
-- [ ] `POST /trips` + error handling; recent trips from `GET /trips`
-- [ ] Trip screen: poll `GET /trips/:id`, route polyline, progress
-- [ ] Downloads to the file system (store ids, refetch on 403), offline trip JSON
-- [ ] Background location + trigger engine + player queue (development build)
-- [ ] Sponsored label
-- [ ] `POST /listens` queue
-- [ ] 🎤 live mode with `POST /ask`
+- [x] `api()` helper + base URL config
+- [x] `GET /me` routing after login; onboarding from `/catalog` + voice picker + `PUT /me`
+- [x] Settings on `GET /me` / `PATCH /me` + clear offline data on logout
+- [x] Destination search on `/places/autocomplete` with session token
+- [x] `POST /trips` + error handling; recent trips from `GET /trips` + offline cache
+- [x] Trip screen: poll `GET /trips/:id`, route polyline, progress
+- [x] Downloads to the file system (store ids, refetch on 403), offline trip JSON persistence & zero-network playback
+- [x] Background location + trigger engine + player queue (development build)
+- [x] Sponsored label
+- [x] `POST /listens` queue + offline persistence
+- [x] 🎤 live mode with `POST /ask`
 
 ## 9. Seeing it working before the app is ready
 The backend has a local browser demo: Google Maps, a simulated car driving the latest ready trip (Bengaluru → Mysuru),

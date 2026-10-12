@@ -38,8 +38,9 @@ apiClient.interceptors.request.use(
  */
 apiClient.interceptors.response.use(
   (response) => response,
-  (error: AxiosError<{ success?: boolean; error?: { code?: string; message?: string } }>) => {
+  (error: AxiosError<{ success?: boolean; error?: { code?: string; message?: string; details?: any } }>) => {
     const errorData = error.response?.data;
+    const code = errorData?.error?.code;
     const message =
       errorData?.error?.message ||
       (typeof errorData === 'string' ? errorData : null) ||
@@ -47,7 +48,11 @@ apiClient.interceptors.response.use(
       'An unexpected network error occurred';
 
     console.warn(`[API ${error.config?.method?.toUpperCase()} ${error.config?.url}] Error:`, message);
-    return Promise.reject(new Error(message));
+    const err: any = new Error(message);
+    err.code = code;
+    err.status = error.response?.status;
+    err.details = errorData?.error?.details;
+    return Promise.reject(err);
   }
 );
 

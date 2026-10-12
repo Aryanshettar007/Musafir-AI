@@ -1,6 +1,7 @@
 import { api } from './api';
 import { auth } from '@/config/firebase';
 import { buildApiUrl } from '@/config/api';
+import * as FileSystem from 'expo-file-system/legacy';
 
 // ─── Autocomplete ──────────────────────────────────────────────────────────────
 export interface PlaceSuggestion {
@@ -196,6 +197,7 @@ export interface AskHistoryTurn {
 
 export interface AskParams {
   audioUri?: string;
+  audioBase64?: string;
   text?: string;
   lat: number;
   lng: number;
@@ -224,69 +226,65 @@ export interface AskResult {
 }
 
 export async function askMusafir(params: AskParams): Promise<AskResult> {
-  const token = await auth.currentUser?.getIdToken();
+  let audioBase64 = params.audioBase64;
 
-  const form = new FormData();
-
-  if (params.audioUri) {
-    // In React Native, FormData requires { uri, name, type }
-    form.append('audio', {
-      uri: params.audioUri,
-      name: 'question.m4a',
-      type: 'audio/mp4',
-    } as any);
-  } else if (params.text) {
-    form.append('text', params.text.trim());
+  if (!audioBase64 && params.audioUri) {
+    try {
+      const fileInfo = await FileSystem.getInfoAsync(params.audioUri);
+      if (!fileInfo.exists || fileInfo.size === 0) {
+        throw new Error("Recorded audio was empty. Please speak again.");
+      }
+      audioBase64 = await FileSystem.readAsStringAsync(params.audioUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+    } catch (readErr: any) {
+      console.warn('[askMusafir] Error reading audio file:', readErr);
+      throw new Error(readErr?.message || "Could not read recorded audio file.");
+    }
   }
 
-  form.append('lat', String(params.lat));
-  form.append('lng', String(params.lng));
+  const payload: Record<string, any> = {
+    lat: params.lat,
+    lng: params.lng,
+  };
+
+  if (audioBase64) {
+    payload.audioBase64 = audioBase64;
+  } else if (params.text) {
+    payload.text = params.text.trim();
+  }
 
   if (params.heading != null && !isNaN(params.heading)) {
-    form.append('heading', String(Math.round(params.heading)));
+    payload.heading = Math.round(params.heading);
   }
 
-  // Only pass 24-character hex tripId if valid
   if (params.tripId && /^[0-9a-f]{24}$/i.test(params.tripId)) {
-    form.append('tripId', params.tripId);
+    payload.tripId = params.tripId;
   }
 
   if (params.history && params.history.length > 0) {
-    // Backend takes JSON string of last turns
-    form.append('history', JSON.stringify(params.history.slice(-6)));
+    payload.history = params.history.slice(-6);
   }
 
   if (params.language) {
-    form.append('language', params.language);
+    payload.language = params.language;
   }
 
-  const endpoint = buildApiUrl('/ask');
-
-  let res: Response;
   try {
-    res = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: form,
-    });
-  } catch (netErr: any) {
-    const offlineErr: any = new Error("I'll answer once we're back in coverage");
-    offlineErr.code = 'OFFLINE';
-    throw offlineErr;
-  }
-
-  const json = await res.json().catch(() => null);
-
-  if (!res.ok || !json?.success) {
-    const code = json?.error?.code || `HTTP_${res.status}`;
-    let message = json?.error?.message;
+    const res = await api.post<any>('/ask', payload);
+    const data = res?.data ?? res;
+    if (!data || !data.audio?.base64) {
+      throw new Error('Invalid response from Musafir voice assistant');
+    }
+    return data as AskResult;
+  } catch (err: any) {
+    const code = err?.code || (err?.status ? `HTTP_${err.status}` : undefined);
+    let message = err?.message;
 
     if (code === 'NOTHING_HEARD') {
-      message = "Sorry, I didn't catch that";
+      message = "Sorry, I didn't catch that. Please speak again.";
     } else if (code === 'RATE_LIMITED') {
-      const retryAfter = json?.error?.details?.retryAfterS;
+      const retryAfter = err?.details?.retryAfterS;
       message = retryAfter
         ? `Too many questions. Please try again in ${retryAfter}s.`
         : 'Too many questions. Please try again in a few minutes.';
@@ -298,14 +296,33 @@ export async function askMusafir(params: AskParams): Promise<AskResult> {
       message = 'Unsupported audio format.';
     } else if (code === 'UPSTREAM_UNAVAILABLE') {
       message = 'Speech or maps service temporarily unavailable. Please try again.';
+    } else if (code === 'UNAUTHORIZED') {
+      message = 'Please sign in to ask questions.';
+    } else if (
+      !err.status &&
+      (err.message?.includes('Network Error') || err.message?.includes('network'))
+    ) {
+      message = "I'll answer once we're back in coverage";
     }
 
-    const err: any = new Error(message || 'Failed to process question');
-    err.code = code;
-    err.status = res.status;
-    err.details = json?.error?.details;
-    throw err;
+    const friendlyErr: any = new Error(message || 'Failed to process question');
+    friendlyErr.code = code;
+    friendlyErr.status = err?.status;
+    friendlyErr.details = err?.details;
+    throw friendlyErr;
   }
-
-  return json.data as AskResult;
 }
+
+// ─── Offline Storage & Playback Re-exports ─────────────────────────────────────
+export {
+  saveOfflineTrip,
+  loadOfflineTrip,
+  loadCachedRecentTrips,
+  saveCachedRecentTrips,
+  savePendingListens,
+  loadPendingListens,
+  clearPendingListens,
+  clearAllOfflineTripData,
+  getOfflineStorageUsage,
+} from './offline-trip-service';
+

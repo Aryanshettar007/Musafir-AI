@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { DEFAULT_INTERESTS, INTEREST_IDS, type InterestId } from "../catalog/interests";
 import { DEFAULT_LANGUAGE, LANGUAGE_IDS, type LanguageId } from "../catalog/languages";
-import { DEFAULT_MUSIC_MODE, GENDER_IDS, MUSIC_MODE_IDS, type GenderId, type MusicModeId } from "../catalog/profile";
+import { DEFAULT_MUSIC_MODE, GENDER_IDS, MUSIC_MODE_IDS, AGE_RANGE_IDS, type GenderId, type MusicModeId, type AgeRangeId } from "../catalog/profile";
 import { RECOMMENDED_VOICES, findVoice, type VoiceGender } from "../catalog/voices";
 import { badRequest } from "../errors";
 
@@ -10,7 +10,7 @@ import { badRequest } from "../errors";
 export const ProfileInputSchema = z.strictObject({
   name: z.string().trim().min(1).max(60).optional(),
   gender: z.enum(GENDER_IDS).optional(),
-  age: z.number().int().min(1).max(120).optional(),
+  age: z.union([z.number().int().min(1).max(120), z.enum(AGE_RANGE_IDS)]).optional(),
   language: z.enum(LANGUAGE_IDS).optional(),
   voiceGender: z.enum(["male", "female"]).optional(),
   voice: z.string().optional(),
@@ -23,7 +23,7 @@ export type ProfileInput = z.infer<typeof ProfileInputSchema>;
 export interface Profile {
   name?: string;
   gender: GenderId;
-  age?: number;
+  age?: number | AgeRangeId;
   language: LanguageId;
   voiceGender: VoiceGender;
   voice: string;

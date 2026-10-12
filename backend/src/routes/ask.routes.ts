@@ -24,6 +24,9 @@ function parseAudio(): RequestHandler {
     limits: { fileSize: MAX_AUDIO_BYTES, files: 1, fields: 20, fieldSize: MAX_FIELD_BYTES },
   }).single("audio");
   return (req: Request, res: Response, next: NextFunction) => {
+    if (req.is("application/json")) {
+      return next();
+    }
     upload(req, res, (err: unknown) => {
       if (!err) return next();
       if (err instanceof multer.MulterError) {

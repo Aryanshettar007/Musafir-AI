@@ -10,7 +10,7 @@ const userSchema = new Schema(
     email: { type: String },
     name: { type: String, trim: true },
     gender: { type: String, enum: GENDER_IDS, required: true },
-    age: { type: Number, min: 1, max: 120 },
+    age: { type: Schema.Types.Mixed },
     language: { type: String, enum: LANGUAGE_IDS, required: true },
     voiceGender: { type: String, enum: ["male", "female"], required: true },
     voice: { type: String, required: true },

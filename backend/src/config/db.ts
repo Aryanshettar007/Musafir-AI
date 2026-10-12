@@ -1,5 +1,14 @@
+import dns from "dns";
 import mongoose from "mongoose";
 import { env } from "./env";
+
+// Ensure Node's c-ares DNS resolver can resolve MongoDB Atlas SRV records
+// when local router/ISP DNS returns IPv6 link-local or malformed responses (EBADRESP)
+try {
+  dns.setServers(["8.8.8.8", "1.1.1.1"]);
+} catch (e) {
+  console.warn("[MongoDB] Could not override DNS servers:", e);
+}
 
 export const connectDB = async (): Promise<void> => {
   mongoose.connection.on("connected", () => {

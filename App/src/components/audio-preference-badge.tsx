@@ -75,17 +75,17 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 4,
-    paddingBottom: 2,
+    flexShrink: 1,
   },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     paddingLeft: 4,
-    paddingRight: 8,
+    paddingRight: 7,
     paddingVertical: 3.5,
     borderRadius: 12,
+    maxWidth: '100%',
   },
   avatarImage: {
     width: 18,
@@ -97,8 +97,9 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   text: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '600',
     letterSpacing: -0.1,
+    flexShrink: 1,
   },
 });

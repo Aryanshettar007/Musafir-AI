@@ -19,34 +19,42 @@ const HistorySchema = z.array(z.object({ q: z.string().max(TURN_CHARS_SLACK), a:
 
 const AskFieldsSchema = z.object({
   text: optional(z.string().trim().min(1).max(500)),
+  audioBase64: optional(z.string().max(4_000_000)),
   // Not plain z.coerce.number(): that turns a blank field into 0, a real position in the Gulf of Guinea.
   lat: z.preprocess(blankIsUndefined, z.coerce.number().min(-90).max(90)),
   lng: z.preprocess(blankIsUndefined, z.coerce.number().min(-180).max(180)),
   heading: optional(z.coerce.number().min(0).max(360)),
   tripId: optional(z.string().regex(/^[0-9a-f]{24}$/i, "must be a 24-character trip id")),
-  history: optional(z.string().max(200_000)),
+  history: optional(z.union([z.string().max(200_000), z.array(z.any())])),
   language: optional(z.enum(LANGUAGE_IDS)),
 });
 
-function parseHistory(raw: string | undefined) {
-  if (raw === undefined) return [];
-  let json: unknown;
-  try {
-    json = JSON.parse(raw);
-  } catch {
-    throw invalid("history", "must be a JSON string");
+function parseHistory(raw: unknown) {
+  if (raw === undefined || raw === null || raw === "") return [];
+  let parsedJson = raw;
+  if (typeof raw === "string") {
+    try {
+      parsedJson = JSON.parse(raw);
+    } catch {
+      throw invalid("history", "must be a JSON string");
+    }
   }
-  const parsed = HistorySchema.safeParse(json);
+  const parsed = HistorySchema.safeParse(parsedJson);
   if (!parsed.success) {
     throw invalid("history", 'must be an array of { "q": string, "a": string }');
   }
   return parsed.data;
 }
 
-// POST /ask (multipart/form-data). Nothing is stored; the reply audio comes back as base64.
+// POST /ask (multipart/form-data or application/json). Nothing is stored; the reply audio comes back as base64.
 export const askController = (service: AskService) => async (req: Request, res: Response) => {
   const fields = AskFieldsSchema.parse(req.body ?? {});
-  const audio = req.file?.buffer;
+  let audio = req.file?.buffer;
+  if (!audio && fields.audioBase64 && fields.audioBase64.trim().length > 0) {
+    const buf = Buffer.from(fields.audioBase64, "base64");
+    if (buf.length > 0) audio = buf;
+  }
+
   if (audio && fields.text) {
     throw invalid("text", "send audio or text, not both");
   }

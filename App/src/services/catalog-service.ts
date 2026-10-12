@@ -13,6 +13,11 @@ export interface VoiceModel {
   avatarUrl?: string | null;
 }
 
+export interface CatalogInterest {
+  id: string;
+  label: string;
+}
+
 export interface CatalogDefaults {
   language: string;
   interests: string[];
@@ -21,8 +26,9 @@ export interface CatalogDefaults {
 
 export interface CatalogData {
   genders: string[];
+  ageRanges?: { id: string; label: string }[];
   languages: CatalogLanguage[];
-  interests: string[];
+  interests: CatalogInterest[];
   musicModes: string[];
   defaults: CatalogDefaults;
 }
@@ -40,6 +46,19 @@ export const FALLBACK_LANGUAGES: CatalogLanguage[] = [
   { id: 'bn-IN', label: 'Bengali' },
   { id: 'gu-IN', label: 'Gujarati' },
   { id: 'pa-IN', label: 'Punjabi' },
+];
+
+// Built-in fallback interests matching backend catalog
+export const FALLBACK_INTERESTS: CatalogInterest[] = [
+  { id: 'history', label: 'History' },
+  { id: 'architecture', label: 'Architecture' },
+  { id: 'spirituality', label: 'Spirituality' },
+  { id: 'food', label: 'Food' },
+  { id: 'nature', label: 'Nature' },
+  { id: 'adventure', label: 'Adventure' },
+  { id: 'art-culture', label: 'Art & Culture' },
+  { id: 'legends', label: 'Legends' },
+  { id: 'cinema', label: 'Cinema' },
 ];
 
 // Fallback recommended voices per language
@@ -149,7 +168,7 @@ export async function fetchCatalog(): Promise<CatalogData> {
   return {
     genders: ['male', 'female', 'unspecified'],
     languages: FALLBACK_LANGUAGES,
-    interests: [],
+    interests: FALLBACK_INTERESTS,
     musicModes: ['rj', 'duck-only', 'off'],
     defaults: {
       language: 'en-IN',

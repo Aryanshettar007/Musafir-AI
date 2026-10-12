@@ -1,6 +1,6 @@
 import { INTERESTS, DEFAULT_INTERESTS } from "../catalog/interests";
 import { DEFAULT_LANGUAGE, LANGUAGES, type LanguageId } from "../catalog/languages";
-import { DEFAULT_MUSIC_MODE, GENDERS, MUSIC_MODES } from "../catalog/profile";
+import { DEFAULT_MUSIC_MODE, GENDERS, MUSIC_MODES, AGE_RANGES, DEFAULT_AGE_RANGE } from "../catalog/profile";
 import { VOICES, isRecommended, type VoiceGender } from "../catalog/voices";
 import type { Storage } from "../clients/storage";
 import { VoiceDemo } from "../models/voiceDemo.model";
@@ -9,6 +9,7 @@ import { VoiceDemo } from "../models/voiceDemo.model";
 export function getCatalog() {
   return {
     genders: GENDERS,
+    ageRanges: AGE_RANGES,
     languages: LANGUAGES.map(({ id, label }) => ({ id, label })),
     interests: INTERESTS,
     musicModes: MUSIC_MODES,

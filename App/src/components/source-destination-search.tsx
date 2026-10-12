@@ -24,6 +24,7 @@ import * as Crypto from 'expo-crypto';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { getPlaceAutocomplete, PlaceSuggestion } from '@/services/trip-service';
 import { AudioPreferenceBadge } from '@/components/audio-preference-badge';
+import { MoodPreferenceBadge } from '@/components/mood-preference-badge';
 
 export interface LocationPoint {
   text: string;
@@ -43,6 +44,8 @@ export interface SourceDestinationSearchProps {
   preferredAudio?: string;
   voice?: string;
   onPressAudioPreference?: () => void;
+  selectedMoods?: string[];
+  onPressMoodPreference?: () => void;
   onSourceTextChange: (text: string) => void;
   onDestinationTextChange: (text: string) => void;
   onSelectSourceSuggestion: (suggestion: PlaceSuggestion) => void;
@@ -67,6 +70,8 @@ export const SourceDestinationSearch = forwardRef<
     preferredAudio = 'English',
     voice = 'Nalini',
     onPressAudioPreference,
+    selectedMoods = [],
+    onPressMoodPreference,
     onSourceTextChange,
     onDestinationTextChange,
     onSelectSourceSuggestion,
@@ -319,12 +324,18 @@ export const SourceDestinationSearch = forwardRef<
             )}
           </View>
 
-          {/* PREFERRED AUDIO BADGE (BELOW DESTINATION) */}
-          <AudioPreferenceBadge
-            preferredAudio={preferredAudio}
-            voice={voice}
-            onPress={onPressAudioPreference}
-          />
+          {/* PREFERENCES ROW (VOICE & MOOD SELECTORS) */}
+          <View style={styles.preferencesRow}>
+            <AudioPreferenceBadge
+              preferredAudio={preferredAudio}
+              voice={voice}
+              onPress={onPressAudioPreference}
+            />
+            <MoodPreferenceBadge
+              selectedMoods={selectedMoods}
+              onPress={onPressMoodPreference}
+            />
+          </View>
         </View>
 
         {/* SWAP SOURCE & DESTINATION BUTTON */}
@@ -446,6 +457,13 @@ const styles = StyleSheet.create({
   inputsColumn: {
     flex: 1,
     gap: 2,
+  },
+  preferencesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingTop: 4,
+    paddingBottom: 2,
   },
   inputRow: {
     flexDirection: 'row',

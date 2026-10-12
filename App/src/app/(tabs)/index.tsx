@@ -34,6 +34,8 @@ import {
   PlaceSuggestion,
   TripSummary,
   RouteOption,
+  loadCachedRecentTrips,
+  saveCachedRecentTrips,
 } from '@/services/trip-service';
 import {
   SourceDestinationSearch,
@@ -41,6 +43,8 @@ import {
   LocationPoint,
 } from '@/components/source-destination-search';
 import { AudioLanguageSheetModal } from '@/components/ui/audio-language-sheet';
+import { MoodSelectSheetModal } from '@/components/ui/mood-select-sheet';
+import { DEFAULT_INTERESTS } from '@/constants/onboarding';
 import { mapLanguage, mapLanguageToLabel, updateProfileOnBackend } from '@/services/user-service';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -230,11 +234,13 @@ export default function HomeScreen() {
   // Toggle view all recent destinations
   const [showAllDestinations, setShowAllDestinations] = useState<boolean>(false);
 
-  // User Audio Preferences
+  // User Audio Preferences & Mood
   const [preferredAudio, setPreferredAudio] = useState<string>('English');
   const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
   const [voice, setVoice] = useState<string>('Nalini');
+  const [selectedMoods, setSelectedMoods] = useState<string[]>([...DEFAULT_INTERESTS]);
   const [isAudioModalVisible, setIsAudioModalVisible] = useState<boolean>(false);
+  const [isMoodModalVisible, setIsMoodModalVisible] = useState<boolean>(false);
 
   // DRAGGABLE SHEET ANIMATION & PAN RESPONDER
   const sheetHeight = useRef(new Animated.Value(COLLAPSED_SHEET_HEIGHT)).current;
@@ -345,17 +351,32 @@ export default function HomeScreen() {
     return () => clearInterval(interval);
   }, []);
 
-  // Load recent trips from server
+  // Load recent trips from server or offline cache
   const loadRecentTrips = useCallback(async () => {
     try {
       setIsLoadingRecent(true);
       const trips = await getRecentTrips(10);
       setRecentTrips(trips);
+      await saveCachedRecentTrips(trips);
     } catch {
-      // Silently fail — not critical
+      // Offline fallback: load cached recent trips from disk/storage
+      const cached = await loadCachedRecentTrips();
+      if (cached && cached.length > 0) {
+        setRecentTrips(cached);
+      }
     } finally {
       setIsLoadingRecent(false);
     }
+  }, []);
+
+  // Pre-load cached trips immediately on mount for instant zero-network display
+  useEffect(() => {
+    (async () => {
+      const cached = await loadCachedRecentTrips();
+      if (cached && cached.length > 0) {
+        setRecentTrips((curr) => (curr.length > 0 ? curr : cached));
+      }
+    })();
   }, []);
 
   useEffect(() => {
@@ -372,6 +393,9 @@ export default function HomeScreen() {
           if (data.preferredAudio) setPreferredAudio(mapLanguageToLabel(data.preferredAudio));
           if (data.voiceGender) setVoiceGender(data.voiceGender);
           if (data.voice) setVoice(data.voice);
+          if (data.interests && Array.isArray(data.interests) && data.interests.length > 0) {
+            setSelectedMoods(data.interests);
+          }
         }
       } catch {
         // Non-critical background read
@@ -469,6 +493,7 @@ export default function HomeScreen() {
           language: mapLanguage(preferredAudio),
           voiceGender,
           voice,
+          interests: selectedMoods,
         },
       });
       router.push(`/trip/${tripId}`);
@@ -507,6 +532,7 @@ export default function HomeScreen() {
     preferredAudio,
     voiceGender,
     voice,
+    selectedMoods,
     router,
   ]);
 
@@ -1212,6 +1238,8 @@ export default function HomeScreen() {
             preferredAudio={preferredAudio}
             voice={voice}
             onPressAudioPreference={() => setIsAudioModalVisible(true)}
+            selectedMoods={selectedMoods}
+            onPressMoodPreference={() => setIsMoodModalVisible(true)}
             onSourceTextChange={(text) => {
               setSelectedSourceSuggestion(null);
               setSourcePoint({ text, coords: null, isGps: false });
@@ -1419,6 +1447,30 @@ export default function HomeScreen() {
             updateProfileOnBackend(updated).catch(() => {});
           } catch (err) {
             console.warn('[HomeScreen] Failed to save updated audio preference:', err);
+          }
+        }}
+      />
+
+      {/* MOOD SELECTION MODAL */}
+      <MoodSelectSheetModal
+        visible={isMoodModalVisible}
+        onClose={() => setIsMoodModalVisible(false)}
+        selectedMoods={selectedMoods}
+        onApply={async (moods) => {
+          setSelectedMoods(moods);
+          setIsMoodModalVisible(false);
+
+          try {
+            const raw = await AsyncStorage.getItem('@musafir_user_profile');
+            const existing = raw ? JSON.parse(raw) : {};
+            const updated = {
+              ...existing,
+              interests: moods,
+            };
+            await AsyncStorage.setItem('@musafir_user_profile', JSON.stringify(updated));
+            updateProfileOnBackend(updated).catch(() => {});
+          } catch (err) {
+            console.warn('[HomeScreen] Failed to save updated mood preferences:', err);
           }
         }}
       />

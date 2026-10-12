@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Dimensions,
   PanResponder,
@@ -10,12 +11,12 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import MapView from 'react-native-maps';
 import { File } from 'expo-file-system';
 import * as Location from 'expo-location';
-import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
+import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
 import * as Crypto from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
 
@@ -26,6 +27,11 @@ import {
   Trip,
   TripItem,
   ListenEvent,
+  saveOfflineTrip,
+  loadOfflineTrip,
+  savePendingListens,
+  loadPendingListens,
+  clearPendingListens,
 } from '@/services/trip-service';
 import {
   DownloadState,
@@ -74,15 +80,21 @@ export default function TripScreen() {
 
   const mapRef = useRef<MapView>(null);
   const player = useAudioPlayer('');
+  const livePlayer = useAudioPlayer('');
+  const livePlayerStatus = useAudioPlayerStatus(livePlayer);
   const listenQueueRef = useRef<ListenEvent[]>([]);
   const listenFlushTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
 
   const [trip, setTrip] = useState<Trip | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isOffline, setIsOffline] = useState(false);
   const [downloads, setDownloads] = useState<DownloadState>({});
   const [played, setPlayed] = useState<PlayedSet>({});
   const [playingItem, setPlayingItem] = useState<TripItem | null>(null);
+  const [lastPlayedItem, setLastPlayedItem] = useState<TripItem | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [queue, setQueue] = useState<string[]>([]);
   const audioQueueRef = useRef<TripAudioQueue>(new TripAudioQueue());
   const [polylineCoords, setPolylineCoords] = useState<{ latitude: number; longitude: number }[]>([]);
@@ -93,7 +105,138 @@ export default function TripScreen() {
   const [audioMultiplier, setAudioMultiplier] = useState<number>(2);
   const audioMultiplierRef = useRef(2);
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const [showTranscript, setShowTranscript] = useState(false);
+
+  // Audio scrubbing and playback position
+  const [currentPosition, setCurrentPosition] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
+
+  // ─── Live Mode State & Player Synchronization ─────────────────────────────
+  const [liveTranscript, setLiveTranscript] = useState<{ question?: string; answerText: string } | null>(null);
+  const [isLivePlaying, setIsLivePlaying] = useState(false);
+  const wasPlayingStoryRef = useRef(false);
+  const liveDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const livePlaybackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleLivePlaybackFinished = useCallback(() => {
+    if (livePlaybackTimeoutRef.current) {
+      clearTimeout(livePlaybackTimeoutRef.current);
+      livePlaybackTimeoutRef.current = null;
+    }
+    setIsLivePlaying(false);
+
+    // Resume interrupted story if one was playing before the live question
+    if (wasPlayingStoryRef.current) {
+      audioQueueRef.current.resume();
+      wasPlayingStoryRef.current = false;
+    }
+
+    // Auto-dismiss the temporary transcript card after reading grace period (3.5s)
+    if (liveDismissTimerRef.current) clearTimeout(liveDismissTimerRef.current);
+    liveDismissTimerRef.current = setTimeout(() => {
+      setLiveTranscript(null);
+    }, 3500);
+  }, []);
+
+  useEffect(() => {
+    if (isLivePlaying && livePlayerStatus.didJustFinish) {
+      handleLivePlaybackFinished();
+    }
+  }, [isLivePlaying, livePlayerStatus.didJustFinish, handleLivePlaybackFinished]);
+
+  const handleLiveRecordingStart = useCallback(() => {
+    // Duck / pause currently playing story during voice question
+    if (isPlaying && !isPaused) {
+      wasPlayingStoryRef.current = true;
+      audioQueueRef.current.pause();
+    }
+    if (liveDismissTimerRef.current) {
+      clearTimeout(liveDismissTimerRef.current);
+      liveDismissTimerRef.current = null;
+    }
+  }, [isPlaying, isPaused]);
+
+  const handleLiveResponse = useCallback(
+    (data: { transcript: string; answerText: string; audioUri: string; durationS: number }) => {
+      // Ensure story is paused while Musafir answers
+      if (isPlaying && !isPaused) {
+        wasPlayingStoryRef.current = true;
+        audioQueueRef.current.pause();
+      }
+
+      if (liveDismissTimerRef.current) {
+        clearTimeout(liveDismissTimerRef.current);
+        liveDismissTimerRef.current = null;
+      }
+
+      setLiveTranscript({
+        question: data.transcript,
+        answerText: data.answerText,
+      });
+      setIsLivePlaying(true);
+
+      // Play spoken answer
+      try {
+        livePlayer.replace({ uri: data.audioUri });
+        livePlayer.play();
+      } catch (err) {
+        console.warn('Error playing live response audio:', err);
+      }
+
+      // Resilient fallback duration timeout in case player status didJustFinish is delayed
+      if (livePlaybackTimeoutRef.current) clearTimeout(livePlaybackTimeoutRef.current);
+      const fallbackMs = Math.max(3000, (data.durationS || 4) * 1000 + 1200);
+      livePlaybackTimeoutRef.current = setTimeout(() => {
+        handleLivePlaybackFinished();
+      }, fallbackMs);
+    },
+    [isPlaying, isPaused, livePlayer, handleLivePlaybackFinished]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (liveDismissTimerRef.current) clearTimeout(liveDismissTimerRef.current);
+      if (livePlaybackTimeoutRef.current) clearTimeout(livePlaybackTimeoutRef.current);
+      try {
+        livePlayer.pause();
+      } catch {}
+    };
+  }, [livePlayer]);
+
+  useEffect(() => {
+    if (!isPlaying || isPaused) return;
+    const interval = setInterval(() => {
+      try {
+        if (player) {
+          if (typeof (player as any).currentTime === 'number') {
+            setCurrentPosition((player as any).currentTime);
+          }
+          if (typeof (player as any).duration === 'number' && (player as any).duration > 0) {
+            setAudioDuration((player as any).duration);
+          }
+        }
+      } catch {}
+    }, 250);
+    return () => clearInterval(interval);
+  }, [isPlaying, isPaused, player]);
+
+  useEffect(() => {
+    setCurrentPosition(0);
+    setAudioDuration(playingItem?.audio?.durationS ?? 0);
+  }, [playingItem?.id]);
+
+  const handleSeek = useCallback(
+    (seconds: number) => {
+      try {
+        if (player && typeof (player as any).seekTo === 'function') {
+          (player as any).seekTo(seconds);
+          setCurrentPosition(seconds);
+        }
+      } catch (err) {
+        console.warn('Error seeking player:', err);
+      }
+    },
+    [player]
+  );
 
   useEffect(() => {
     isSimulatingRef.current = isSimulating;
@@ -242,13 +385,16 @@ export default function TripScreen() {
   const queueListen = useCallback(
     (itemId: string, event: 'started' | 'completed' | 'skipped') => {
       if (!tripId) return;
-      listenQueueRef.current.push({
+      const ev: ListenEvent = {
         id: Crypto.randomUUID(),
         tripId,
         itemId,
         event,
         at: new Date().toISOString(),
-      });
+      };
+      listenQueueRef.current.push(ev);
+      // Persist offline events to storage so they survive app closures
+      savePendingListens(listenQueueRef.current);
     },
     [tripId]
   );
@@ -259,8 +405,11 @@ export default function TripScreen() {
     listenQueueRef.current = [];
     try {
       await postListens(batch);
+      await clearPendingListens();
     } catch {
+      // Re-queue and persist to disk for next online attempt
       listenQueueRef.current = [...batch, ...listenQueueRef.current];
+      await savePendingListens(listenQueueRef.current);
     }
   }, []);
 
@@ -295,6 +444,24 @@ export default function TripScreen() {
           console.warn('[TripAudioQueue] Error playing item:', err);
         }
       },
+      onPauseItem: () => {
+        try {
+          if (player) {
+            player.pause();
+          }
+        } catch (err) {
+          console.warn('[TripAudioQueue] Error pausing item:', err);
+        }
+      },
+      onResumeItem: () => {
+        try {
+          if (player) {
+            player.play();
+          }
+        } catch (err) {
+          console.warn('[TripAudioQueue] Error resuming item:', err);
+        }
+      },
       onStopItem: () => {
         try {
           if (player) {
@@ -315,6 +482,9 @@ export default function TripScreen() {
       setQueue(state.queue);
       setPlayed(state.played);
       setPlayingItem(state.playingItem);
+      setLastPlayedItem(state.lastPlayedItem);
+      setIsPlaying(state.isPlaying);
+      setIsPaused(state.isPaused);
     });
     return unsub;
   }, []);
@@ -327,6 +497,8 @@ export default function TripScreen() {
     }
   }, [trip?.items]);
 
+  const handleLocationUpdateRef = useRef<((coords: { latitude: number; longitude: number }) => void) | null>(null);
+
   // Subscribe to background geofence & background location events
   useEffect(() => {
     const unsubGeofence = subscribeToGeofence((itemId) => {
@@ -338,7 +510,7 @@ export default function TripScreen() {
 
     const unsubBgLoc = subscribeToBackgroundLocation((coords) => {
       if (!isSimulatingRef.current) {
-        setUserLocation(coords);
+        handleLocationUpdateRef.current?.(coords);
       }
     });
 
@@ -354,10 +526,6 @@ export default function TripScreen() {
       stopBackgroundGeofencing();
       audioQueueRef.current.stop();
     };
-  }, []);
-
-  const playItem = useCallback((item: TripItem) => {
-    audioQueueRef.current.enqueue(item.id, true);
   }, []);
 
   // ─── Download an item's audio ──────────────────────────────────────────────
@@ -377,6 +545,8 @@ export default function TripScreen() {
         await File.downloadFileAsync(item.audio.url, file, { idempotent: true });
         setDownloads((prev) => ({ ...prev, [item.id]: 'ready' }));
         setDownloadedBytes((b) => b + (item.audio?.bytes ?? 0));
+        // Ensure trip JSON is also persisted alongside downloaded audio
+        await saveOfflineTrip(tripData);
       } catch (err: any) {
         if (err?.message?.includes('403') || err?.message?.includes('UnableToDownload')) {
           try {
@@ -386,6 +556,7 @@ export default function TripScreen() {
               await File.downloadFileAsync(freshItem.audio.url, file, { idempotent: true });
               setDownloads((prev) => ({ ...prev, [item.id]: 'ready' }));
               setDownloadedBytes((b) => b + (item.audio?.bytes ?? 0));
+              await saveOfflineTrip(fresh);
               return;
             }
           } catch {
@@ -398,6 +569,42 @@ export default function TripScreen() {
     []
   );
 
+  // ─── Initial offline hydration & restore pending listens ─────────────────
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      // 1. Restore any unsent offline listens
+      try {
+        const pending = await loadPendingListens();
+        if (pending.length > 0 && isMounted) {
+          listenQueueRef.current = [...pending, ...listenQueueRef.current];
+        }
+      } catch {}
+
+      // 2. Pre-load offline trip immediately for instantaneous zero-network startup
+      if (tripId) {
+        try {
+          const cached = await loadOfflineTrip(tripId);
+          if (cached && isMounted) {
+            setTrip((current) => current || cached);
+            if (cached.route?.polyline) {
+              setPolylineCoords(decodePolyline(cached.route.polyline));
+            }
+            for (const item of cached.items) {
+              const file = localFile(item.id);
+              if (file.exists) {
+                setDownloads((prev) => ({ ...prev, [item.id]: 'ready' }));
+              }
+            }
+          }
+        } catch {}
+      }
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, [tripId]);
+
   // ─── Poll trip ──────────────────────────────────────────────────────────────
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -406,6 +613,11 @@ export default function TripScreen() {
     try {
       const data = await getTrip(tripId);
       setTrip(data);
+      setIsOffline(false);
+      setError(null);
+
+      // Persist trip JSON to local storage for zero-network playback
+      await saveOfflineTrip(data);
 
       if (data.route?.polyline) {
         setPolylineCoords(decodePolyline(data.route.polyline));
@@ -427,8 +639,28 @@ export default function TripScreen() {
         pollRef.current = null;
       }
     } catch (e: any) {
-      setError(e?.message ?? 'Failed to load trip');
-      if (pollRef.current) clearInterval(pollRef.current);
+      // Zero-network fallback: Load from device storage
+      const offline = await loadOfflineTrip(tripId);
+      if (offline) {
+        setTrip(offline);
+        setIsOffline(true);
+        setError(null);
+        if (offline.route?.polyline) {
+          setPolylineCoords(decodePolyline(offline.route.polyline));
+        }
+        for (const item of offline.items) {
+          const file = localFile(item.id);
+          if (file.exists) {
+            setDownloads((prev) => ({ ...prev, [item.id]: 'ready' }));
+          }
+        }
+      } else {
+        setError(e?.message ?? 'Failed to load trip');
+      }
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
     }
   }, [tripId, downloadItem]);
 
@@ -458,6 +690,7 @@ export default function TripScreen() {
     },
     [trip]
   );
+  handleLocationUpdateRef.current = handleLocationUpdate;
 
   const handleResetToGPS = useCallback(async () => {
     try {
@@ -515,6 +748,28 @@ export default function TripScreen() {
     }
   }, [polylineCoords]);
 
+  // ─── Exit session action (Defined before early returns to preserve hook order) ───
+  const handleExitSession = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Alert.alert(
+      'Exit Session',
+      'Are you sure you want to exit this trip session?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Exit Session',
+          style: 'destructive',
+          onPress: () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            audioQueueRef.current.stop();
+            stopBackgroundGeofencing();
+            router.replace('/(tabs)');
+          },
+        },
+      ]
+    );
+  }, [router]);
+
   if (error) {
     return (
       <SafeAreaView style={[styles.centered, { backgroundColor: colors.background }]}>
@@ -548,6 +803,16 @@ export default function TripScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Stack.Screen options={{ gestureEnabled: false, headerShown: false }} />
+
+      {/* ── OFFLINE STATUS BADGE ── */}
+      {isOffline && (
+        <View style={styles.offlineBanner}>
+          <Ionicons name="cloud-offline" size={13} color="#FFF" />
+          <Text style={styles.offlineBannerText}>Offline Mode · Playing from device storage</Text>
+        </View>
+      )}
+
       {/* ── FULL SCREEN MAP & HEADER OVERLAY ── */}
       <TripMap
         mapRef={mapRef}
@@ -558,18 +823,23 @@ export default function TripScreen() {
         sheetHeight={sheetHeight}
         colors={colors}
         isDark={isDark}
-        onBack={() => router.back()}
         onRecenter={handleRecenter}
         isSimulating={isSimulating}
         onToggleSimulate={() => setIsSimulating((v) => !v)}
         items={trip.items}
-        isPlaying={!!playingItem}
+        playingItem={playingItem}
+        isPlaying={isPlaying}
+        isPaused={isPaused}
+        played={played}
         playingItemTitle={playingItem?.title}
         onSimLocationUpdate={handleLocationUpdate}
         onResetToGPS={handleResetToGPS}
         polylineCoords={polylineCoords}
         audioMultiplier={audioMultiplier}
         onAudioMultiplierChange={setAudioMultiplier}
+        liveTranscript={liveTranscript}
+        isLivePlaying={isLivePlaying}
+        onDismissLiveTranscript={() => setLiveTranscript(null)}
       />
 
       {/* ── DRAGGABLE BOTTOM SHEET ── */}
@@ -583,10 +853,17 @@ export default function TripScreen() {
         pulseAnim={pulseAnim}
         readyItems={readyItems}
         progressPct={progressPct}
-        totalDownloadedBytes={totalDownloadedBytes}
         playingItem={playingItem}
-        showTranscript={showTranscript}
-        onToggleTranscript={() => setShowTranscript((v) => !v)}
+        lastPlayedItem={lastPlayedItem}
+        isPlaying={isPlaying}
+        isPaused={isPaused}
+        currentTime={currentPosition}
+        duration={audioDuration > 0 ? audioDuration : (playingItem?.audio?.durationS ?? lastPlayedItem?.audio?.durationS ?? 0)}
+        onSeek={handleSeek}
+        onTogglePlayPause={() => {
+          const targetId = playingItem?.id || lastPlayedItem?.id;
+          audioQueueRef.current.togglePlayPause(targetId);
+        }}
         onStopPlaying={() => {
           audioQueueRef.current.stop();
         }}
@@ -596,8 +873,11 @@ export default function TripScreen() {
         }}
         downloads={downloads}
         played={played}
+        onExitSession={handleExitSession}
         userLocation={userLocation}
-        onPlayItem={playItem}
+        onLiveRecordingStart={handleLiveRecordingStart}
+        onLiveResponse={handleLiveResponse}
+        isLivePlaying={isLivePlaying}
       />
     </View>
   );
@@ -637,5 +917,31 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 15,
     marginTop: 12,
+  },
+  offlineBanner: {
+    position: 'absolute',
+    top: 52,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(28, 28, 30, 0.92)',
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    zIndex: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 6,
+  },
+  offlineBannerText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
 });

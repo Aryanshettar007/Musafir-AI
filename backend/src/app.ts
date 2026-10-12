@@ -20,7 +20,7 @@ export function createApp({ verifyIdToken, storage, corsOrigins, routers }: AppO
   const app = express();
 
   app.use(cors(corsOrigins?.length ? { origin: corsOrigins } : undefined));
-  app.use(express.json({ limit: "100kb" }));
+  app.use(express.json({ limit: "10mb" }));
 
   app.get("/", (_req: Request, res: Response) => {
     res.json({
