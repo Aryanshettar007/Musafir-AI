@@ -57,20 +57,22 @@ function zoomToDelta(zoom: number): { latitudeDelta: number; longitudeDelta: num
 let scriptLoadingPromise: Promise<any> | null = null;
 
 async function ensureGoogleMapsLoaded(mapsApi: any): Promise<any> {
-  if (mapsApi?.Map) {
-    return mapsApi;
+  const api = mapsApi || (typeof window !== 'undefined' ? window.google?.maps : null);
+  if (!api) return null;
+  if (api.Map) {
+    return api;
   }
-  if (mapsApi?.importLibrary) {
+  if (typeof api.importLibrary === 'function') {
     try {
-      const { Map } = await mapsApi.importLibrary('maps');
+      const { Map } = await api.importLibrary('maps');
       if (Map) {
-        mapsApi.Map = Map;
+        api.Map = Map;
       }
     } catch (e) {
       console.warn('Failed to import maps library:', e);
     }
   }
-  return mapsApi;
+  return api;
 }
 
 function loadGoogleMapsScript(apiKey: string): Promise<any> {
@@ -85,36 +87,49 @@ function loadGoogleMapsScript(apiKey: string): Promise<any> {
   }
 
   scriptLoadingPromise = new Promise((resolve, reject) => {
-    const onLoaded = async () => {
+    const callbackName = '__musafirGoogleMapsLoaded';
+
+    const finishLoading = async () => {
       try {
         const maps = await ensureGoogleMapsLoaded(window.google?.maps);
         if (maps?.Map) {
           resolve(maps);
         } else {
+          scriptLoadingPromise = null;
           reject(new Error('Google Maps script loaded, but google.maps.Map is not available.'));
         }
       } catch (err) {
+        scriptLoadingPromise = null;
         reject(err);
+      } finally {
+        try {
+          delete (window as any)[callbackName];
+        } catch {}
       }
     };
 
+    (window as any)[callbackName] = finishLoading;
+
     const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
     if (existingScript) {
-      if (window.google?.maps) {
-        onLoaded();
+      if (window.google?.maps?.Map) {
+        resolve(window.google.maps);
       } else {
-        existingScript.addEventListener('load', onLoaded);
-        existingScript.addEventListener('error', reject);
+        existingScript.addEventListener('load', finishLoading);
+        existingScript.addEventListener('error', (err) => {
+          scriptLoadingPromise = null;
+          reject(err);
+        });
       }
       return;
     }
 
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=geometry`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=geometry&loading=async&callback=${callbackName}`;
     script.async = true;
     script.defer = true;
-    script.onload = onLoaded;
     script.onerror = (err) => {
+      scriptLoadingPromise = null;
       console.warn('Failed to load Google Maps script on web:', err);
       reject(err);
     };
@@ -232,7 +247,6 @@ export const MapView = forwardRef<any, MapViewProps>((props, ref) => {
         console.warn('Google Maps script error:', err);
         if (isMounted) {
           setLoading(false);
-          setAuthError(true);
         }
       });
 

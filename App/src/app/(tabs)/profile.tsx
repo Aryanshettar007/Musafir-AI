@@ -182,63 +182,97 @@ export default function ProfileScreen() {
   }, [refreshStorageUsage]);
 
   // Clear offline storage handler
+  const performClearOffline = async () => {
+    try {
+      setIsClearingCache(true);
+      await clearAllOfflineTripData();
+      await refreshStorageUsage();
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert('Storage Cleared', 'Offline trips and audio have been deleted.');
+      } else {
+        window.alert('Offline trips and audio have been deleted.');
+      }
+    } catch (err) {
+      console.error('[Profile] Error clearing offline data:', err);
+      if (Platform.OS !== 'web') {
+        Alert.alert('Error', 'Could not clear offline storage.');
+      } else {
+        window.alert('Could not clear offline storage.');
+      }
+    } finally {
+      setIsClearingCache(false);
+    }
+  };
+
   const handleClearOfflinePress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Alert.alert(
-      'Clear Offline Storage',
-      `This will delete all offline audio downloads and cached trips (${offlineStorageText}) from your device.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Clear Data',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setIsClearingCache(true);
-              await clearAllOfflineTripData();
-              await refreshStorageUsage();
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              Alert.alert('Storage Cleared', 'Offline trips and audio have been deleted.');
-            } catch (err) {
-              console.error('[Profile] Error clearing offline data:', err);
-              Alert.alert('Error', 'Could not clear offline storage.');
-            } finally {
-              setIsClearingCache(false);
-            }
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      Alert.alert(
+        'Clear Offline Storage',
+        `This will delete all offline audio downloads and cached trips (${offlineStorageText}) from your device.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Clear Data',
+            style: 'destructive',
+            onPress: performClearOffline,
           },
-        },
-      ]
-    );
+        ]
+      );
+    } else {
+      const confirmed = window.confirm(
+        `This will delete all offline audio downloads and cached trips (${offlineStorageText}) from your device. Continue?`
+      );
+      if (confirmed) {
+        performClearOffline();
+      }
+    }
   };
 
   // Logout handler: clears all offline trip data and signs out
+  const performLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+      // Clear offline trips, audio downloads, and cached storage on logout
+      await clearAllOfflineTripData();
+      await logOut();
+      router.replace('/(auth)/login');
+    } catch (err) {
+      console.error('[Profile] Logout error:', err);
+      if (Platform.OS !== 'web') {
+        Alert.alert('Logout Error', 'Could not sign out. Please check your connection.');
+      } else {
+        window.alert('Could not sign out. Please check your connection.');
+      }
+      setIsLoggingOut(false);
+    }
+  };
+
   const handleLogoutPress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert(
-      'Log Out',
-      'Are you sure you want to log out? All offline trip data and audio downloads will be cleared from this device.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Log Out',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setIsLoggingOut(true);
-              // Clear offline trips, audio downloads, and cached storage on logout
-              await clearAllOfflineTripData();
-              await logOut();
-              router.replace('/(auth)/login');
-            } catch (err) {
-              console.error('[Profile] Logout error:', err);
-              Alert.alert('Logout Error', 'Could not sign out. Please check your connection.');
-              setIsLoggingOut(false);
-            }
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      Alert.alert(
+        'Log Out',
+        'Are you sure you want to log out? All offline trip data and audio downloads will be cleared from this device.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Log Out',
+            style: 'destructive',
+            onPress: performLogout,
           },
-        },
-      ],
-      { cancelable: true }
-    );
+        ],
+        { cancelable: true }
+      );
+    } else {
+      const confirmed = window.confirm(
+        'Are you sure you want to log out? All offline trip data and audio downloads will be cleared from this device.'
+      );
+      if (confirmed) {
+        performLogout();
+      }
+    }
   };
 
   // Dynamic Uber-themed palette

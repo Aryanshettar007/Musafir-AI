@@ -14,6 +14,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SocialAuthButtons } from '@/components/auth/social-auth-buttons';
 import { useAuth } from '@/context/auth-context';
 import { syncUserSignIn } from '@/services/user-service';
 
@@ -118,6 +119,11 @@ export default function LoginScreen() {
                   style={styles.submitButton}>
                   {loading ? 'Signing In...' : 'Sign In'}
                 </Button>
+
+                <SocialAuthButtons
+                  disabled={loading}
+                  onError={(err) => setErrorMessage(err)}
+                />
               </View>
 
               <View style={styles.footerRow}>
