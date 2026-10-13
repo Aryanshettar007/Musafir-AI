@@ -76,6 +76,26 @@ describe("POST /trips", () => {
     expect(user).toMatchObject({ language: "en-IN", voice: "Deepak", interests: ["history", "food"] });
   });
 
+  it("accepts selected moods at root and inside prefs, mapping to trip prefs and moods", async () => {
+    const res = await request(app()).post("/trips").set(authHeader("u1")).send({ ...body, moods: ["adventure", "nature"] });
+    expect(res.status).toBe(202);
+    const t = (await Trip.findById(res.body.data.tripId).lean())!;
+    expect(t.prefs.interests).toEqual(["adventure", "nature"]);
+    expect(t.moods).toEqual(["adventure", "nature"]);
+    expect(t.prefs.moods).toEqual(["adventure", "nature"]);
+
+    // Mark first trip done so user can create another
+    await Trip.deleteMany({});
+
+    // Moods array inside prefs
+    const res2 = await request(app()).post("/trips").set(authHeader("u1")).send({ ...body, prefs: { moods: ["spirituality"] } });
+    expect(res2.status).toBe(202);
+    const t2 = (await Trip.findById(res2.body.data.tripId).lean())!;
+    expect(t2.prefs.interests).toEqual(["spirituality"]);
+    expect(t2.moods).toEqual(["spirituality"]);
+    expect(t2.prefs.moods).toEqual(["spirituality"]);
+  });
+
   it("accepts a place id as the origin and takes its point from the route start", async () => {
     const res = await request(app()).post("/trips").set(authHeader("u1")).send({ origin: { placeId: "ChIJorigin", label: "Bengaluru" }, destination: body.destination });
     expect(res.status).toBe(202);

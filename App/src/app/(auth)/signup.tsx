@@ -15,6 +15,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SocialAuthButtons } from '@/components/auth/social-auth-buttons';
 import { useAuth } from '@/context/auth-context';
 import { syncUserSignIn } from '@/services/user-service';
 
@@ -155,6 +156,11 @@ export default function SignUpScreen() {
                   style={styles.submitButton}>
                   {loading ? 'Creating Account...' : 'Create Account'}
                 </Button>
+
+                <SocialAuthButtons
+                  disabled={loading}
+                  onError={(err) => setErrorMessage(err)}
+                />
               </View>
 
               <View style={styles.footerRow}>

@@ -94,11 +94,13 @@ export interface Trip {
   progress: { ready: number; failed: number; total: number };
   origin: { label: string; lat?: number; lng?: number };
   destination: { label: string; lat?: number; lng?: number };
+  moods?: string[];
   prefs: {
     language: string;
     voice: string;
     voiceGender: string;
     interests: string[];
+    moods?: string[];
     musicMode: string;
   };
   route?: {
@@ -150,11 +152,13 @@ export interface StartTripParams {
     durationS?: number;
     description?: string;
   };
+  moods?: string[];
   prefs?: {
     language?: string;
     voice?: string;
     voiceGender?: string;
     interests?: string[];
+    moods?: string[];
     musicMode?: string;
   };
 }

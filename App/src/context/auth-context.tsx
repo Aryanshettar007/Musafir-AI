@@ -15,6 +15,8 @@ interface AuthContextType {
   error: string | null;
   signInWithEmail: (email: string, password: string) => Promise<User>;
   signUpWithEmail: (email: string, password: string) => Promise<User>;
+  signInWithGoogle: () => Promise<User>;
+  signInWithApple: () => Promise<User>;
   logOut: () => Promise<void>;
   clearError: () => void;
 }
@@ -70,6 +72,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const signInWithGoogle = async (): Promise<User> => {
+    setError(null);
+    try {
+      const { performGoogleSignIn } = await import('@/services/social-auth');
+      const authedUser = await performGoogleSignIn();
+      setUser(authedUser);
+      return authedUser;
+    } catch (err: any) {
+      if (err?.message !== 'Sign-in cancelled.') {
+        setError(err.message);
+      }
+      throw err;
+    }
+  };
+
+  const signInWithApple = async (): Promise<User> => {
+    setError(null);
+    try {
+      const { performAppleSignIn } = await import('@/services/social-auth');
+      const authedUser = await performAppleSignIn();
+      setUser(authedUser);
+      return authedUser;
+    } catch (err: any) {
+      if (err?.message !== 'Sign-in cancelled.') {
+        setError(err.message);
+      }
+      throw err;
+    }
+  };
+
   const logOut = async (): Promise<void> => {
     setError(null);
     try {
@@ -90,6 +122,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error,
         signInWithEmail,
         signUpWithEmail,
+        signInWithGoogle,
+        signInWithApple,
         logOut,
         clearError,
       }}>

@@ -12,7 +12,20 @@
           "package_name": "com.musafir.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "623421286127-malqrok1hg6p5stn1h3u99hbhn710o8h.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.musafir.app",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "623421286127-84e7pp3ni6h0gorfsqs29j29e5sptdle.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCU4dEPe7vjyDj5ToGSLWQkj8Iv9GOrkIs"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "623421286127-84e7pp3ni6h0gorfsqs29j29e5sptdle.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "623421286127-9bp61od55qsgoc8skmdps0tu2sbpaveq.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.musafir.app"
+              }
+            }
+          ]
         }
       }
     }

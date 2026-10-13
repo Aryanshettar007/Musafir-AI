@@ -64,12 +64,14 @@ const tripSchema = new Schema(
           voice: { type: String, required: true },
           voiceGender: { type: String, enum: ["male", "female"], required: true },
           interests: { type: [{ type: String, enum: INTEREST_IDS }], default: [] },
+          moods: { type: [{ type: String, enum: INTEREST_IDS }], default: [] },
           musicMode: { type: String, enum: MUSIC_MODE_IDS, required: true },
         },
         { _id: false },
       ),
       required: true,
     },
+    moods: { type: [{ type: String, enum: INTEREST_IDS }], default: [] },
     route: {
       type: new Schema(
         { polyline: { type: String, required: true }, distanceM: { type: Number, required: true }, durationS: { type: Number, required: true } },

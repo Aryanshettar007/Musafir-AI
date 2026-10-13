@@ -5,10 +5,12 @@ import {
   Text,
   Pressable,
   Animated,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Polyline, Marker } from 'react-native-maps';
+import MapView, { Polyline, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { darkMapStyle } from '@/constants/map-theme';
 import { Trip, TripItem } from '@/services/trip-service';
 import { formatDist, formatDuration } from './trip-utils';
 import { TripSimulator } from './trip-simulator';
@@ -90,8 +92,12 @@ export function TripMap({
   return (
     <View style={StyleSheet.absoluteFill}>
       <MapView
+        provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
         ref={mapRef}
         style={StyleSheet.absoluteFill}
+        customMapStyle={isDark ? darkMapStyle : []}
+        zoomControlEnabled={true}
+        zoomEnabled={true}
         showsUserLocation={false}
         showsCompass={false}
         showsMyLocationButton={false}

@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CLIENT_ID</key>
+	<string>623421286127-c5m9bv8ba366qm9l5arcml15d2bqrftp.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.623421286127-c5m9bv8ba366qm9l5arcml15d2bqrftp</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>623421286127-malqrok1hg6p5stn1h3u99hbhn710o8h.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
 	<string>AIzaSyA-Ia-TGog92HWWaIdbKasw2qRdFkNZyrI</string>
 	<key>GCM_SENDER_ID</key>
@@ -9,7 +15,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.musafir.app</string>
+	<string>com.musafir-ai.app</string>
 	<key>PROJECT_ID</key>
 	<string>musafir-ai-a7114</string>
 	<key>STORAGE_BUCKET</key>
@@ -25,6 +31,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:623421286127:ios:bc8e9d285a02b937649d1a</string>
+	<string>1:623421286127:ios:420a727f9c3c7171649d1a</string>
 </dict>
 </plist>

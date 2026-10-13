@@ -8,7 +8,7 @@
     "scheme": "musafir",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "bundleIdentifier": "com.musafir.app",
+      "bundleIdentifier": "com.musafir-ai.app",
       "icon": "./assets/expo.icon",
       "googleServicesFile": "./src/config/GoogleService-Info.plist",
       "infoPlist": {
@@ -21,6 +21,7 @@
     "android": {
       "package": "com.musafir.app",
       "googleServicesFile": "./src/config/google-services.json",
+
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -67,7 +68,9 @@
           "locationAlwaysAndWhenInUsePermission": "Musafir AI needs background location access to trigger audio stories automatically as you travel.",
           "isAndroidBackgroundLocationEnabled": true
         }
-      ]
+      ],
+      "expo-apple-authentication",
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -6,11 +6,17 @@ import {
   initializeAuth,
   getAuth,
   browserLocalPersistence,
+  browserPopupRedirectResolver,
   inMemoryPersistence,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  GoogleAuthProvider,
+  OAuthProvider,
+  signInWithCredential,
+  signInWithPopup,
+  updateProfile,
   User,
   Auth,
 } from 'firebase/auth';
@@ -29,19 +35,21 @@ export const firebaseConfig = {
 // Initialize or reuse Firebase App
 const app: FirebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize or reuse Auth with platform-appropriate persistence (AsyncStorage on native, localStorage on web)
+// Initialize or reuse Auth with platform-appropriate persistence and popup resolver
 let auth: Auth;
 try {
-  const persistence =
-    Platform.OS === 'web'
-      ? browserLocalPersistence
-      : typeof getReactNativePersistence === 'function'
-      ? getReactNativePersistence(AsyncStorage)
-      : inMemoryPersistence;
+  if (Platform.OS === 'web') {
+    auth = getAuth(app);
+  } else {
+    const persistence =
+      typeof getReactNativePersistence === 'function'
+        ? getReactNativePersistence(AsyncStorage)
+        : inMemoryPersistence;
 
-  auth = initializeAuth(app, {
-    persistence,
-  });
+    auth = initializeAuth(app, {
+      persistence,
+    });
+  }
 } catch {
   auth = getAuth(app);
 }
@@ -72,14 +80,20 @@ export function getFirebaseErrorMessage(error: unknown): string {
     case 'auth/weak-password':
       return 'Password should be at least 6 characters.';
     case 'auth/operation-not-allowed':
-      return 'Email/password sign-in is not enabled in Firebase Console.';
+      return 'This sign-in method is not enabled in Firebase Console.';
+    case 'auth/popup-closed-by-user':
+      return 'Sign-in cancelled.';
+    case 'auth/popup-blocked':
+      return 'Sign-in popup was blocked. Please allow popups for this site.';
+    case 'auth/account-exists-with-different-credential':
+      return 'An account already exists with this email using another sign-in method. Please use that method.';
     case 'auth/network-request-failed':
       return 'Network error. Please check your internet connection.';
     case 'auth/too-many-requests':
       return 'Too many failed attempts. Please try again in a few minutes.';
     case 'auth/invalid-api-key':
     case 'auth/api-key-not-valid':
-      return 'Firebase API Key is invalid or not yet configured in .env.';
+      return 'Firebase API Key is invalid or not yet configured.';
     default:
       if (err.message && err.message.length < 120) {
         return err.message.replace('Firebase: ', '');
@@ -95,5 +109,11 @@ export {
   createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  GoogleAuthProvider,
+  OAuthProvider,
+  signInWithCredential,
+  signInWithPopup,
+  browserPopupRedirectResolver,
+  updateProfile,
   User,
 };
