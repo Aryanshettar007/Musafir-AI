@@ -13,7 +13,8 @@ export default function AppTabs() {
     <NativeTabs
       backgroundColor={Platform.OS === 'ios' ? undefined : colors.background}
       tintColor={ACCENT_BLUE}
-      indicatorColor={ACCENT_BLUE}
+      indicatorColor={Platform.OS === 'android' ? 'transparent' : undefined}
+      disableIndicator={Platform.OS === 'android'}
       iconColor={{
         default: colors.textSecondary,
         selected: ACCENT_BLUE,
