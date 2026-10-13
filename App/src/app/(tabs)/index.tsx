@@ -19,12 +19,13 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { Image as ExpoImage } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useRouter } from 'expo-router';
 import * as Crypto from 'expo-crypto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { darkMapStyle } from '@/constants/map-theme';
 import { api, BACKEND_URL } from '@/services/api';
 import {
   getRecentTrips,
@@ -89,68 +90,6 @@ const DEFAULT_COORDS = {
   latitudeDelta: 0.04,
   longitudeDelta: 0.04,
 };
-
-interface CreatorPack {
-  id: string;
-  title: string;
-  creatorName: string;
-  imageUrl: string;
-  storiesCount: number;
-  duration: string;
-  category: string;
-}
-
-
-
-const CREATOR_PACKS: CreatorPack[] = [
-  {
-    id: 'pack_1',
-    title: 'Old Bengaluru Heritage Walk',
-    creatorName: 'Aarav Sharma',
-    imageUrl: 'https://images.unsplash.com/photo-1587474260584-136574528ed5?auto=format&fit=crop&w=800&q=80',
-    storiesCount: 8,
-    duration: '42m',
-    category: 'Heritage',
-  },
-  {
-    id: 'pack_2',
-    title: 'Secret Street Food Trail',
-    creatorName: 'Chef Tanya Roy',
-    imageUrl: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=800&q=80',
-    storiesCount: 14,
-    duration: '1h 10m',
-    category: 'Food Trail',
-  },
-  {
-    id: 'pack_3',
-    title: 'Western Ghats Monsoon Drive',
-    creatorName: 'Rohit Shenoy',
-    imageUrl: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80',
-    storiesCount: 6,
-    duration: '28m',
-    category: 'Road Trip',
-  },
-  {
-    id: 'pack_4',
-    title: 'Midnight Ghost Lore & Myths',
-    creatorName: 'Urban Mythologist',
-    imageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80',
-    storiesCount: 5,
-    duration: '35m',
-    category: 'Mystery',
-  },
-  {
-    id: 'pack_5',
-    title: 'Ancient Hoysala Temple Tales',
-    creatorName: 'Dr. K. Sastri',
-    imageUrl: 'https://images.unsplash.com/photo-1609766857041-ed402ea8069a?auto=format&fit=crop&w=800&q=80',
-    storiesCount: 11,
-    duration: '50m',
-    category: 'Architecture',
-  },
-];
-
-
 
 export default function HomeScreen() {
   const scheme = useColorScheme();
@@ -477,7 +416,15 @@ export default function HomeScreen() {
       const currentIndex = selectedRouteIndexRef.current;
       const currentRoutes = availableRoutesRef.current.length > 0 ? availableRoutesRef.current : availableRoutes;
       const chosenRoute = currentRoutes[currentIndex];
-      console.log(`[handleStartTrip] Starting trip with route #${currentIndex}:`, chosenRoute?.description, chosenRoute?.distanceM);
+      const effectiveMoods =
+        selectedMoods && selectedMoods.length > 0 ? selectedMoods : [...DEFAULT_INTERESTS];
+      console.log(
+        `[handleStartTrip] Starting trip with route #${currentIndex}:`,
+        chosenRoute?.description,
+        chosenRoute?.distanceM,
+        'moods:',
+        effectiveMoods
+      );
       const { tripId } = await startTrip({
         origin,
         destination: { placeId: selectedSuggestion.placeId, label: selectedSuggestion.primaryText },
@@ -489,11 +436,13 @@ export default function HomeScreen() {
               description: chosenRoute.description,
             }
           : undefined,
+        moods: effectiveMoods,
         prefs: {
           language: mapLanguage(preferredAudio),
           voiceGender,
           voice,
-          interests: selectedMoods,
+          interests: effectiveMoods,
+          moods: effectiveMoods,
         },
       });
       router.push(`/trip/${tripId}`);
@@ -567,20 +516,22 @@ export default function HomeScreen() {
       setDeviceGpsCoords(current);
 
       let formatted = 'Current Location';
-      try {
-        const reverseGeocode = await Location.reverseGeocodeAsync(current);
-        if (reverseGeocode && reverseGeocode.length > 0) {
-          const item = reverseGeocode[0];
-          const parts = [
-            item.name || item.street,
-            item.district || item.subregion || item.city,
-          ].filter(Boolean);
-          if (parts.length > 0) {
-            formatted = parts.join(', ');
+      if (Platform.OS !== 'web') {
+        try {
+          const reverseGeocode = await Location.reverseGeocodeAsync(current);
+          if (reverseGeocode && reverseGeocode.length > 0) {
+            const item = reverseGeocode[0];
+            const parts = [
+              item.name || item.street,
+              item.district || item.subregion || item.city,
+            ].filter(Boolean);
+            if (parts.length > 0) {
+              formatted = parts.join(', ');
+            }
           }
+        } catch {
+          formatted = 'Current Location';
         }
-      } catch {
-        formatted = 'Current Location';
       }
 
       setDeviceGpsAddress(formatted);
@@ -878,15 +829,6 @@ export default function HomeScreen() {
     deviceGpsCoords,
   ]);
 
-  // Handle Creator Pack preview tap
-  const handleCreatorPackPress = (pack: CreatorPack) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Alert.alert(
-      pack.title,
-      `Curated by ${pack.creatorName}\n${pack.storiesCount} geo-tagged audio stories • ${pack.duration}\n\nAudio stories will automatically trigger as you navigate along this route!`
-    );
-  };
-
   const currentRegion = {
     latitude: getVisibleCenterLatitude(
       sourcePoint.coords?.latitude ?? deviceGpsCoords?.latitude ?? DEFAULT_COORDS.latitude,
@@ -906,9 +848,13 @@ export default function HomeScreen() {
       {/* MAP SECTION */}
       <View style={styles.mapContainer}>
         <MapView
+          provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
           ref={mapRef}
           style={StyleSheet.absoluteFill}
           initialRegion={currentRegion}
+          customMapStyle={isDark ? darkMapStyle : []}
+          zoomControlEnabled={true}
+          zoomEnabled={true}
           showsUserLocation={false}
           showsCompass={false}
           showsMyLocationButton={false}
@@ -1377,46 +1323,6 @@ export default function HomeScreen() {
             })}
           </View>
 
-          {/* CREATOR PACKS SECTION */}
-          <View style={styles.creatorSection}>
-            <View style={styles.creatorSectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                Creator Packs
-              </Text>
-            </View>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.creatorCardsScroll}>
-              {CREATOR_PACKS.map((pack) => (
-                <Pressable
-                  key={pack.id}
-                  style={({ pressed }) => [
-                    styles.creatorCard,
-                    pressed && styles.cardPressed,
-                  ]}
-                  onPress={() => handleCreatorPackPress(pack)}>
-                  <View style={styles.imageContainer}>
-                    <ExpoImage
-                      source={{ uri: pack.imageUrl }}
-                      style={styles.creatorImage}
-                      contentFit="cover"
-                      transition={300}
-                    />
-                  </View>
-                  <View style={styles.creatorInfoBlock}>
-                    <Text
-                      style={[styles.creatorPackTitle, { color: colors.text }]}
-                      numberOfLines={1}>
-                      {pack.title}
-                    </Text>
-                  </View>
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
-
 
         </ScrollView>
       </Animated.View>
@@ -1766,45 +1672,6 @@ const styles = StyleSheet.create({
   buttonPressed: {
     opacity: 0.7,
     transform: [{ scale: 0.96 }],
-  },
-
-  // Creator Packs Section
-  creatorSection: {
-    marginTop: 22,
-    marginBottom: 16,
-  },
-  creatorSectionHeader: {
-    paddingVertical: 10,
-  },
-  creatorCardsScroll: {
-    paddingRight: 16,
-    gap: 14,
-  },
-  creatorCard: {
-    width: 200,
-  },
-  cardPressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.98 }],
-  },
-  imageContainer: {
-    width: '100%',
-    height: 130,
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: '#E5E3DF',
-  },
-  creatorImage: {
-    width: '100%',
-    height: '100%',
-  },
-  creatorInfoBlock: {
-    marginTop: 8,
-  },
-  creatorPackTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    letterSpacing: -0.2,
   },
 
   // Route selection & loading

@@ -33,9 +33,21 @@ export function AnimatedSplashOverlay() {
     },
   });
 
-  const image = <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />;
+  if (!animate) {
+    return (
+      <View
+        onLayout={() => {
+          SplashScreen.hideAsync().finally(() => {
+            setAnimate(true);
+          });
+        }}
+        style={styles.splashOverlay}>
+        <Image key="static-splash" style={styles.image} source={require('@/assets/images/expo-logo.png')} />
+      </View>
+    );
+  }
 
-  return animate ? (
+  return (
     <Animated.View
       entering={splashKeyframe.duration(DURATION).withCallback((finished) => {
         'worklet';
@@ -44,18 +56,8 @@ export function AnimatedSplashOverlay() {
         }
       })}
       style={styles.splashOverlay}>
-      {image}
+      <Image key="animated-splash" style={styles.image} source={require('@/assets/images/expo-logo.png')} />
     </Animated.View>
-  ) : (
-    <View
-      onLayout={() => {
-        SplashScreen.hideAsync().finally(() => {
-          setAnimate(true);
-        });
-      }}
-      style={styles.splashOverlay}>
-      {image}
-    </View>
   );
 }
 

@@ -1,13 +1,15 @@
 import React from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import { Redirect } from 'expo-router';
+import { Redirect, useRootNavigationState } from 'expo-router';
 
 import { useAuth } from '@/context/auth-context';
 
 export default function Index() {
   const { user, loading } = useAuth();
+  const rootNavigationState = useRootNavigationState();
+  const isNavigationReady = rootNavigationState?.key != null;
 
-  if (loading) {
+  if (loading || !isNavigationReady) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#000000" />

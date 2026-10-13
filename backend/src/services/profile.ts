@@ -16,6 +16,7 @@ export const ProfileInputSchema = z.strictObject({
   voice: z.string().optional(),
   interests: z.array(z.enum(INTEREST_IDS)).min(1).optional(),
   musicMode: z.enum(MUSIC_MODE_IDS).optional(),
+  moods: z.array(z.string()).optional(),
 });
 
 export type ProfileInput = z.infer<typeof ProfileInputSchema>;
@@ -28,6 +29,7 @@ export interface Profile {
   voiceGender: VoiceGender;
   voice: string;
   interests: InterestId[];
+  moods?: InterestId[];
   musicMode: MusicModeId;
 }
 
@@ -58,14 +60,20 @@ export function resolveProfile(existing: Profile | null, input: ProfileInput): P
     voice = keepOrRecommend(existing, language, voiceGender);
   }
 
+  const resolvedFromMoods = input.moods
+    ? (input.moods.filter((m) => (INTEREST_IDS as readonly string[]).includes(m)) as InterestId[])
+    : undefined;
+  const resolvedInterests = input.interests ?? (resolvedFromMoods && resolvedFromMoods.length > 0 ? resolvedFromMoods : undefined);
+  const finalInterests = resolvedInterests ? [...new Set(resolvedInterests)] : (existing?.interests ?? [...DEFAULT_INTERESTS]);
+
   return {
     name: input.name ?? existing?.name,
     gender,
-    age: input.age ?? existing?.age,
+    ...(existing && !("age" in existing) && input.age === undefined ? {} : { age: input.age ?? existing?.age }),
     language,
     voiceGender,
     voice,
-    interests: input.interests ? [...new Set(input.interests)] : (existing?.interests ?? [...DEFAULT_INTERESTS]),
+    interests: finalInterests,
     musicMode: input.musicMode ?? existing?.musicMode ?? DEFAULT_MUSIC_MODE,
   };
 }

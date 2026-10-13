@@ -45,7 +45,7 @@ import { clearAllOfflineTripData, getOfflineStorageUsage } from '@/services/trip
 
 const STORAGE_KEY = '@musafir_user_profile';
 
-export default function SettingsScreen() {
+export default function ProfileScreen() {
   const router = useRouter();
   const { user, logOut } = useAuth();
   const insets = useSafeAreaInsets();
@@ -106,7 +106,7 @@ export default function SettingsScreen() {
           // Non-critical background sync
         }
       } catch (err) {
-        console.warn('[Settings] Failed to load user profile:', err);
+        console.warn('[Profile] Failed to load user profile:', err);
       } finally {
         setLoadingInitial(false);
       }
@@ -146,15 +146,15 @@ export default function SettingsScreen() {
       try {
         await updateProfileOnBackend(profilePayload);
       } catch (backendErr) {
-        console.warn('[Settings] Error syncing profile with backend:', backendErr);
+        console.warn('[Profile] Error syncing profile with backend:', backendErr);
       }
 
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setIsSaved(true);
       setTimeout(() => setIsSaved(false), 2500);
     } catch (err) {
-      console.error('[Settings] Error saving profile:', err);
-      Alert.alert('Error', 'Unable to save settings. Please try again.');
+      console.error('[Profile] Error saving profile:', err);
+      Alert.alert('Error', 'Unable to save profile. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -200,7 +200,7 @@ export default function SettingsScreen() {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               Alert.alert('Storage Cleared', 'Offline trips and audio have been deleted.');
             } catch (err) {
-              console.error('[Settings] Error clearing offline data:', err);
+              console.error('[Profile] Error clearing offline data:', err);
               Alert.alert('Error', 'Could not clear offline storage.');
             } finally {
               setIsClearingCache(false);
@@ -230,7 +230,7 @@ export default function SettingsScreen() {
               await logOut();
               router.replace('/(auth)/login');
             } catch (err) {
-              console.error('[Settings] Logout error:', err);
+              console.error('[Profile] Logout error:', err);
               Alert.alert('Logout Error', 'Could not sign out. Please check your connection.');
               setIsLoggingOut(false);
             }
@@ -291,7 +291,7 @@ export default function SettingsScreen() {
             ]}>
             {/* Header Title */}
             <View style={styles.header}>
-              <Text style={[styles.title, { color: colors.textPrimary }]}>Account</Text>
+              <Text style={[styles.title, { color: colors.textPrimary }]}>Profile</Text>
             </View>
 
             {/* Profile Overview (Uber-style flat layout, no box wrapper) */}
@@ -364,7 +364,7 @@ export default function SettingsScreen() {
               onToggle={toggleInterest}
             />
 
-            {/* Save Button (Uber high-contrast solid button) */}
+            {/* Save Button */}
             <View style={styles.actionSection}>
               <Pressable
                 onPress={handleSave}
@@ -401,7 +401,7 @@ export default function SettingsScreen() {
                 </Text>
               </View>
 
-              {/* Dual Action Buttons: Clear Offline Storage & Logout next to each other */}
+              {/* Dual Action Buttons: Clear Offline Storage & Logout */}
               <View style={styles.dualButtonsRow}>
                 {/* Clear Offline Storage Button */}
                 <Pressable
@@ -430,7 +430,7 @@ export default function SettingsScreen() {
                   )}
                 </Pressable>
 
-                {/* Logout Button (differentiated by its red color) */}
+                {/* Logout Button */}
                 <Pressable
                   onPress={handleLogoutPress}
                   disabled={isLoggingOut}

@@ -40,7 +40,15 @@ export const CreateTripSchema = z.strictObject({
     .passthrough()
     .optional(),
   // Same rules as PATCH /me, applied on top of the user's profile for this trip only.
-  prefs: ProfileInputSchema.pick({ language: true, voiceGender: true, voice: true, interests: true, musicMode: true }).optional(),
+  prefs: ProfileInputSchema.pick({
+    language: true,
+    voiceGender: true,
+    voice: true,
+    interests: true,
+    musicMode: true,
+    moods: true,
+  }).optional(),
+  moods: z.array(z.string()).optional(),
 });
 export type CreateTripInput = z.infer<typeof CreateTripSchema>;
 
@@ -97,7 +105,13 @@ export function createTripService(deps: TripServiceDeps) {
       const user = await User.findOne({ firebaseUid: identity.uid }).lean();
       if (!user) throw notFound("PROFILE_NOT_FOUND", "No profile yet. Finish onboarding with PUT /me.");
       // The profile itself is not changed: prefs apply to this trip only.
-      const prefs = resolveProfile(profileOf(user), input.prefs ?? {});
+      const effectivePrefsInput = {
+        ...input.prefs,
+        ...(input.moods !== undefined && input.prefs?.moods === undefined
+          ? { moods: input.moods }
+          : {}),
+      };
+      const prefs = resolveProfile(profileOf(user), effectivePrefsInput);
 
       const building = await Trip.findOne({ userId: identity.uid, status: "building" }, { _id: 1 }).lean();
       if (building) throw tripInProgress(String(building._id));
@@ -140,7 +154,15 @@ export function createTripService(deps: TripServiceDeps) {
         stage: "discovering",
         origin: { label: origin.label, location: toPoint("placeId" in origin ? first : origin), ...("placeId" in origin ? { placeId: origin.placeId } : {}) },
         destination: { label: destination.label, location: toPoint(last), placeId: destination.placeId },
-        prefs: { language: prefs.language, voice: prefs.voice, voiceGender: prefs.voiceGender, interests: prefs.interests, musicMode: prefs.musicMode },
+        prefs: {
+          language: prefs.language,
+          voice: prefs.voice,
+          voiceGender: prefs.voiceGender,
+          interests: prefs.interests,
+          moods: prefs.moods ?? prefs.interests,
+          musicMode: prefs.musicMode,
+        },
+        moods: prefs.moods ?? prefs.interests,
         route: { polyline: route.polyline, distanceM: route.distanceM, durationS: route.durationS },
       }).catch(async (e: unknown) => {
         // A request that raced past the check above loses on the unique partial index (one building trip per user).
@@ -194,9 +216,14 @@ export function createTripService(deps: TripServiceDeps) {
         origin: { label: trip.origin.label, ...origin },
         destination: { label: trip.destination.label, ...destination },
         prefs: {
-          language: trip.prefs.language, voice: trip.prefs.voice, voiceGender: trip.prefs.voiceGender,
-          interests: trip.prefs.interests, musicMode: trip.prefs.musicMode,
+          language: trip.prefs.language,
+          voice: trip.prefs.voice,
+          voiceGender: trip.prefs.voiceGender,
+          interests: trip.prefs.interests,
+          moods: trip.prefs.moods ?? trip.prefs.interests,
+          musicMode: trip.prefs.musicMode,
         },
+        moods: trip.moods ?? trip.prefs.moods ?? trip.prefs.interests,
         route: { polyline: trip.route.polyline, distanceM: trip.route.distanceM, durationS: trip.route.durationS },
         items,
         totalBytes: items.reduce((sum, i) => sum + (i.audio?.bytes ?? 0), 0),

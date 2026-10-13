@@ -1,3 +1,4 @@
+import React from 'react';
 import {
   Tabs,
   TabList,
@@ -6,25 +7,33 @@ import {
   TabTriggerSlotProps,
   TabListProps,
 } from 'expo-router/ui';
-import { SymbolView } from 'expo-symbols';
-import { Pressable, useColorScheme, View, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Pressable, useColorScheme, View, StyleSheet, Text } from 'react-native';
 
-import { ThemedText } from './themed-text';
-import { ThemedView } from './themed-view';
+import { Colors, MaxContentWidth } from '@/constants/theme';
 
-import { Colors, MaxContentWidth, Spacing } from '@/constants/theme';
+const ACCENT_BLUE = '#007AFF';
 
 export default function AppTabs() {
   return (
-    <Tabs>
-      <TabSlot style={{ height: '100%' }} />
+    <Tabs style={styles.screenWrapper}>
+      <TabSlot style={styles.slot} />
       <TabList asChild>
         <CustomTabList>
           <TabTrigger name="index" href="/(tabs)" asChild>
-            <TabButton>Home</TabButton>
+            <TabButton icon="home" iconOutline="home-outline">
+              Home
+            </TabButton>
           </TabTrigger>
-          <TabTrigger name="settings" href="/(tabs)/settings" asChild>
-            <TabButton>Settings</TabButton>
+          <TabTrigger name="explore" href="/(tabs)/explore" asChild>
+            <TabButton icon="compass" iconOutline="compass-outline">
+              Explore
+            </TabButton>
+          </TabTrigger>
+          <TabTrigger name="profile" href="/(tabs)/profile" asChild>
+            <TabButton icon="person" iconOutline="person-outline">
+              Profile
+            </TabButton>
           </TabTrigger>
         </CustomTabList>
       </TabList>
@@ -32,65 +41,119 @@ export default function AppTabs() {
   );
 }
 
-export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps) {
+interface TabButtonProps extends TabTriggerSlotProps {
+  children?: React.ReactNode;
+  icon: keyof typeof Ionicons.glyphMap;
+  iconOutline: keyof typeof Ionicons.glyphMap;
+}
+
+export function TabButton({
+  children,
+  isFocused,
+  icon,
+  iconOutline,
+  ...props
+}: TabButtonProps) {
+  const scheme = useColorScheme();
+  const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
+  const color = isFocused ? ACCENT_BLUE : colors.textSecondary;
+
   return (
-    <Pressable {...props} style={({ pressed }) => pressed && styles.pressed}>
-      <ThemedView
-        type={isFocused ? 'backgroundSelected' : 'backgroundElement'}
-        style={styles.tabButtonView}>
-        <ThemedText type="small" themeColor={isFocused ? 'text' : 'textSecondary'}>
-          {children}
-        </ThemedText>
-      </ThemedView>
+    <Pressable
+      {...props}
+      style={({ pressed }) => [
+        styles.tabButton,
+        pressed && styles.pressed,
+      ]}>
+      <Ionicons
+        name={isFocused ? icon : iconOutline}
+        size={22}
+        color={color}
+      />
+      <Text
+        style={[
+          styles.tabLabel,
+          {
+            color,
+            fontWeight: isFocused ? '600' : '500',
+          },
+        ]}>
+        {children}
+      </Text>
     </Pressable>
   );
 }
 
 export function CustomTabList(props: TabListProps) {
   const scheme = useColorScheme();
-  const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
+  const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
 
   return (
-    <View {...props} style={styles.tabListContainer}>
-      <ThemedView type="backgroundElement" style={styles.innerContainer}>
-        <ThemedText type="smallBold" style={styles.brandText}>
-          Musafir AI
-        </ThemedText>
-
+    <View
+      {...props}
+      style={[
+        styles.tabListContainer,
+        {
+          backgroundColor: colors.background,
+          borderTopColor: scheme === 'dark' ? '#27272a' : '#e4e4e7',
+          boxShadow:
+            scheme === 'dark'
+              ? '0 -2px 10px rgba(0,0,0,0.5)'
+              : '0 -2px 10px rgba(0,0,0,0.06)',
+        },
+      ]}>
+      <View style={styles.innerContainer}>
         {props.children}
-      </ThemedView>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  tabListContainer: {
-    position: 'absolute',
+  screenWrapper: {
+    flex: 1,
+    height: '100%',
+    position: 'relative',
+  },
+  slot: {
+    flex: 1,
+    height: '100%',
     width: '100%',
-    padding: Spacing.three,
+  },
+  tabListContainer: {
+    position: 'fixed' as const,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    width: '100%',
+    height: 64,
+    borderTopWidth: StyleSheet.hairlineWidth,
     justifyContent: 'center',
     alignItems: 'center',
-    flexDirection: 'row',
+    zIndex: 9999,
   },
   innerContainer: {
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.five,
-    borderRadius: Spacing.five,
     flexDirection: 'row',
     alignItems: 'center',
-    flexGrow: 1,
-    gap: Spacing.two,
+    justifyContent: 'center',
+    gap: 64,
     maxWidth: MaxContentWidth,
+    width: '100%',
+    height: '100%',
   },
-  brandText: {
-    marginRight: 'auto',
+  tabButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    gap: 3,
+    cursor: 'pointer',
+  },
+  tabLabel: {
+    fontSize: 12,
   },
   pressed: {
     opacity: 0.7,
-  },
-  tabButtonView: {
-    paddingVertical: Spacing.one,
-    paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.three,
   },
 });
