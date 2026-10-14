@@ -52,6 +52,7 @@
     "android": "expo run:android",
     "android:fast": "expo start --dev-client",
     "ios": "expo run:ios",
+    "ios:physical": "expo run:ios --device",
     "ios:fast": "expo start --dev-client",
     "web": "expo start --web",
     "lint": "expo lint"

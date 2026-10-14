@@ -42,7 +42,7 @@ export function AnimatedSplashOverlay() {
           });
         }}
         style={styles.splashOverlay}>
-        <Image key="static-splash" style={styles.image} source={require('@/assets/images/expo-logo.png')} />
+        <Image key="static-splash" style={styles.image} contentFit="contain" source={require('@/assets/images/splash-icon.png')} />
       </View>
     );
   }
@@ -56,7 +56,7 @@ export function AnimatedSplashOverlay() {
         }
       })}
       style={styles.splashOverlay}>
-      <Image key="animated-splash" style={styles.image} source={require('@/assets/images/expo-logo.png')} />
+      <Image key="animated-splash" style={styles.image} contentFit="contain" source={require('@/assets/images/splash-icon.png')} />
     </Animated.View>
   );
 }
@@ -130,8 +130,8 @@ const styles = StyleSheet.create({
     zIndex: 100,
   },
   image: {
-    width: 76,
-    height: 71,
+    width: 160,
+    height: 160,
   },
   background: {
     borderRadius: 40,
@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
   },
   splashOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#208AEF',
+    backgroundColor: '#FCF7ED',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,

@@ -401,7 +401,10 @@ export const Marker: React.FC<MarkerProps> = ({
       if (onPress) {
         div.onclick = (e) => {
           e.stopPropagation();
-          onPress();
+          (onPress as any)({
+            nativeEvent: e,
+            stopPropagation: () => e.stopPropagation(),
+          });
         };
       }
 
@@ -418,7 +421,12 @@ export const Marker: React.FC<MarkerProps> = ({
       });
 
       if (onPress) {
-        marker.addListener('click', onPress);
+        marker.addListener('click', (e: any) => {
+          (onPress as any)({
+            nativeEvent: e,
+            stopPropagation: () => {},
+          });
+        });
       }
 
       return () => {

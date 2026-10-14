@@ -13,7 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Trip, TripItem } from '@/services/trip-service';
-import { DownloadState, PlayedSet, itemTypeLabel } from './trip-utils';
+import { DownloadState, PlayedSet, itemTypeLabel, formatAudioDuration } from './trip-utils';
 import { DownloadProgressIndicator } from './download-progress-indicator';
 import { SpotifyScrubber } from './spotify-scrubber';
 import { OscillatingText } from './oscillating-text';
@@ -134,7 +134,13 @@ export function TripBottomSheet({
                     styles.buildingPill,
                     { backgroundColor: colors.orange, transform: [{ scale: pulseAnim }] },
                   ]}>
-                  <Text style={styles.buildingPillText}>⏳ Building… {progressPct}%</Text>
+                  <Text style={styles.buildingPillText}>
+                    {trip.stage === 'discovering'
+                      ? '⏳ Finding landmarks…'
+                      : trip.stage === 'curating'
+                      ? '⏳ Curating stories…'
+                      : `⏳ Building… ${progressPct}%`}
+                  </Text>
                 </Animated.View>
               ) : isPlayingActive ? (
                 <View style={styles.liveIndicatorRow}>
@@ -193,7 +199,7 @@ export function TripBottomSheet({
             <View style={styles.metaRow}>
               <Text style={[styles.metaText, { color: colors.textSecondary }]}>
                 {itemTypeLabel[activeItem.type] ?? activeItem.type}
-                {activeItem.audio?.durationS ? ` · ${activeItem.audio.durationS}s` : ''}
+                {activeItem.audio?.durationS ? ` · ${formatAudioDuration(activeItem.audio.durationS)}` : ''}
               </Text>
               {!isPlayingActive && lastPlayedItem?.id === activeItem.id && (
                 <View style={[styles.recentlyPlayedBadge, { backgroundColor: colors.surface2 }]}>
@@ -360,8 +366,11 @@ export function TripBottomSheet({
                 backgroundColor: colors.surface2,
                 borderColor: colors.border,
                 opacity: pressed ? 0.75 : 1,
-              },
+                cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+              } as any,
             ]}
+            accessibilityRole="button"
+            accessibilityLabel="Exit Session"
             onPress={onExitSession}>
             <Ionicons name="log-out-outline" size={17} color={colors.red} />
             <Text style={[styles.exitSessionBtnText, { color: colors.red }]}>

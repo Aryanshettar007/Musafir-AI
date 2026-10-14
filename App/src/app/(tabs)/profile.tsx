@@ -18,6 +18,7 @@ import { useRouter } from 'expo-router';
 import { updateProfile } from 'firebase/auth';
 
 import { ThemedView } from '@/components/themed-view';
+import { LegalLinks } from '@/components/legal-links';
 import { AudioLanguageRow } from '@/components/ui/audio-language-sheet';
 import {
   InputRow,
@@ -427,14 +428,8 @@ export default function ProfileScreen() {
               </Pressable>
             </View>
 
-            {/* Bottom Section: App Info & Logout Button */}
+            {/* Bottom Section: App Info & Action Buttons */}
             <View style={styles.bottomSection}>
-              <View style={[styles.appInfoRow, { borderTopColor: colors.divider }]}>
-                <Text style={[styles.appInfoText, { color: colors.textSecondary }]}>
-                  Musafir AI • v1.0.0
-                </Text>
-              </View>
-
               {/* Dual Action Buttons: Clear Offline Storage & Logout */}
               <View style={styles.dualButtonsRow}>
                 {/* Clear Offline Storage Button */}
@@ -490,6 +485,14 @@ export default function ProfileScreen() {
                     </View>
                   )}
                 </Pressable>
+              </View>
+
+              {/* App Info & Legal Links */}
+              <View style={[styles.appInfoRow, { borderTopColor: colors.divider }]}>
+                <Text style={[styles.appInfoText, { color: colors.textSecondary }]}>
+                  Musafir AI • v1.0.0
+                </Text>
+                <LegalLinks variant="compact" />
               </View>
             </View>
           </ScrollView>
@@ -592,6 +595,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 16,
     borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 8,
   },
   appInfoText: {
     fontSize: 12,

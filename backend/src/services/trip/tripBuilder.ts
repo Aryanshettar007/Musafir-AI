@@ -79,8 +79,31 @@ interface Lease {
 const describe = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 function defaultLog(e: BuildEvent) {
-  if (e.kind === "warn") console.warn(`[Trip ${e.tripId}] ${e.message}`);
-  if (e.kind === "item" && e.status === "failed") console.error(`[Trip ${e.tripId}] item "${e.title}" failed: ${e.error}`);
+  const shortId = e.tripId.slice(-6);
+  switch (e.kind) {
+    case "stage":
+      console.log(`[Trip ${shortId}] Stage -> ${e.stage}${e.detail ? ` (${e.detail})` : ""}${e.ms ? ` [${e.ms}ms]` : ""}`);
+      break;
+    case "discovery":
+      console.log(`[Trip ${shortId}] Discovered ${e.discovery.google.length} Google places, ${e.discovery.wiki.length} Wikipedia articles`);
+      break;
+    case "selection":
+      console.log(`[Trip ${shortId}] Selected ${e.selection.picks.length} items via ${e.selection.source}${e.selection.model ? ` (${e.selection.model})` : ""}`);
+      break;
+    case "item":
+      if (e.status === "ready") {
+        console.log(`[Trip ${shortId}] Item ready: "${e.title}" (${e.type}, ${e.durationS?.toFixed(1)}s audio)${e.cached ? " [cached]" : ` [${e.ms}ms]`}`);
+      } else {
+        console.error(`[Trip ${shortId}] Item failed: "${e.title}" (${e.type}) - ${e.error}`);
+      }
+      break;
+    case "warn":
+      console.warn(`[Trip ${shortId}] Warning: ${e.message}`);
+      break;
+    case "finished":
+      console.log(`[Trip ${shortId}] Build finished: ${e.status.toUpperCase()} in ${e.ms}ms`);
+      break;
+  }
 }
 
 export function createTripBuilder(deps: TripBuilderDeps): TripBuilder {

@@ -11,7 +11,7 @@ import { TripItem } from '@/services/trip-service';
 import {
   haversineDistanceM,
   formatDist,
-  formatDuration,
+  formatAudioDuration,
   itemTypeLabel,
   sideIcon,
 } from './trip-utils';
@@ -118,7 +118,7 @@ export function TripStoryItem({
           <Text style={[styles.itemMeta, { color: colors.textSecondary }]}>
             {itemTypeLabel[item.type] ?? item.type}
             {item.side !== 'none' ? `  ${sideIcon(item.side)}` : ''}
-            {item.audio?.durationS ? `  ${formatDuration(item.audio.durationS)}` : ''}
+            {item.audio?.durationS ? ` · ${formatAudioDuration(item.audio.durationS)}` : ''}
           </Text>
         </View>
 

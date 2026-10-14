@@ -8,6 +8,7 @@ import {
   PanResponder,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,11 +21,12 @@ import { Image as ExpoImage } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import * as Crypto from 'expo-crypto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAuth } from '@/context/auth-context';
 import { darkMapStyle } from '@/constants/map-theme';
 import { api, BACKEND_URL } from '@/services/api';
 import {
@@ -95,6 +97,7 @@ export default function HomeScreen() {
   const scheme = useColorScheme();
   const isDark = scheme === 'dark';
   const router = useRouter();
+  const { user } = useAuth();
 
   const mapRef = useRef<MapView>(null);
 
@@ -126,6 +129,7 @@ export default function HomeScreen() {
   // Recent trips from server
   const [recentTrips, setRecentTrips] = useState<TripSummary[]>([]);
   const [isLoadingRecent, setIsLoadingRecent] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Trip start loading
   const [isStartingTrip, setIsStartingTrip] = useState(false);
@@ -291,36 +295,57 @@ export default function HomeScreen() {
   }, []);
 
   // Load recent trips from server or offline cache
-  const loadRecentTrips = useCallback(async () => {
+  const loadRecentTrips = useCallback(async (showIndicator = true) => {
+    if (showIndicator) setIsLoadingRecent(true);
     try {
-      setIsLoadingRecent(true);
       const trips = await getRecentTrips(10);
       setRecentTrips(trips);
-      await saveCachedRecentTrips(trips);
-    } catch {
+      await saveCachedRecentTrips(trips, user?.uid);
+    } catch (err: any) {
+      console.warn('[Home] Could not fetch recent trips from backend:', err?.message || err);
       // Offline fallback: load cached recent trips from disk/storage
-      const cached = await loadCachedRecentTrips();
+      const cached = await loadCachedRecentTrips(user?.uid);
       if (cached && cached.length > 0) {
         setRecentTrips(cached);
       }
     } finally {
-      setIsLoadingRecent(false);
+      if (showIndicator) setIsLoadingRecent(false);
     }
-  }, []);
+  }, [user?.uid]);
 
-  // Pre-load cached trips immediately on mount for instant zero-network display
+  const onRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await loadRecentTrips(false);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [loadRecentTrips]);
+
+  // Pre-load cached trips immediately on mount or user change for instant zero-network display
   useEffect(() => {
+    let isMounted = true;
     (async () => {
-      const cached = await loadCachedRecentTrips();
-      if (cached && cached.length > 0) {
+      const cached = await loadCachedRecentTrips(user?.uid);
+      if (cached && cached.length > 0 && isMounted) {
         setRecentTrips((curr) => (curr.length > 0 ? curr : cached));
       }
     })();
-  }, []);
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.uid]);
 
   useEffect(() => {
-    loadRecentTrips();
+    loadRecentTrips(true);
   }, [loadRecentTrips]);
+
+  // Re-fetch fresh trips from backend whenever Home screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadRecentTrips(false);
+    }, [loadRecentTrips])
+  );
 
   // Load user audio preferences from local storage on mount
   useEffect(() => {
@@ -1174,7 +1199,15 @@ export default function HomeScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.scrollContent}>
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.accent}
+              colors={[colors.accent]}
+            />
+          }>
           {/* SOURCE-DESTINATION SEARCH COMPONENT */}
           <SourceDestinationSearch
             ref={searchRef}

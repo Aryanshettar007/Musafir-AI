@@ -308,7 +308,7 @@ describe("GET /trips", () => {
     expect(res.body.data).toHaveLength(2);
     expect(res.body.data[0]).toMatchObject({ status: "ready", progress: { ready: 2, failed: 1, total: 4 }, origin: { label: "Start" }, destination: { label: "End" }, route: { distanceM: 60_000, durationS: 3600 } });
     expect(res.body.data[1].id).toBe(String(a._id));
-    expect(Object.keys(res.body.data[0]).sort()).toEqual(["createdAt", "destination", "id", "origin", "progress", "route", "status"]);
+    expect(Object.keys(res.body.data[0]).sort()).toEqual(["createdAt", "destination", "id", "origin", "progress", "route", "stage", "status"]);
     expect(JSON.stringify(res.body)).not.toContain("sig=");
   });
 

@@ -5,6 +5,7 @@ import {
   Animated,
   Easing,
   Pressable,
+  Platform,
   StyleSheet,
   Text,
   View,
@@ -378,15 +379,20 @@ export function VoiceRecordButton({
         { q: result.transcript, a: result.answerText },
       ];
 
-      // Save audio response base64 to local cache (.mp3)
-      const cacheDir = FileSystem.cacheDirectory?.endsWith('/')
-        ? FileSystem.cacheDirectory
-        : `${FileSystem.cacheDirectory}/`;
-      const responseFileUri = `${cacheDir}musafir_live_${Date.now()}.mp3`;
+      // Save audio response base64 to local cache (.mp3) on native, or use data URI on web
+      let responseFileUri: string;
+      if (Platform.OS === 'web') {
+        responseFileUri = `data:audio/mp3;base64,${result.audio.base64}`;
+      } else {
+        const cacheDir = FileSystem.cacheDirectory?.endsWith('/')
+          ? FileSystem.cacheDirectory
+          : `${FileSystem.cacheDirectory}/`;
+        responseFileUri = `${cacheDir}musafir_live_${Date.now()}.mp3`;
 
-      await FileSystem.writeAsStringAsync(responseFileUri, result.audio.base64, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
+        await FileSystem.writeAsStringAsync(responseFileUri, result.audio.base64, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+      }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 

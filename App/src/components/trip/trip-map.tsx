@@ -41,19 +41,19 @@ export interface TripMapProps {
   isDark: boolean;
   onBack?: () => void;
   onRecenter: () => void;
-  isSimulating: boolean;
-  onToggleSimulate: () => void;
+  isSimulating?: boolean;
+  onToggleSimulate?: () => void;
   items: TripItem[];
   playingItem?: TripItem | null;
   isPlaying: boolean;
   isPaused?: boolean;
   played?: Record<string, boolean>;
   playingItemTitle?: string;
-  onSimLocationUpdate: (loc: { latitude: number; longitude: number }) => void;
-  onResetToGPS: () => void;
+  onSimLocationUpdate?: (loc: { latitude: number; longitude: number }) => void;
+  onResetToGPS?: () => void;
   polylineCoords: { latitude: number; longitude: number }[];
-  audioMultiplier: number;
-  onAudioMultiplierChange: (mult: number) => void;
+  audioMultiplier?: number;
+  onAudioMultiplierChange?: (mult: number) => void;
   liveTranscript?: LiveTranscriptData | null;
   isLivePlaying?: boolean;
   onDismissLiveTranscript?: () => void;
@@ -70,7 +70,7 @@ export function TripMap({
   isDark,
   onBack,
   onRecenter,
-  isSimulating,
+  isSimulating = false,
   onToggleSimulate,
   items,
   playingItem,
@@ -81,7 +81,7 @@ export function TripMap({
   onSimLocationUpdate,
   onResetToGPS,
   polylineCoords,
-  audioMultiplier,
+  audioMultiplier = 1,
   onAudioMultiplierChange,
   liveTranscript,
   isLivePlaying,
@@ -197,7 +197,7 @@ export function TripMap({
                 title={item.title}
                 anchor={{ x: 0.5, y: 0.5 }}
                 onPress={(e) => {
-                  e.stopPropagation?.();
+                  e?.stopPropagation?.();
                   setSelectedPlace(item);
                 }}
                 zIndex={isActiveThis ? 45 : 20}
@@ -236,6 +236,24 @@ export function TripMap({
       {/* Destination header pill & live transcript overlay */}
       <SafeAreaView edges={['top']} style={styles.topContainer} pointerEvents="box-none">
         <View style={styles.topBarRow} pointerEvents="box-none">
+          {onBack && (
+            <Pressable
+              style={({ pressed }) => [
+                styles.topBtn,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  borderWidth: isDark ? 1 : 0,
+                  opacity: pressed ? 0.75 : 1,
+                  cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+                } as any,
+              ]}
+              onPress={onBack}
+              accessibilityLabel="Exit trip session"
+              accessibilityRole="button">
+              <Ionicons name="arrow-back" size={20} color={colors.text} />
+            </Pressable>
+          )}
           <View
             style={[
               styles.tripHeaderPill,
@@ -254,6 +272,7 @@ export function TripMap({
               </Text>
             )}
           </View>
+          {/* Temporary developer simulation flash button - commented out
           <Pressable
             style={[
               styles.topBtn,
@@ -270,6 +289,7 @@ export function TripMap({
               color={isSimulating ? '#FFF' : colors.text}
             />
           </Pressable>
+          */}
         </View>
 
         {/* Live Mode Spoken Answer Transcript Overlay */}
@@ -284,7 +304,7 @@ export function TripMap({
         )}
       </SafeAreaView>
 
-      {/* Simulation controller card */}
+      {/* Simulation controller card - commented out
       <TripSimulator
         isActive={isSimulating}
         onToggleActive={onToggleSimulate}
@@ -300,6 +320,7 @@ export function TripMap({
         audioMultiplier={audioMultiplier}
         onAudioMultiplierChange={onAudioMultiplierChange}
       />
+      */}
 
       {/* FLOATING SPOT NAME CALLOUT BANNER (Only shows spot name) */}
       {selectedPlace && (

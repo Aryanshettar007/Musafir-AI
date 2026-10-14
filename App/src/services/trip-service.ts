@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { api } from './api';
 import { auth } from '@/config/firebase';
 import { buildApiUrl } from '@/config/api';
@@ -91,6 +92,7 @@ export interface TripItem {
 export interface Trip {
   id: string;
   status: TripStatus;
+  stage?: 'discovering' | 'curating' | 'producing' | 'done';
   progress: { ready: number; failed: number; total: number };
   origin: { label: string; lat?: number; lng?: number };
   destination: { label: string; lat?: number; lng?: number };
@@ -118,6 +120,7 @@ export interface Trip {
 export interface TripSummary {
   id: string;
   status: TripStatus;
+  stage?: 'discovering' | 'curating' | 'producing' | 'done';
   progress: { ready: number; failed: number; total: number };
   origin: { label: string };
   destination: { label: string };
@@ -234,13 +237,28 @@ export async function askMusafir(params: AskParams): Promise<AskResult> {
 
   if (!audioBase64 && params.audioUri) {
     try {
-      const fileInfo = await FileSystem.getInfoAsync(params.audioUri);
-      if (!fileInfo.exists || fileInfo.size === 0) {
-        throw new Error("Recorded audio was empty. Please speak again.");
+      if (Platform.OS === 'web') {
+        const res = await fetch(params.audioUri);
+        const blob = await res.blob();
+        audioBase64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const result = reader.result as string;
+            const base64 = result.includes(',') ? result.split(',')[1] : result;
+            resolve(base64);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      } else {
+        const fileInfo = await FileSystem.getInfoAsync(params.audioUri);
+        if (!fileInfo.exists || fileInfo.size === 0) {
+          throw new Error("Recorded audio was empty. Please speak again.");
+        }
+        audioBase64 = await FileSystem.readAsStringAsync(params.audioUri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
       }
-      audioBase64 = await FileSystem.readAsStringAsync(params.audioUri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
     } catch (readErr: any) {
       console.warn('[askMusafir] Error reading audio file:', readErr);
       throw new Error(readErr?.message || "Could not read recorded audio file.");

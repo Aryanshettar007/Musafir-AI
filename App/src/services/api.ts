@@ -20,6 +20,11 @@ export const apiClient: AxiosInstance = axios.create({
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     try {
+      if (!auth.currentUser && typeof (auth as any).authStateReady === 'function') {
+        try {
+          await (auth as any).authStateReady();
+        } catch {}
+      }
       const currentUser = auth.currentUser;
       if (currentUser) {
         const token = await currentUser.getIdToken();

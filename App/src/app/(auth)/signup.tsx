@@ -16,6 +16,7 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SocialAuthButtons } from '@/components/auth/social-auth-buttons';
+import { LegalLinks } from '@/components/legal-links';
 import { useAuth } from '@/context/auth-context';
 import { syncUserSignIn } from '@/services/user-service';
 
@@ -175,6 +176,10 @@ export default function SignUpScreen() {
                 </Button>
               </View>
             </View>
+
+            <View style={styles.bottomLegalContainer}>
+              <LegalLinks variant="compact" />
+            </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -194,15 +199,18 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 32,
+    paddingTop: 32,
+    paddingBottom: 16,
   },
   formContainer: {
     width: '100%',
     maxWidth: 400,
     gap: 24,
+    flex: 1,
+    justifyContent: 'center',
   },
   header: {
     gap: 8,
@@ -241,5 +249,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  bottomLegalContainer: {
+    width: '100%',
+    alignItems: 'center',
+    paddingTop: 24,
+    paddingBottom: 8,
   },
 });

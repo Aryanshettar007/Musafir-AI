@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 
 import { ThemedText } from '@/components/themed-text';
 import { useAuth } from '@/context/auth-context';
@@ -159,11 +160,11 @@ export function SocialAuthButtons({ onError, disabled }: SocialAuthButtonsProps)
             />
           ) : (
             <View style={styles.buttonContent}>
-              <Ionicons
-                name="logo-google"
-                size={18}
-                color={isDark ? '#ffffff' : '#ea4335'}
-                style={styles.icon}
+              <Image
+                source={require('@/assets/images/google-logo.png')}
+                style={styles.googleIcon}
+                contentFit="contain"
+                accessibilityLabel="Google logo"
               />
               <Text
                 style={[
@@ -220,6 +221,10 @@ const styles = StyleSheet.create({
   },
   icon: {
     marginTop: -1,
+  },
+  googleIcon: {
+    width: 18,
+    height: 18,
   },
   buttonText: {
     fontSize: 14,

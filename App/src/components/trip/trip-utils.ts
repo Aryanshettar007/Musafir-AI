@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { File, Paths } from 'expo-file-system';
 
 export interface DownloadState {
@@ -40,13 +41,36 @@ export function formatDuration(s: number): string {
   return `${(s / 3600).toFixed(1)} h`;
 }
 
+export function formatAudioDuration(s: number): string {
+  if (!s || isNaN(s) || s <= 0) return '0s';
+  const totalSecs = Math.round(s);
+  const hrs = Math.floor(totalSecs / 3600);
+  const mins = Math.floor((totalSecs % 3600) / 60);
+  const secs = totalSecs % 60;
+
+  if (hrs > 0) {
+    if (mins === 0 && secs === 0) return `${hrs} h`;
+    if (secs === 0) return `${hrs} h ${mins} min`;
+    return `${hrs} h ${mins} min ${secs}s`;
+  }
+
+  if (mins === 0) return `${secs}s`;
+  if (secs === 0) return `${mins} min`;
+  return `${mins} min ${secs}s`;
+}
+
 export function formatBytes(b: number): string {
   if (b < 1024 * 1024) return `${(b / 1024).toFixed(0)} KB`;
   return `${(b / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function localFile(itemId: string): File {
-  return new File(Paths.document, `musafir_audio_${itemId}.mp3`);
+export function localFile(itemId: string): File | null {
+  if (Platform.OS === 'web' || !Paths?.document) return null;
+  try {
+    return new File(Paths.document, `musafir_audio_${itemId}.mp3`);
+  } catch {
+    return null;
+  }
 }
 
 export function decodePolyline(encoded: string): { latitude: number; longitude: number }[] {

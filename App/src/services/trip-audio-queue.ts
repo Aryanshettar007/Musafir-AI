@@ -19,7 +19,7 @@ export class TripAudioQueue {
   private lastPlayedItem: TripItem | null = null;
   private isProcessing = false;
   private isPaused = false;
-  private audioMultiplier = 2;
+  private audioMultiplier = 1;
   private finishTimer: ReturnType<typeof setTimeout> | null = null;
   private startTime = 0;
   private remainingMs = 0;

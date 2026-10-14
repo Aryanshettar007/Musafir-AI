@@ -113,8 +113,21 @@ export function createTripService(deps: TripServiceDeps) {
       };
       const prefs = resolveProfile(profileOf(user), effectivePrefsInput);
 
-      const building = await Trip.findOne({ userId: identity.uid, status: "building" }, { _id: 1 }).lean();
-      if (building) throw tripInProgress(String(building._id));
+      const building = await Trip.findOne({ userId: identity.uid, status: "building" }).lean();
+      if (building) {
+        // If the trip has an expired lease (heartbeat died), or has been building for >2 min with no active lease, it is stale.
+        const leaseExpired = building.lease?.expiresAt ? new Date(building.lease.expiresAt).getTime() <= now().getTime() : false;
+        const noLeaseOld = !building.lease && now().getTime() - new Date(building.createdAt).getTime() > 120_000;
+        if (leaseExpired || noLeaseOld) {
+          console.warn(`[Trip] Overriding stale building trip ${building._id} (lease expired: ${leaseExpired}, old: ${noLeaseOld})`);
+          await Trip.updateOne(
+            { _id: building._id, status: "building" },
+            { $set: { status: "failed", stage: "done", failure: { code: "BUILD_TIMED_OUT", message: "Previous build timed out or was interrupted." } }, $unset: { lease: "" } }
+          );
+        } else {
+          throw tripInProgress(String(building._id));
+        }
+      }
       const since = new Date(now().getTime() - 24 * 3600_000);
       const recent = await Trip.countDocuments({ userId: identity.uid, createdAt: { $gte: since } });
       if (recent >= deps.limits.tripsPerDay) {
@@ -182,6 +195,20 @@ export function createTripService(deps: TripServiceDeps) {
       const trip = await Trip.findOne({ _id: id, userId: identity.uid }).lean();
       if (!trip) throw tripNotFound();
 
+      if (trip.status === "building") {
+        const leaseExpiredLongAgo = trip.lease?.expiresAt ? new Date(trip.lease.expiresAt).getTime() + 120_000 <= now().getTime() : false;
+        const noLeaseDead = !trip.lease && now().getTime() - new Date(trip.createdAt).getTime() > 300_000;
+        if (leaseExpiredLongAgo || noLeaseDead) {
+          await Trip.updateOne(
+            { _id: trip._id, status: "building" },
+            { $set: { status: "failed", stage: "done", failure: { code: "BUILD_TIMED_OUT", message: "Build timed out or was interrupted." } }, $unset: { lease: "" } }
+          );
+          trip.status = "failed";
+          trip.stage = "done";
+          trip.failure = { code: "BUILD_TIMED_OUT", message: "Build timed out or was interrupted." };
+        }
+      }
+
       const storyIds = trip.items.flatMap((i) => (i.status === "ready" && i.storyId ? [i.storyId] : []));
       const stories = storyIds.length ? await Story.find({ _id: { $in: storyIds } }, { title: 1, script: 1, audio: 1 }).lean() : [];
       const byId = new Map(stories.map((s) => [String(s._id), s]));
@@ -211,6 +238,7 @@ export function createTripService(deps: TripServiceDeps) {
       return {
         id: String(trip._id),
         status: trip.status,
+        stage: trip.stage,
         ...(trip.failure ? { failure: { code: trip.failure.code, message: trip.failure.message } } : {}),
         progress: progressOf(trip.items),
         origin: { label: trip.origin.label, ...origin },
@@ -240,11 +268,12 @@ export function createTripService(deps: TripServiceDeps) {
       return trips.map((t) => ({
         id: String(t._id),
         status: t.status,
+        ...(t.stage ? { stage: t.stage } : {}),
         progress: progressOf(t.items),
         origin: { label: t.origin.label },
         destination: { label: t.destination.label },
-        route: { distanceM: t.route.distanceM, durationS: t.route.durationS },
-        createdAt: t.createdAt.toISOString(),
+        route: t.route ? { distanceM: t.route.distanceM, durationS: t.route.durationS } : undefined,
+        createdAt: t.createdAt ? t.createdAt.toISOString() : new Date().toISOString(),
       }));
     },
   };

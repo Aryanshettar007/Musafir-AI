@@ -4,12 +4,12 @@
     "slug": "musafir-ai",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/ios-icon-default.png",
     "scheme": "musafir",
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.musafir-ai.app",
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/ios-icon-default.png",
       "googleServicesFile": "./src/config/GoogleService-Info.plist",
       "infoPlist": {
         "UIBackgroundModes": ["location", "audio"],
@@ -32,13 +32,13 @@
         "RECORD_AUDIO"
       ],
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#FCF7ED",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundImage": "./assets/images/android-icon-background.png"
       },
       "predictiveBackGestureEnabled": false
     },
+    
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
@@ -48,9 +48,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#FCF7ED",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 160
         }
       ],
       [

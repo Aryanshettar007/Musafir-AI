@@ -26,6 +26,18 @@ export default function RootLayout() {
               name="trip/[id]"
               options={{ headerShown: false, presentation: 'card', gestureEnabled: false }}
             />
+            <Stack.Screen
+              name="legal"
+              options={{ headerShown: false, presentation: 'modal' }}
+            />
+            <Stack.Screen
+              name="privacy"
+              options={{ headerShown: false, presentation: 'modal' }}
+            />
+            <Stack.Screen
+              name="terms"
+              options={{ headerShown: false, presentation: 'modal' }}
+            />
           </Stack>
         </AuthProvider>
       </ThemeProvider>

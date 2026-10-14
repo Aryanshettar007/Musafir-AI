@@ -1,5 +1,7 @@
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
+import { auth } from '@/config/firebase';
 import { Trip, TripSummary, ListenEvent } from '@/services/trip-service';
 
 const STORAGE_KEY_PREFIX = '@musafir_offline_trip_';
@@ -16,7 +18,7 @@ function getTripJsonPath(tripId: string): string {
  * Persists a trip JSON locally to disk and AsyncStorage for zero-network offline playback.
  */
 export async function saveOfflineTrip(trip: Trip): Promise<void> {
-  if (!trip?.id) return;
+  if (!trip?.id || Platform.OS === 'web') return;
 
   const jsonStr = JSON.stringify(trip);
 
@@ -73,7 +75,7 @@ export async function saveOfflineTrip(trip: Trip): Promise<void> {
  * Loads a cached trip JSON from local storage / disk.
  */
 export async function loadOfflineTrip(tripId: string): Promise<Trip | null> {
-  if (!tripId) return null;
+  if (!tripId || Platform.OS === 'web') return null;
 
   // 1. Try AsyncStorage first
   try {
@@ -107,12 +109,21 @@ export async function loadOfflineTrip(tripId: string): Promise<Trip | null> {
   return null;
 }
 
+function getCachedRecentTripsKey(userId?: string): string {
+  const uid = userId || auth.currentUser?.uid;
+  return uid ? `${CACHED_RECENT_TRIPS_KEY}_${uid}` : CACHED_RECENT_TRIPS_KEY;
+}
+
 /**
  * Retrieves the cached list of recent trips for offline display on Home screen.
  */
-export async function loadCachedRecentTrips(): Promise<TripSummary[]> {
+export async function loadCachedRecentTrips(userId?: string): Promise<TripSummary[]> {
   try {
-    const raw = await AsyncStorage.getItem(CACHED_RECENT_TRIPS_KEY);
+    const key = getCachedRecentTripsKey(userId);
+    let raw = await AsyncStorage.getItem(key);
+    if (!raw && key !== CACHED_RECENT_TRIPS_KEY) {
+      raw = await AsyncStorage.getItem(CACHED_RECENT_TRIPS_KEY);
+    }
     if (raw) {
       return JSON.parse(raw);
     }
@@ -125,10 +136,13 @@ export async function loadCachedRecentTrips(): Promise<TripSummary[]> {
 /**
  * Saves a fresh list of recent trips to offline storage.
  */
-export async function saveCachedRecentTrips(trips: TripSummary[]): Promise<void> {
+export async function saveCachedRecentTrips(trips: TripSummary[], userId?: string): Promise<void> {
   try {
-    if (Array.isArray(trips) && trips.length > 0) {
-      await AsyncStorage.setItem(CACHED_RECENT_TRIPS_KEY, JSON.stringify(trips.slice(0, 20)));
+    if (Array.isArray(trips)) {
+      const key = getCachedRecentTripsKey(userId);
+      const val = JSON.stringify(trips.slice(0, 20));
+      await AsyncStorage.setItem(key, val);
+      await AsyncStorage.setItem(CACHED_RECENT_TRIPS_KEY, val);
     }
   } catch (err) {
     console.warn('[OfflineTripService] Error saving cached recent trips:', err);
@@ -176,6 +190,23 @@ export async function clearPendingListens(): Promise<void> {
  */
 export async function clearAllOfflineTripData(): Promise<void> {
   console.log('[OfflineTripService] Clearing all offline trip data...');
+
+  if (Platform.OS === 'web') {
+    try {
+      const allKeys = await AsyncStorage.getAllKeys();
+      const tripKeysToRemove = allKeys.filter(
+        (key) =>
+          key.startsWith(STORAGE_KEY_PREFIX) ||
+          key === OFFLINE_TRIP_IDS_KEY ||
+          key === CACHED_RECENT_TRIPS_KEY ||
+          key === PENDING_LISTENS_KEY
+      );
+      if (tripKeysToRemove.length > 0) {
+        await AsyncStorage.multiRemove(tripKeysToRemove);
+      }
+    } catch {}
+    return;
+  }
 
   // 1. Delete all audio files (.mp3) and trip json (.json) in FileSystem.documentDirectory
   try {
@@ -262,6 +293,14 @@ export async function getOfflineStorageUsage(): Promise<{
   formatted: string;
   fileCount: number;
 }> {
+  if (Platform.OS === 'web') {
+    return {
+      bytes: 0,
+      formatted: '0 B',
+      fileCount: 0,
+    };
+  }
+
   let totalBytes = 0;
   let fileCount = 0;
 
