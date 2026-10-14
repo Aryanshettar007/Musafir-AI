@@ -5,7 +5,7 @@ import { decodePolyline, indexRoute } from "../src/geo";
 import { prepare } from "../src/pipeline/candidates";
 import { DiscoveryFileSchema, type DiscoveryFile } from "../src/pipeline/discoveryFile";
 import { fallbackPicks, finalizeItems, introItem, limitFood } from "../src/pipeline/plan";
-import { avgSpeedMps } from "../src/pipeline/select";
+import { avgSpeedMps, selectPicks } from "../src/pipeline/select";
 import { buildPool, buildSlots } from "../src/pipeline/slots";
 
 // Trimmed discovery runs (ids, names, locations, types, rating counts, Wikipedia descriptions), made with
@@ -30,9 +30,9 @@ describe("Bengaluru -> Mysuru fixture", () => {
   const file = load("discovery-blr-mys.json");
   const { route, prepared, pool, slots, items } = run(file);
 
-  it("has the expected shape: 138 km and about 15 slots", () => {
+  it("has the expected shape: 138 km and 19 slots (10 for the first hour, then one per 10 minutes)", () => {
     expect(file.route.distanceM).toBeGreaterThan(130_000);
-    expect(slots).toHaveLength(15);
+    expect(slots).toHaveLength(19);
   });
 
   it("keeps one Maddur Tiffany's", () => {
@@ -120,5 +120,23 @@ describe("Bengaluru -> Mumbai fixture", () => {
     for (let k = 1; k < food.length; k++) {
       expect(food[k].anchorRouteDistanceM - food[k - 1].anchorRouteDistanceM).toBeGreaterThanOrEqual(45 * 60 * avgSpeedMps(file.route) - 1);
     }
+  });
+});
+
+describe("Bengaluru city fixture (Nammoora Thindi -> Orion Mall, 27 min)", () => {
+  const file = load("discovery-blr-city.json");
+  const route = indexRoute(decodePolyline(file.route.polyline));
+  const prepared = prepare({ route, google: file.google, wiki: file.wiki, originLabel: file.origin.label, destinationLabel: file.destination.label });
+
+  it("gets five slots for a half-hour trip, each with something to tell", () => {
+    const slots = buildSlots(buildPool(prepared), route, file.route.durationS);
+    expect(slots).toHaveLength(5);
+    for (const s of slots) expect(s.candidates.length + s.towns.length, `slot ${s.index}`).toBeGreaterThan(0);
+  });
+
+  it("keeps ISKCON, the most famous place on the route (143 823 ratings, 400 m away)", async () => {
+    const selection = await selectPicks(undefined, { route, durationS: file.route.durationS, prepared, interests: ["history", "food"] });
+    const items = finalizeItems(selection.picks, { intro: introItem("trip"), avgSpeedMps: avgSpeedMps(file.route), totalM: route.totalM });
+    expect(items.map((i) => i.title)).toContain("ISKCON Temple, Bengaluru");
   });
 });

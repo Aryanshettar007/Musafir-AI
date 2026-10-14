@@ -3,11 +3,11 @@ import { brand, clusterEpisodes, dedupeArticles, dedupeChains, passesFilter, poi
 import { cacheKey } from "../src/pipeline/cacheKey";
 import { classifyWiki, interestsFor, poiKind } from "../src/pipeline/classify";
 import { matchArticle, nameTokens } from "../src/pipeline/match";
-import { alternativesFor, enforceSpacing, fallbackPicks, finalizeItems, fitsSpacing, introItem, limitFood, plan, sponsoredItem } from "../src/pipeline/plan";
+import { addMustSee, alternativesFor, enforceSpacing, fallbackPicks, finalizeItems, fitsSpacing, introItem, limitFood, plan, sponsoredItem } from "../src/pipeline/plan";
 import { checkCuratorAnswer, idMap } from "../src/pipeline/curate";
 import { buildSlots, slotCount, slotIndex, type Pool } from "../src/pipeline/slots";
 import { triggerFor } from "../src/pipeline/triggers";
-import { TARGET_SECONDS } from "../src/pipeline/rules";
+import { PROMPT_VERSION, TARGET_SECONDS } from "../src/pipeline/rules";
 import type { Article, Candidate, PlannedItem } from "../src/pipeline/types";
 import { indexRoute, type LatLng } from "../src/geo";
 
@@ -143,9 +143,44 @@ describe("chains, duplicate articles and clusters", () => {
     expect(episodes).toHaveLength(1);
     expect(episodes[0].anchor?.name).toBe("Tomb");
     expect(episodes[0].members?.map((m) => m.name)).toEqual(["Fort", "Temple", "Tomb"]);
-    expect(episodes[0].score).toBe(7);
+    expect(episodes[0].score).toBe(6.5);
     expect(episodes[0].kind).toBe("episode");
     expect(singles.map((s) => s.name).sort()).toEqual(["A", "B", "Lone"]);
+  });
+
+  it("does not chain an episode across the city: every member is within 3 km of the first", () => {
+    // Each place is 2.5 km from the next, so chaining would make one 10 km episode of five.
+    const chain = [20, 22.5, 25, 27.5, 30].map((km) => cand({ km, name: `C${km}` }));
+    const { episodes } = clusterEpisodes(chain);
+    expect(episodes.every((e) => (e.members ?? []).every((m) => Math.abs(m.routeDistanceM - e.members![0].routeDistanceM) <= 3000))).toBe(true);
+    expect(episodes.flatMap((e) => e.members ?? []).length).toBeLessThan(5);
+  });
+});
+
+describe("famous places", () => {
+  it("gives places above 10 000 ratings extra weight, and leaves ordinary places as they were", () => {
+    const base = { article: undefined, historic: false, distanceFromRouteM: 0, inEdge: false };
+    expect(poiScore({ ...base, ratings: 9_999 })).toBeCloseTo(4, 5);
+    // 100 000 ratings: log10 = 5, plus 2 for the decade above 10 000.
+    expect(poiScore({ ...base, ratings: 99_999 })).toBeCloseTo(7, 3);
+    // A very famous temple beats a small historic place with an article.
+    const famous = poiScore({ ...base, ratings: 143_823, article: { pageId: 1, title: "ISKCON", location: at(1) }, inEdge: true });
+    const small = poiScore({ ...base, ratings: 2_000, article: { pageId: 2, title: "Old Fort", location: at(1) }, historic: true, inEdge: true });
+    expect(famous).toBeGreaterThan(small);
+  });
+
+  it("adds a must-see place that lost its slot, and skips places already in the trip", () => {
+    const winner = cand({ km: 15, name: "Winner", ratings: 2000, score: 9 });
+    const mustSee = cand({ km: 18, name: "Must see", ratings: 60_000, score: 8 });
+    const ordinary = cand({ km: 19, name: "Ordinary", ratings: 3_000, score: 4 });
+    const food = cand({ km: 17, kind: "food", name: "Famous cafe", ratings: 90_000, score: 8 });
+    const pool: Pool = { strict: [winner, mustSee, ordinary, food], relaxed: [], local: [], towns: [], regions: [] };
+    const slots = buildSlots(pool, route, 3600);
+    const picks = fallbackPicks(slots, [], route.totalM);
+    expect(picks.map((p) => p.title)).toEqual(["Winner"]);
+    const out = addMustSee(picks, pool, slots, [], route.totalM);
+    expect(out.map((p) => p.title)).toEqual(["Winner", "Must see"]); // food is not added, ordinary places are not
+    expect(addMustSee(out, pool, slots, [], route.totalM)).toHaveLength(2);
   });
 });
 
@@ -199,9 +234,11 @@ describe("prepare", () => {
 });
 
 describe("slots", () => {
-  it("count is duration / 10 min clamped to 3..60", () => {
-    expect(slotCount(9060)).toBe(15);
-    expect(slotCount(60 * 60)).toBe(6);
+  it("count is one slot per 6 min for the first hour, then one per 10 min, clamped to 3..60", () => {
+    expect(slotCount(27 * 60)).toBe(5); // 4.5 rounds up: a short city trip still gets five stops
+    expect(slotCount(30 * 60)).toBe(5);
+    expect(slotCount(60 * 60)).toBe(10);
+    expect(slotCount(9060)).toBe(19); // Bengaluru to Mysuru, 151 min: 10 + 9.1
     expect(slotCount(600)).toBe(3);
     expect(slotCount(60468)).toBe(60);
     expect(slotCount(10 * 3600 * 24)).toBe(60);
@@ -213,8 +250,8 @@ describe("slots", () => {
     expect(slotIndex(100_001, 100_000, 10)).toBe(9);
   });
 
-  const pool = (over: Partial<Pool>): Pool => ({ strict: [], relaxed: [], towns: [], regions: [], ...over });
-  const durationS = 6000; // 10 slots over 100 km
+  const pool = (over: Partial<Pool>): Pool => ({ strict: [], relaxed: [], local: [], towns: [], regions: [], ...over });
+  const durationS = 3600; // 10 slots over 100 km
 
   it("shortlists the top three per slot, best first, plus the towns", () => {
     const list = [cand({ km: 1, score: 3 }), cand({ km: 2, score: 5 }), cand({ km: 3, score: 4 }), cand({ km: 4, score: 6 }), cand({ km: 15, score: 1 })];
@@ -234,6 +271,15 @@ describe("slots", () => {
     expect(slots[2].relaxed).toBe(true);
     expect(slots[3].candidates).toEqual([region]);
     expect(slots[4].candidates).toEqual([]);
+  });
+
+  it("fills a slot nothing else reaches with a local place close to the road", () => {
+    const local = cand({ km: 45, ratings: 500, distanceFromRouteM: 1500, inEdge: true, name: "Local temple" });
+    const slots = buildSlots(pool({ strict: [cand({ km: 5 })], local: [local] }), route, durationS);
+    expect(slots[4].candidates).toEqual([local]);
+    expect(slots[4].relaxed).toBe(true);
+    const strictToo = buildSlots(pool({ strict: [cand({ km: 45, name: "Strict" })], local: [local] }), route, durationS);
+    expect(strictToo[4].candidates.map((c) => c.name)).toEqual(["Strict"]);
   });
 
   it("prefers a town over a region for an empty slot", () => {
@@ -326,7 +372,7 @@ describe("refilling an item dropped for lack of facts", () => {
     const used = cand({ km: 18, name: "Used" });
     const other = cand({ km: 35, name: "Other slot" });
     const town = cand({ km: 16, kind: "town", name: "Town" });
-    const slots = buildSlots({ strict: [top, second, used, other], relaxed: [], towns: [town], regions: [] }, route, 6000);
+    const slots = buildSlots({ strict: [top, second, used, other], relaxed: [], local: [], towns: [town], regions: [] }, route, 3600);
     const dropped = plan("story", top, "general", slots[1], route.totalM);
     const alts = alternativesFor(dropped, slots, new Set([top.key, used.key]), ["history"], route.totalM);
     expect(alts.map((a) => [a.type, a.title])).toEqual([["story", "Second"], ["town-welcome", "Town"]]);
@@ -353,7 +399,7 @@ describe("curator answer checks (D3)", () => {
     const f0 = cand({ km: 8, kind: "food", name: "Dosa" });
     const t0 = cand({ km: 9, kind: "town", name: "Town" });
     const e1 = cand({ km: 15, kind: "episode", name: "Cluster", members: [cand({ km: 15 }), cand({ km: 15.5 }), cand({ km: 16 })] });
-    const slots = buildSlots({ strict: [s0, f0, e1], relaxed: [], towns: [t0], regions: [] }, route, 6000);
+    const slots = buildSlots({ strict: [s0, f0, e1], relaxed: [], local: [], towns: [t0], regions: [] }, route, 3600);
     return { slots, s0, f0, t0, e1 };
   };
 
@@ -411,13 +457,13 @@ describe("curator answer checks (D3)", () => {
 describe("cache key and triggers", () => {
   const base = { type: "story", placeIds: ["b", "a"], language: "kn-IN", voice: "Girish", focus: "history", side: "left" } as const;
   it("sorts place ids and includes everything that changes the audio", () => {
-    expect(cacheKey(base)).toBe("v2|story|a,b|kn-IN|Girish|history|left");
+    expect(cacheKey(base)).toBe(`v${PROMPT_VERSION}|story|a,b|kn-IN|Girish|history|left`);
     expect(cacheKey({ ...base, voice: "Nalini" })).not.toBe(cacheKey(base));
     expect(cacheKey({ ...base, side: "right" })).not.toBe(cacheKey(base));
     expect(cacheKey({ ...base, focus: "general" })).not.toBe(cacheKey(base));
   });
   it("keys the trip intro per trip", () => {
-    expect(cacheKey({ ...base, type: "trip-intro", placeIds: [], tripId: "T1", focus: "general", side: "none" })).toBe("v2|trip-intro|T1|kn-IN|Girish");
+    expect(cacheKey({ ...base, type: "trip-intro", placeIds: [], tripId: "T1", focus: "general", side: "none" })).toBe(`v${PROMPT_VERSION}|trip-intro|T1|kn-IN|Girish`);
   });
 
   it("starts 30 % of the audio before the anchor, never before the route start", () => {

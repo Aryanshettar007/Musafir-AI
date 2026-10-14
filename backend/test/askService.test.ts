@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { UpstreamError } from "../src/clients/upstream";
 import { Place } from "../src/models/place.model";
 import { createAskService, type AskRequest } from "../src/services/ask/ask.service";
-import { AnswerSchema } from "../src/services/ask/prompt";
+import { AnswerSchema, buildSystem } from "../src/services/ask/prompt";
 import { clearCollections, startMongo, stopMongo } from "./helpers/mongo";
 import { fakeGemini, fakeGnani, fakeMaps, SHORT_MP3 } from "./helpers/fakes";
 import { answer, makePlace, makeProfile, makeTrip, MID } from "./askFixtures";
@@ -103,7 +103,7 @@ describe("ask service: audio path", () => {
       seen.push(req.languageCode);
       return original(req, o);
     };
-    const service = createAskService({ gemini: fakeGemini([answer("Yeh purana qila hai.")]), gnani, maps: fakeMaps() });
+    const service = createAskService({ gemini: fakeGemini([answer("यह पुराना किला है।")]), gnani, maps: fakeMaps() });
     await service.ask(base({ language: "hi-en", question: { kind: "audio", audio: SHORT_MP3 } }));
     expect(seen).toEqual(["hi-IN"]);
   });
@@ -185,6 +185,32 @@ describe("ask service: Places tool loop", () => {
     expect(gemini.calls[1].prompt).toMatch(/(left|right) side of the road/);
     // Only the final answer is spoken.
     expect(gnani.calls.filter((c) => c.kind === "tts").map((c) => c.text)).toEqual(["Try Hotel Kamat on the right."]);
+  });
+
+  it("searches the town the passenger names instead of around the car", async () => {
+    const searchText = vi.fn(async () => ({ places: [{ ...found, name: "Hotel Mysore Grand" }] }));
+    const trip = await makeTrip("u1", { language: "en-IN" });
+    const { service, gemini } = setup(
+      [
+        answer("Let me check.", { missingData: "nearby_places", placesQuery: "good hotels", placesArea: "Mysuru" }),
+        answer("Hotel Mysore Grand is a well-reviewed option in Mysuru."),
+      ],
+      { maps: fakeMaps({ searchText }) },
+    );
+    const r = await service.ask(base({ tripId: trip._id.toString(), question: { kind: "text", text: "can you suggest good hotels in mysore" } }));
+    expect(r.answerText).toBe("Hotel Mysore Grand is a well-reviewed option in Mysuru.");
+    // A named area: no bias around the car, the area goes into the query.
+    expect(searchText).toHaveBeenCalledWith({ query: "good hotels in Mysuru", pageSize: 5 });
+    expect(gemini.calls[1].prompt).toContain('PLACES SEARCH "good hotels in Mysuru" (in Mysuru, from Google Maps)');
+    // Side of the road and distance from the car mean nothing for a town far ahead.
+    const results = gemini.calls[1].prompt.split("PLACES SEARCH")[1].split("\n").filter((l) => l.startsWith("- "));
+    expect(results).toEqual(["- Hotel Mysore Grand (340 reviews)"]);
+  });
+
+  it("tells the model it may search a named town, not only near the car", () => {
+    const system = buildSystem("en-IN");
+    expect(system).toMatch(/placesArea/);
+    expect(system).toMatch(/stay/);
   });
 
   it("defaults the query to famous restaurants and never loops more than once", async () => {

@@ -276,7 +276,7 @@ Google type; the curator may choose them as `focus` from the facts.
 A global "top 30" leaves long empty stretches (28 km Mandya → Srirangapatna) and, on long routes, one item every
 33 km (Bengaluru → Mumbai). Selection therefore works in **time slots**:
 
-1. **Slots:** `slots = clamp(round(durationMin / 10), 3, 60)`; the route is cut into that many equal stretches
+1. **Slots:** `slots = clamp(round(min(durationMin, 60) / 6 + max(durationMin - 60, 0) / 10), 3, 60)` (one per 6 minutes for the first hour, then one per 10; changed 2026-10-15 so short city trips get about five stops); the route is cut into that many equal stretches
    (Mysuru ≈ 15 slots, Mumbai = 60 slots of ~17 min).
 2. **Shortlist per slot:** the top 3 candidates (episodes, POIs, food) anchored in the slot, plus the towns the
    slot passes through.

@@ -5,7 +5,8 @@ import { haversineM, projectOntoRoute, type RouteIndex } from "../geo";
 import { classifyWiki, interestsFor, isHistoric, poiKind } from "./classify";
 import { labelTokens, matchArticle } from "./match";
 import {
-  CITY_EDGE_M, CLUSTER_MIN_SIZE, CLUSTER_RADIUS_M, EDGE_ARTICLE_MIN_RATINGS, EDGE_MIN_RATINGS, HEARD_PENALTY, MAX_OFF_ROUTE_M, MIN_RATINGS,
+  CITY_EDGE_M, CLUSTER_MIN_SIZE, CLUSTER_RADIUS_M, EDGE_ARTICLE_MIN_RATINGS, EDGE_MIN_RATINGS, EPISODE_BONUS, FAME_WEIGHT, FAMOUS_FROM_RATINGS,
+  HEARD_PENALTY, LOCAL_MAX_OFF_ROUTE_M, MAX_OFF_ROUTE_M, MIN_RATINGS,
   REGION_MAX_OFF_ROUTE_M, RELAXED_MAX_OFF_ROUTE_M, RELAXED_MIN_RATINGS, TOWN_MAX_OFF_ROUTE_M, TOWN_MIN_ROUTE_M,
 } from "./rules";
 import type { Article, Candidate } from "./types";
@@ -38,9 +39,11 @@ const toArticle = (h: WikiHit): Article => ({
   pageId: h.pageId, title: h.title, location: h.location, wikidataId: h.wikidataId, description: h.description, length: h.length,
 });
 
-// score = log10(ratings + 1) + 1.5 hasArticle + 1 isHistoric - 0.3 offRouteKm - 1.5 inCityEdge (trip spec 5.3.5).
+// score = log10(ratings + 1) + fame + 1.5 hasArticle + 1 isHistoric - 0.3 offRouteKm - 1.5 inCityEdge (trip spec 5.3.5),
+// fame = 2 log10(ratings / 10 000) above 10 000 ratings, else 0.
 export function poiScore(c: Pick<Candidate, "ratings" | "article" | "historic" | "distanceFromRouteM" | "inEdge">): number {
-  return Math.log10(c.ratings + 1) + (c.article ? 1.5 : 0) + (c.historic ? 1 : 0) - 0.3 * (c.distanceFromRouteM / 1000) - (c.inEdge ? 1.5 : 0);
+  const fame = c.ratings > FAMOUS_FROM_RATINGS ? FAME_WEIGHT * Math.log10(c.ratings / FAMOUS_FROM_RATINGS) : 0;
+  return Math.log10(c.ratings + 1) + fame + (c.article ? 1.5 : 0) + (c.historic ? 1 : 0) - 0.3 * (c.distanceFromRouteM / 1000) - (c.inEdge ? 1.5 : 0);
 }
 
 // Towns and regions have no review counts: the article length is their importance.
@@ -99,16 +102,17 @@ function edge(route: RouteIndex, routeDistanceM: number): boolean {
   return routeDistanceM < CITY_EDGE_M || routeDistanceM > route.totalM - CITY_EDGE_M;
 }
 
-export type FilterMode = "strict" | "relaxed";
+export type FilterMode = "strict" | "relaxed" | "local";
 
 // Trip spec 5.3.2: story or food types (decided in prepare), close to the route, enough ratings unless there is an
-// article, and inside the city edges only the very prominent.
+// article, and inside the city edges only the very prominent. "local" (empty slots only) keeps places close to the road
+// with a few ratings, city edge or not.
 export function passesFilter(c: Candidate, mode: FilterMode = "strict"): boolean {
-  const maxOff = mode === "strict" ? MAX_OFF_ROUTE_M : RELAXED_MAX_OFF_ROUTE_M;
+  const maxOff = mode === "strict" ? MAX_OFF_ROUTE_M : mode === "relaxed" ? RELAXED_MAX_OFF_ROUTE_M : LOCAL_MAX_OFF_ROUTE_M;
   const minRatings = mode === "strict" ? MIN_RATINGS : RELAXED_MIN_RATINGS;
   if (c.distanceFromRouteM > maxOff) return false;
   if (c.ratings < minRatings && !c.article) return false;
-  if (c.inEdge && !(c.ratings >= EDGE_MIN_RATINGS || (c.article && c.ratings >= EDGE_ARTICLE_MIN_RATINGS))) return false;
+  if (mode !== "local" && c.inEdge && !(c.ratings >= EDGE_MIN_RATINGS || (c.article && c.ratings >= EDGE_ARTICLE_MIN_RATINGS))) return false;
   return true;
 }
 
@@ -146,15 +150,16 @@ export function dedupeArticles(list: readonly Candidate[]): Candidate[] {
   return list.filter((c) => !c.article || best.get(c.article.pageId) === c);
 }
 
-// Non-food POIs sorted by route position; a POI joins the current group when it is within 3 km of any member. A group
-// of 3 or more becomes one episode candidate (anchor = best-scoring member, score = anchor + 1, members in route
-// order). Returns the episodes and the POIs that stay single.
+// Non-food POIs sorted by route position; a POI joins the current group when it is within 3 km of the group's first
+// place (within 3 km of any member chained 11 places across central Bengaluru into one episode). A group of 3 or more
+// becomes one episode candidate (anchor = best-scoring member, score = anchor + 0.5, members in route order). Returns
+// the episodes and the POIs that stay single.
 export function clusterEpisodes(stories: readonly Candidate[]): { episodes: Candidate[]; singles: Candidate[] } {
   const sorted = [...stories].sort((a, b) => a.routeDistanceM - b.routeDistanceM);
   const groups: Candidate[][] = [];
   for (const c of sorted) {
     const group = groups.at(-1);
-    if (group && group.some((m) => haversineM(m.location, c.location) <= CLUSTER_RADIUS_M)) group.push(c);
+    if (group && haversineM(group[0].location, c.location) <= CLUSTER_RADIUS_M) group.push(c);
     else groups.push([c]);
   }
   const episodes: Candidate[] = [];
@@ -172,7 +177,7 @@ export function clusterEpisodes(stories: readonly Candidate[]): { episodes: Cand
       kind: "episode",
       name: anchor.name,
       interests,
-      score: anchor.score + 1,
+      score: anchor.score + EPISODE_BONUS,
       heard: members.every((m) => m.heard),
       members,
       anchor,

@@ -75,4 +75,23 @@ describe("writeStory", () => {
     await expect(writeStory(check(`${words(114)} 5 km`), base)).rejects.toThrow(/Contains digits|km/);
     await expect(writeStory(check(`${words(100)} ${Array.from({ length: 15 }, () => "కోట").join(" ")}`), base)).rejects.toThrow(/Telugu/);
   });
+
+  it("rejects a greeting at the start of any item but the trip intro", async () => {
+    const greeted = (opening: string) => fakeGemini([{ ...ok, script: `${opening} ${words(113)}` }]);
+    await expect(writeStory(greeted("ನಮಸ್ಕಾರ ಸ್ನೇಹಿತರೆ,"), base)).rejects.toThrow(/Do not greet/);
+    await expect(writeStory(greeted("ಹಲೋ ಸ್ನೇಹಿತರೇ,"), { ...base, type: "town-welcome" })).rejects.toThrow(/Do not greet/);
+    const en = { ...base, language: "en-IN" as const };
+    const enWords = (n: number) => Array.from({ length: n }, () => "fort").join(" ");
+    for (const opening of ["Hey folks,", "Hello friends!", "Namaste doston,", "Welcome back to the drive,"]) {
+      await expect(writeStory(fakeGemini([{ ...ok, script: `${opening} ${enWords(185)}` }]), en)).rejects.toThrow(/Do not greet/);
+    }
+    // The trip intro greets once; a greeting later in a story is not an opening.
+    await expect(writeStory(greeted("ನಮಸ್ಕಾರ ಸ್ನೇಹಿತರೆ,"), { ...base, type: "trip-intro", tripFacts: "x" })).resolves.toBeDefined();
+    await expect(writeStory(fakeGemini([{ ...ok, script: `${words(100)} ನಮಸ್ಕಾರ ${words(13)}` }]), base)).resolves.toBeDefined();
+  });
+
+  it("tells the model only the intro greets", () => {
+    expect(buildPrompt(base)).toMatch(/already under way.*do not greet/i);
+    expect(buildPrompt({ ...base, type: "trip-intro", tripFacts: "x" })).not.toMatch(/do not greet/i);
+  });
 });

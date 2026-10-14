@@ -65,6 +65,29 @@ const TASK: Record<WriteRequest["type"], string> = {
 
 const languageLabel = (id: LanguageId) => LANGUAGES.find((l) => l.id === id)?.label ?? id;
 
+// Every item is written on its own, so the model opened each one with "Namaste doston" / "ನಮಸ್ಕಾರ ಸ್ನೇಹಿತರೆ" / "Hey
+// folks". Only the trip intro greets; these words in the first few words of any other item are sent back for a retry.
+const GREETING_WORDS = new Set([
+  "hey", "hello", "hi", "hiya", "greetings", "namaste", "namaskar", "namaskara", "namaskaram", "vanakkam", "doston", "dosto", "folks", "friends",
+  "नमस्ते", "नमस्कार", "दोस्तों", "दोस्तो", "हेलो", "हैलो", "हाय", "मित्रों", "मित्रांनो", // Hindi, Hinglish, Marathi
+  "ನಮಸ್ಕಾರ", "ಸ್ನೇಹಿತರೆ", "ಸ್ನೇಹಿತರೇ", "ಗೆಳೆಯರೆ", "ಗೆಳೆಯರೇ", "ಹಲೋ", // Kannada
+  "வணக்கம்", "நண்பர்களே", "ஹலோ", // Tamil
+  "నమస్కారం", "నమస్తే", "స్నేహితులారా", "హలో", // Telugu
+  "നമസ്കാരം", "സുഹൃത്തുക്കളേ", "ഹലോ", // Malayalam
+  "নমস্কার", "বন্ধুরা", "হ্যালো", // Bengali
+  "નમસ્તે", "નમસ્કાર", "મિત્રો", "હેલો", // Gujarati
+  "ਨਮਸਤੇ", "ਦੋਸਤੋ", "ਹੈਲੋ", // Punjabi
+]);
+const OPENING_WORDS = 5;
+
+export function greetingProblems(script: string): string[] {
+  const opening = script.split(/\s+/).slice(0, OPENING_WORDS).map((w) => w.toLowerCase().replace(/[^\p{L}\p{M}]/gu, "")).filter(Boolean);
+  const hit = opening.find((w) => GREETING_WORDS.has(w)) ?? (opening[0] === "welcome" && opening[1] === "back" ? "welcome back" : undefined);
+  return hit
+    ? [`Do not greet or address the listeners at the start ("${hit}"): the trip is already under way and only the trip intro greets. Start directly with the place.`]
+    : [];
+}
+
 export function buildPrompt(req: WriteRequest): string {
   const budget = wordBudget(req.language, req.targetSeconds, req.voice);
   const perPlace = req.type === "episode" ? EPISODE_FACTS_CHARS : FACTS_MAX_CHARS;
@@ -85,7 +108,13 @@ export function buildPrompt(req: WriteRequest): string {
       `invent nothing about ${area.length > 1 ? "them" : "it"}, and keep the story about the area the FACTS describe.\n`
     : "";
 
-  return `TASK: ${TASK[req.type]}
+  // Only the intro greets: every other item is one stop in a trip the listener is already on.
+  const flow =
+    req.type === "trip-intro"
+      ? ""
+      : "\nFLOW: The trip is already under way and the listener has heard other stops: do not greet them (no hello, namaste, welcome back) and do not address them as friends. Start directly with the place.";
+
+  return `TASK: ${TASK[req.type]}${flow}
 ${req.places.length ? `PLACES: ${req.places.map((p) => p.name).join("; ")}\n` : ""}SIDE: ${side}
 LISTENER INTERESTS: ${req.interests.join(", ")}${req.focus !== "general" ? ` (lean this story towards ${req.focus})` : ""}.
 LANGUAGE: ${languageLabel(req.language)} (${LANGUAGE_STYLES[req.language].script} script). ${LANGUAGE_STYLES[req.language].guide}
@@ -104,7 +133,7 @@ export async function writeStory(gemini: GeminiClient, req: WriteRequest): Promi
     prompt: buildPrompt(req),
     schema: StorySchema,
     language: req.language,
-    validate: (v) => checkScript(v.script, req.language, { wordBudget: budget }),
+    validate: (v) => [...checkScript(v.script, req.language, { wordBudget: budget }), ...(req.type === "trip-intro" ? [] : greetingProblems(v.script))],
   });
   return { ...res.value, model: res.model, words: countWords(res.value.script), budget };
 }

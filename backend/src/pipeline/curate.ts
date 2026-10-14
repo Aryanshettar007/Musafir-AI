@@ -1,8 +1,7 @@
 import { z } from "zod";
 import { INTEREST_IDS, type InterestId } from "../catalog/interests";
 import type { GeminiClient } from "../clients/gemini";
-import { rank } from "./candidates";
-import { CURATOR_NULL_MAX_RANK, MIN_CURATOR_PICKS } from "./rules";
+import { MIN_CURATOR_PICKS } from "./rules";
 import { allowedTypes, defaultType, fallbackPicks, focusFor, plan } from "./plan";
 import type { Slot } from "./slots";
 import type { Candidate, Focus, PlannedItem } from "./types";
@@ -83,16 +82,18 @@ export function checkCuratorAnswer(answer: CuratorAnswer, slots: readonly Slot[]
 
 const SYSTEM = `You are the curator of an audio road trip. The route is cut into equal stretches ("slots"). For every slot you get a
 short list of places the car passes. Choose at most one place per slot to tell a story about, plus optionally one town
-to welcome travellers to (towns have ids starting with t, places with c). The trip should have something to listen to
-every ten minutes or so, so use null only when every place in a slot is a poor fit, and never leave a slot empty just
-because a place is outside the listener's interests. Pick for the listener: lean towards their interests, prefer places
-they have not heard (heard=true means they already did), and vary the kinds of places so the trip stays interesting.
+to welcome travellers to (towns have ids starting with t, places with c). Every slot must have something to listen
+to: pick a place for every slot that has one, even when it is outside the listener's interests. Travellers most want the most famous places on their way: the
+review count shows how famous a place is, and a well-known landmark (a major temple, palace, fort or park) should not be
+skipped for a lesser one. Then lean towards the listener's interests, prefer places they have not heard (heard=true
+means they already did), and vary the kinds of places so the trip stays interesting.
 Use only the ids you are given. Types: story (a single place), food (a food place), episode (a cluster of places, longer), town-welcome
 (a town), long-form (a longer story about a town or a region). Answer with JSON only.`;
 
 function prompt(slots: readonly Slot[], interests: readonly InterestId[], durationS: number): string {
   const line = (id: string, c: Candidate) =>
     `  ${id}: ${c.name} | ${c.kind}${c.kind === "episode" ? ` of ${c.members?.length ?? 0} places` : ""}` +
+    `${c.ratings > 0 ? ` | ${c.ratings} reviews` : ""}${c.article ? " | has a Wikipedia article" : ""}` +
     ` | ${c.side} side | interests: ${c.interests.join(", ") || "-"}${c.heard ? " | heard=true" : ""}`;
   const body = slots
     .map((s) => {
@@ -108,10 +109,9 @@ function prompt(slots: readonly Slot[], interests: readonly InterestId[], durati
     `listener's interests or "general". Include a separate pick for a town when you want a town-welcome.\n\n${body}`;
 }
 
-// What the curator left empty. A slot without a valid pick (skipped, or only invalid answers) gets its top shortlist
-// entry. An explicit null is honoured only when the slot's best place is weak and the slot or a neighbour has an item
-// anyway (CURATOR_NULL_MAX_RANK); otherwise the top entry is used with focus "general" (the model judged it off-interest).
-// A slot with only towns that ends up empty between two empty neighbours gets a town-welcome.
+// What the curator left empty: every slot gets audio. A slot without a valid pick (skipped, or only invalid answers)
+// gets its top shortlist entry; an explicit null gets it too, with focus "general" (the model judged it off-interest),
+// unless the slot already has a town-welcome. A slot with only towns gets a town-welcome.
 export function fillSlots(checked: Checked, answer: CuratorAnswer, slots: readonly Slot[], interests: readonly InterestId[], totalM: number): PlannedItem[] {
   const items = [...checked.items];
   const covered = new Set(checked.itemSlots); // slots with any item, town-welcomes included
@@ -126,15 +126,10 @@ export function fillSlots(checked: Checked, answer: CuratorAnswer, slots: readon
     const top = slot.candidates[0];
     if (!top || picked.has(slot.index)) continue;
     if (!nulled.has(slot.index)) add(plan(defaultType(top), top, focusFor(top, interests), slot, totalM), slot);
-    else if (rank(top) >= CURATOR_NULL_MAX_RANK) add(plan(defaultType(top), top, "general", slot, totalM), slot);
+    else if (!covered.has(slot.index)) add(plan(defaultType(top), top, "general", slot, totalM), slot);
   }
-  // Weak nulls and town-only slots, in route order: fill only where the slot and both neighbours would stay empty.
   for (const slot of slots) {
-    const i = slot.index;
-    if (covered.has(i) || covered.has(i - 1) || covered.has(i + 1)) continue;
-    const top = slot.candidates[0];
-    if (top) add(plan(defaultType(top), top, "general", slot, totalM), slot);
-    else if (slot.towns[0]) add(plan("town-welcome", slot.towns[0], "general", slot, totalM), slot);
+    if (!covered.has(slot.index) && slot.towns[0]) add(plan("town-welcome", slot.towns[0], "general", slot, totalM), slot);
   }
   return items;
 }

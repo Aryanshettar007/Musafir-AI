@@ -17,15 +17,16 @@
   body { margin:0; font:14px/1.5 system-ui, -apple-system, "Segoe UI", "Noto Sans Kannada", sans-serif; background:var(--bg); color:var(--text); }
   .app { display:grid; grid-template-columns: minmax(0,1fr) 400px; height:100vh; }
   .mapwrap { position:relative; }
-  #map { position:absolute; inset:0; }
-  .hud { position:absolute; left:16px; right:16px; bottom:16px; display:flex; gap:12px; align-items:center; background:var(--panel);
+  /* The map is its own stacking context, so Leaflet's high z-index panes stay inside it. */
+  #map { position:absolute; inset:0; z-index:0; }
+  .hud { position:absolute; z-index:1; left:16px; right:16px; bottom:16px; display:flex; gap:12px; align-items:center; background:var(--panel);
          border:1px solid var(--line); border-radius:14px; padding:10px 14px; box-shadow:0 6px 24px rgba(0,0,0,.18); }
   .hud .km { font-variant-numeric:tabular-nums; font-weight:600; min-width:120px; }
   .track { flex:1; height:8px; background:var(--line); border-radius:4px; position:relative; }
   .track i { position:absolute; inset:0 auto 0 0; background:var(--accent); border-radius:4px; }
   .track b { position:absolute; top:-3px; width:4px; height:14px; border-radius:2px; background:var(--muted); transform:translateX(-2px); }
   .track b.sponsored { background:var(--gold); }
-  .badge { position:absolute; top:16px; left:16px; background:var(--panel); border:1px solid var(--line); border-radius:999px;
+  .badge { position:absolute; z-index:1; top:16px; left:16px; background:var(--panel); border:1px solid var(--line); border-radius:999px;
            padding:4px 10px; font-size:12px; color:var(--muted); }
   aside { background:var(--panel); border-left:1px solid var(--line); display:flex; flex-direction:column; min-height:0; }
   header { padding:16px 18px 12px; }
@@ -68,7 +69,44 @@
   .convo .q { background:var(--panel); border:1px solid var(--line); align-self:flex-end; max-width:90%; }
   .convo .a { background:var(--accent-soft); max-width:95%; }
   .convo .meta { font-size:11px; color:var(--muted); margin-top:2px; }
-  @media (max-width: 860px) { .app { grid-template-columns:1fr; grid-template-rows:55vh auto; height:auto; } aside { border-left:0; } }
+  .tripbar { display:flex; gap:8px; align-items:center; padding:0 18px 12px; }
+  .tripbar select { flex:1; min-width:0; }
+  .empty { position:absolute; inset:0; display:grid; place-items:center; color:var(--muted); text-align:center; padding:24px; }
+  /* ---- planner ---- */
+  .overlay { position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:flex-start; justify-content:center; padding:6vh 16px; z-index:5000; overflow:auto; }
+  .overlay.open { display:flex; }
+  .sheet { width:min(560px, 100%); background:var(--panel); border:1px solid var(--line); border-radius:18px; box-shadow:0 20px 60px rgba(0,0,0,.35); padding:20px 22px; }
+  .sheet h2 { margin:0 0 2px; font-size:19px; }
+  .sheet .x { float:right; border:0; background:transparent; font-size:20px; padding:2px 6px; color:var(--muted); }
+  .field { margin-top:14px; position:relative; }
+  .field > span { display:block; font-size:12px; color:var(--muted); font-weight:600; margin-bottom:5px; text-transform:uppercase; letter-spacing:.05em; }
+  .field input[type=text], .field select { width:100%; font:inherit; border:1px solid var(--line); background:var(--raised); color:var(--text); border-radius:10px; padding:9px 12px; }
+  .field input[type=text]:focus { outline:2px solid var(--accent); outline-offset:-1px; }
+  .field input.picked { border-color:var(--ok); }
+  .sugg { position:absolute; left:0; right:0; top:100%; margin-top:4px; background:var(--panel); border:1px solid var(--line); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.2); z-index:5; overflow:hidden; display:none; }
+  .sugg.open { display:block; }
+  .sugg div { padding:8px 12px; cursor:pointer; border-bottom:1px solid var(--line); }
+  .sugg div:last-child { border-bottom:0; }
+  .sugg div:hover, .sugg div.active { background:var(--accent-soft); }
+  .sugg small { display:block; color:var(--muted); font-size:12px; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chips label { border:1px solid var(--line); border-radius:999px; padding:4px 10px; font-size:12.5px; cursor:pointer; user-select:none; background:var(--raised); }
+  .chips input { display:none; }
+  .chips label:has(input:checked) { background:var(--accent-soft); border-color:var(--accent); color:var(--accent); font-weight:600; }
+  .actions { display:flex; gap:10px; align-items:center; margin-top:18px; }
+  .actions .muted { flex:1; }
+  .err { color:#c92a2a; font-size:13px; margin-top:10px; min-height:1em; }
+  .prog .route { font-weight:600; margin:6px 0 2px; }
+  .bar { height:8px; background:var(--line); border-radius:4px; overflow:hidden; margin:12px 0 6px; }
+  .bar i { display:block; height:100%; width:0; background:var(--accent); transition:width .4s; }
+  .bar.indet i { width:30%; animation:slide 1.2s infinite ease-in-out; }
+  @keyframes slide { 0%{ transform:translateX(-100%);} 100%{ transform:translateX(340%);} }
+  .stats { display:flex; gap:14px; font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .stats b { color:var(--text); }
+  .log { margin-top:12px; background:var(--raised); border:1px solid var(--line); border-radius:10px; padding:8px 10px; max-height:240px; overflow:auto;
+         font:12px/1.55 ui-monospace, "Cascadia Mono", Consolas, monospace; white-space:pre-wrap; }
+  @media (max-width: 860px) { .app { grid-template-columns:1fr; grid-template-rows:55vh auto; height:auto; } aside { border-left:0; } .two { grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
@@ -84,6 +122,10 @@
       <h1 id="title"></h1>
       <div class="muted" id="meta"></div>
     </header>
+    <div class="tripbar">
+      <select id="tripPicker" title="Open another trip"><option value="">Recent trips…</option></select>
+      <button class="primary" id="newTrip">＋ New trip</button>
+    </div>
     <div class="controls">
       <button class="primary" id="play">▶ Start drive</button>
       <button id="reset">↺ Reset</button>
@@ -97,9 +139,7 @@
           <div class="status" id="askStatus">Ask Musafir</div>
           <div class="hint" id="askHint">Tap the mic, ask your question, tap again. "What's coming up next?", "Where should we stop for food?"</div>
         </div>
-        <select id="askLang" title="Language you speak in">
-          <option value="kn-IN">ಕನ್ನಡ</option><option value="en-IN">English</option><option value="hi-IN">हिन्दी</option><option value="hi-en">Hinglish</option>
-        </select>
+        <select id="askLang" title="Language you speak in"></select>
       </div>
       <div class="convo" id="convo"></div>
     </div>
@@ -112,9 +152,53 @@
     <ol id="list"></ol>
   </aside>
 </div>
+<div class="overlay" id="planner">
+  <div class="sheet">
+    <button class="x" id="plannerClose" title="Close">✕</button>
+    <div id="planForm">
+      <h2>Plan a trip</h2>
+      <div class="muted">Builds with the real pipeline: Google Maps, Wikipedia, Gemini and Gnani. It uses free-tier quota.</div>
+      <div class="field"><span>From</span><input type="text" id="from" placeholder="e.g. Bengaluru" autocomplete="off"><div class="sugg" id="fromSugg"></div></div>
+      <div class="field"><span>To</span><input type="text" id="to" placeholder="e.g. Mysore Palace" autocomplete="off"><div class="sugg" id="toSugg"></div></div>
+      <div class="two">
+        <div class="field"><span>Language</span><select id="planLang"></select></div>
+        <div class="field"><span>Voice</span><select id="planVoice"></select></div>
+      </div>
+      <div class="field"><span>Interests</span><div class="chips" id="planInterests"></div></div>
+      <div class="err" id="planErr"></div>
+      <div class="actions">
+        <div class="muted" id="planNote"></div>
+        <button class="primary" id="planGo">Build trip</button>
+      </div>
+    </div>
+    <div id="planProgress" class="prog" hidden>
+      <h2 id="progTitle">Building your trip…</h2>
+      <div class="route" id="progRoute"></div>
+      <div class="muted" id="progStage"></div>
+      <div class="bar indet" id="progBar"><i></i></div>
+      <div class="stats"><span>Ready <b id="progReady">0</b></span><span>Failed <b id="progFailed">0</b></span><span>Stops <b id="progTotal">–</b></span><span id="progTime"></span></div>
+      <div class="log" id="progLog"></div>
+      <div class="actions">
+        <div class="muted" id="progHint">Stories appear as they're written and narrated. You can close this and come back.</div>
+        <button id="progNew">Plan another</button>
+        <button class="primary" id="progOpen" disabled>Open trip</button>
+      </div>
+    </div>
+  </div>
+</div>
 <audio id="audio" preload="none"></audio>
 <script>
 const DATA = __DATA__;
+const CATALOG = __CATALOG__;
+(function initTrip() {
+if (!DATA) {
+  window.initGoogle = () => {};
+  document.getElementById("map").innerHTML = '<div class="empty">No trips yet. Use “＋ New trip” to build one.</div>';
+  document.getElementById("mapBadge").hidden = true;
+  document.getElementById("title").textContent = "No trip loaded";
+  document.querySelector(".controls").hidden = true; document.querySelector(".ask").hidden = true; document.getElementById("now").hidden = true;
+  return;
+}
 const COLORS = { "trip-intro":"#6b665e", "town-welcome":"#2f9e44", story:"#d9480f", episode:"#c2255c", food:"#e67700", "long-form":"#0b7285", sponsored:"#c98a00" };
 const LABEL = { "trip-intro":"Trip intro", "town-welcome":"Town welcome", story:"Story", episode:"Episode", food:"Food stop", "long-form":"Long story", sponsored:"Sponsored" };
 
@@ -205,7 +289,8 @@ setTimeout(() => { if (!mapApi) loadLeaflet(); }, 8000);
 function escapeHtml(s) { return String(s).replace(/[&<>"]/g, (ch) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[ch])); }
 const $ = (id) => document.getElementById(id);
 $("title").textContent = `${DATA.origin} → ${DATA.destination}`;
-$("meta").textContent = `${(DATA.distanceM/1000).toFixed(1)} km · ${Math.round(DATA.durationS/60)} min · ${DATA.language} · voice ${DATA.voice} · ${DATA.items.length} stops`;
+$("meta").textContent = `${(DATA.distanceM/1000).toFixed(1)} km · ${Math.round(DATA.durationS/60)} min · ${DATA.language} · voice ${DATA.voice} · ${DATA.items.length} of ${DATA.totalItems} stops ready` +
+  (DATA.status === "building" ? " · still building (reload for more)" : DATA.status === "failed" ? " · build failed" : "");
 DATA.items.forEach((it) => { const b = document.createElement("b"); b.style.left = (100*it.routeDistanceM/total) + "%"; if (it.type === "sponsored") b.className = "sponsored"; $("track").appendChild(b); });
 DATA.items.forEach((it, idx) => {
   const c = COLORS[it.type] || "#d9480f";
@@ -273,6 +358,7 @@ $("play").onclick = (e) => {
   if (running) { last = 0; if (current >= 0) audio.play().catch(() => {}); requestAnimationFrame(tick); } else audio.pause();
 };
 // ---- live mode: record → 16 kHz WAV → POST /ask → play the spoken answer ----
+CATALOG.languages.forEach((l) => $("askLang").add(new Option(l.label, l.id)));
 $("askLang").value = DATA.language;
 const answerAudio = new Audio();
 const turns = [];
@@ -312,14 +398,14 @@ async function startRecording() {
   recTimer = setTimeout(() => recorder && recorder.state === "recording" && recorder.stop(), 20000);
 }
 async function send(blob) {
-  clearTimeout(recTimer); busy = true; askState("Thinking…", "Speech to text → Gemini → Girish's voice", "busy");
+  clearTimeout(recTimer); busy = true; askState("Thinking…", `Speech to text → Gemini → ${DATA.voice}'s voice`, "busy");
   try {
     const { bytes, seconds } = await toWav16k(blob);
     if (seconds < 0.6) throw new Error("That was too short. Hold the mic a little longer.");
     const { p } = at(pos);
     const t0 = performance.now();
     const res = await fetch("/ask", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ audioBase64: toBase64(bytes), lat: p.lat, lng: p.lng, history: turns, language: $("askLang").value }) });
+      body: JSON.stringify({ audioBase64: toBase64(bytes), lat: p.lat, lng: p.lng, tripId: DATA.id, history: turns, language: $("askLang").value }) });
     const json = await res.json();
     if (!json.success) {
       const msg = json.error.code === "NOTHING_HEARD" ? "Sorry, I didn't catch that. Try again." : `${json.error.code}: ${json.error.message}`;
@@ -348,6 +434,168 @@ $("reset").onclick = () => {
   DATA.items.forEach((x) => x.li.classList.remove("playing", "done"));
   $("play").textContent = "▶ Start drive"; setNow("Ready", 'Press "Start drive"', "Each story plays when the car enters its trigger circle.", false); draw(true);
 };
+})();
+</script>
+<script>
+// ---- trip planner: autocomplete → POST /api/trips → poll /api/trips/:id → open the trip ----
+(function planner() {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (ch) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[ch]));
+  // Per-viewer convenience only: remembers a build in progress across reloads.
+  const BUILD_KEY = "musafir-demo-build";
+  const store = {
+    get() { try { return localStorage.getItem(BUILD_KEY); } catch { return null; } },
+    set(v) { try { if (v) localStorage.setItem(BUILD_KEY, v); else localStorage.removeItem(BUILD_KEY); } catch {} },
+  };
+  const newSession = () => (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
+  let session = newSession(); // one Places autocomplete session per planned trip (cheaper billing)
+  const picked = { from: null, to: null };
+
+  async function api(path, opts) {
+    const res = await fetch(path, opts);
+    const json = await res.json().catch(() => null);
+    if (!json || !json.success) throw new Error(json ? json.error.message : `HTTP ${res.status}`);
+    return json.data;
+  }
+
+  // Recent trips
+  api("/api/trips").then((rows) => {
+    rows.forEach((t) => {
+      const label = `${t.origin} → ${t.destination} · ${t.km} km · ${t.language}/${t.voice} · ${t.ready}/${t.total}${t.status !== "ready" ? " · " + t.status : ""}`;
+      const o = new Option(label, t.id); if (DATA && t.id === DATA.id) o.selected = true; $("tripPicker").add(o);
+    });
+  }).catch((e) => console.warn(e));
+  $("tripPicker").onchange = (e) => { if (e.target.value) location.href = "/?trip=" + e.target.value; };
+
+  // Language, voice (recommended first), interests
+  CATALOG.languages.forEach((l) => $("planLang").add(new Option(l.label, l.id)));
+  function fillVoices() {
+    const rec = CATALOG.recommended[$("planLang").value];
+    const prev = CATALOG.voices.find((v) => v.name === $("planVoice").value);
+    const sel = $("planVoice"); sel.innerHTML = "";
+    const top = document.createElement("optgroup"); top.label = "Recommended";
+    top.append(new Option(`${rec.male} (male)`, rec.male), new Option(`${rec.female} (female)`, rec.female));
+    const rest = document.createElement("optgroup"); rest.label = "All voices";
+    CATALOG.voices.filter((v) => v.name !== rec.male && v.name !== rec.female).sort((a, b) => a.name.localeCompare(b.name))
+      .forEach((v) => rest.append(new Option(`${v.name} (${v.gender})`, v.name)));
+    sel.append(top, rest); sel.value = rec[prev ? prev.gender : "male"];
+  }
+  $("planLang").onchange = fillVoices;
+  $("planLang").value = DATA ? DATA.language : "en-IN"; fillVoices();
+  CATALOG.interests.forEach((i) => {
+    const l = document.createElement("label");
+    l.innerHTML = `<input type="checkbox" value="${esc(i.id)}"${i.id === "history" || i.id === "food" ? " checked" : ""}>${esc(i.label)}`;
+    $("planInterests").appendChild(l);
+  });
+  $("planNote").textContent = `Up to ${CATALOG.maxRouteKm} km. About 150 km takes 10–15 minutes to build.`;
+
+  // Place autocomplete (Google Places via the server; the key never reaches the page except for the map script)
+  function autocomplete(which) {
+    const input = $(which), box = $(which + "Sugg");
+    let timer = null, results = [], active = -1, seq = 0;
+    const close = () => { box.classList.remove("open"); active = -1; };
+    const render = () => {
+      box.innerHTML = results.map((r, k) => `<div data-k="${k}" class="${k === active ? "active" : ""}">${esc(r.primaryText)}<small>${esc(r.secondaryText)}</small></div>`).join("");
+      box.classList.toggle("open", results.length > 0);
+    };
+    const choose = (k) => {
+      const r = results[k]; if (!r) return;
+      picked[which] = { placeId: r.placeId, label: r.primaryText.slice(0, 100) };
+      input.value = r.primaryText; input.classList.add("picked"); close();
+      if (which === "from") $("to").focus();
+    };
+    input.addEventListener("input", () => {
+      picked[which] = null; input.classList.remove("picked"); $("planErr").textContent = "";
+      clearTimeout(timer); const q = input.value.trim();
+      if (q.length < 2) { results = []; render(); return; }
+      timer = setTimeout(async () => {
+        const mine = ++seq;
+        try { const r = await api(`/api/places?q=${encodeURIComponent(q)}&session=${session}`); if (mine === seq) { results = r.slice(0, 6); active = -1; render(); } }
+        catch (e) { $("planErr").textContent = e.message; }
+      }, 250);
+    });
+    input.addEventListener("keydown", (e) => {
+      if (!box.classList.contains("open") || !results.length) return;
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); active = (active + (e.key === "ArrowDown" ? 1 : -1) + results.length) % results.length; render(); }
+      else if (e.key === "Enter") { e.preventDefault(); choose(active >= 0 ? active : 0); }
+      else if (e.key === "Escape") close();
+    });
+    box.addEventListener("mousedown", (e) => { const d = e.target.closest("[data-k]"); if (d) { e.preventDefault(); choose(Number(d.dataset.k)); } });
+    input.addEventListener("blur", () => setTimeout(close, 150));
+  }
+  autocomplete("from"); autocomplete("to");
+
+  // Sheet
+  let watching = null, pollTimer = null;
+  function open(mode) {
+    $("planner").classList.add("open");
+    $("planForm").hidden = mode !== "form"; $("planProgress").hidden = mode !== "progress";
+    if (mode === "form") setTimeout(() => $("from").focus(), 50);
+  }
+  const closeSheet = () => $("planner").classList.remove("open");
+  $("newTrip").onclick = () => open(watching ? "progress" : "form");
+  $("plannerClose").onclick = closeSheet;
+  $("planner").addEventListener("mousedown", (e) => { if (e.target.id === "planner") closeSheet(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("planner").classList.contains("open")) closeSheet(); });
+  $("progNew").onclick = () => open("form");
+  $("progOpen").onclick = () => { if (watching) location.href = "/?trip=" + watching; };
+
+  $("planGo").onclick = async () => {
+    $("planErr").textContent = "";
+    if (!picked.from || !picked.to) { $("planErr").textContent = "Pick both places from the suggestions."; return; }
+    const interests = [...$("planInterests").querySelectorAll("input:checked")].map((i) => i.value);
+    if (!interests.length) { $("planErr").textContent = "Pick at least one interest."; return; }
+    $("planGo").disabled = true; $("planGo").textContent = "Finding the route…";
+    try {
+      const r = await api("/api/trips", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ origin: picked.from, destination: picked.to, language: $("planLang").value, voice: $("planVoice").value, interests }) });
+      session = newSession();
+      watch(r.tripId, true);
+    } catch (e) { $("planErr").textContent = e.message; }
+    finally { $("planGo").disabled = false; $("planGo").textContent = "Build trip"; }
+  };
+
+  function watch(id, show) {
+    watching = id; store.set(id);
+    $("progLog").textContent = ""; $("progOpen").disabled = true; $("progTitle").textContent = "Building your trip…";
+    $("progBar").classList.add("indet"); $("progBar").firstElementChild.style.width = "";
+    if (show) open("progress");
+    poll();
+  }
+  async function poll() {
+    clearTimeout(pollTimer);
+    const id = watching; if (!id) return;
+    try {
+      const s = await api(`/api/trips/${id}`);
+      if (id !== watching) return;
+      $("progRoute").textContent = `${s.origin} → ${s.destination} · ${(s.distanceM / 1000).toFixed(1)} km · ${Math.round(s.durationS / 60)} min drive`;
+      $("progStage").textContent = s.status === "building" ? `Stage: ${s.stage}` : s.status === "ready" ? "Done." : `Failed: ${s.failure ? `${s.failure.code}: ${s.failure.message}` : "unknown error"}`;
+      $("progReady").textContent = s.items.ready; $("progFailed").textContent = s.items.failed; $("progTotal").textContent = s.items.total || "–";
+      $("progTime").textContent = `${Math.round((Date.now() - new Date(s.createdAt).getTime()) / 1000)} s`;
+      const bar = $("progBar"), done = s.items.ready + s.items.failed;
+      bar.classList.toggle("indet", s.status === "building" && !s.items.total);
+      bar.firstElementChild.style.width = s.status !== "building" ? "100%" : s.items.total ? `${(100 * done) / s.items.total}%` : "";
+      const log = $("progLog"), atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 4;
+      log.textContent = s.log.length ? s.log.join("\n") : "Waiting for the first stage… (log lines appear only for builds started by this server run)";
+      if (atBottom) log.scrollTop = log.scrollHeight;
+      $("progOpen").disabled = s.items.ready === 0;
+      $("newTrip").textContent = s.status === "building" ? "● Building…" : "＋ New trip";
+      if (s.status !== "building") {
+        $("progTitle").textContent = s.status === "ready" ? "Trip ready" : "Build failed";
+        $("progHint").textContent = s.status === "ready" ? "Opening the trip…" : "Stories that were finished can still be opened.";
+        store.set(null);
+        if (s.status === "ready" && $("planner").classList.contains("open")) setTimeout(() => { location.href = "/?trip=" + id; }, 1200);
+        return;
+      }
+    } catch (e) { $("progStage").textContent = e.message; }
+    pollTimer = setTimeout(poll, 2000);
+  }
+
+  // A build started before a reload keeps being watched (the sheet stays closed until "● Building…" is clicked).
+  const pending = store.get();
+  if (pending && /^[a-f0-9]{24}$/.test(pending) && (!DATA || DATA.id !== pending || DATA.status === "building")) watch(pending, false);
+  if (!DATA) open("form");
+})();
 </script>
 <script async src="https://maps.googleapis.com/maps/api/js?key=__GOOGLE_KEY__&callback=initGoogle&loading=async"></script>
 </body>

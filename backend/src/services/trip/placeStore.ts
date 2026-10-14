@@ -34,6 +34,8 @@ export interface FactsStats {
 
 export interface PlaceStoreDeps {
   wikipedia: WikipediaClient;
+  // Whether a town really is where Wikipedia puts it (see townCheck.ts); every town is trusted when absent.
+  townIsReal?: (town: Candidate) => Promise<boolean>;
   exclude?: ReadonlySet<string>;
   now?: () => Date;
   warn?: (message: string) => void;
@@ -44,6 +46,7 @@ export interface PlaceStoreDeps {
 export function createPlaceStore(deps: PlaceStoreDeps) {
   const now = deps.now ?? (() => new Date());
   const warn = deps.warn ?? (() => {});
+  const townIsReal = deps.townIsReal ?? (async () => true);
   const stored = new Map<string, StoredPlace>();
   const stats: FactsStats = { extracts: 0, nameSearches: 0, borrowed: 0, dropped: 0 };
 
@@ -124,8 +127,8 @@ export function createPlaceStore(deps: PlaceStoreDeps) {
   }
 
   // Facts for every place of every chosen item (trip spec 5.5). An item whose places have no article borrows the
-  // nearest town's facts (the town id is added to the item's places); with no town in reach the item is dropped,
-  // because nothing is ever written without facts.
+  // nearest real town's facts (the town id is added to the item's places); with no town in reach the item is dropped,
+  // because nothing is ever written without facts. A town-welcome or long-form on a misplaced town is dropped too.
   async function resolveItems(items: readonly PlannedItem[], towns: readonly Candidate[]): Promise<{ resolved: ResolvedItem[]; dropped: PlannedItem[] }> {
     const resolved: ResolvedItem[] = [];
     const dropped: PlannedItem[] = [];
@@ -135,6 +138,11 @@ export function createPlaceStore(deps: PlaceStoreDeps) {
         continue;
       }
       const keys = placeKeysOf(planned);
+      if (planned.candidate.kind === "town" && !(await townIsReal(planned.candidate))) {
+        stats.dropped++;
+        dropped.push(planned);
+        continue;
+      }
       const members = planned.type === "episode" ? (planned.candidate.members ?? [planned.candidate]) : [planned.candidate];
       const withFacts: string[] = [];
       for (const m of members) {
@@ -145,11 +153,17 @@ export function createPlaceStore(deps: PlaceStoreDeps) {
         resolved.push({ planned, keys });
         continue;
       }
-      const town = nearestTown(planned.candidate.anchor ?? planned.candidate, towns);
-      if (town && (await ensureFacts(town, undefined))) {
-        await upsert(town);
+      let lender: Candidate | undefined;
+      for (const town of townsNear(planned.candidate.anchor ?? planned.candidate, towns)) {
+        if ((await townIsReal(town)) && (await ensureFacts(town, undefined))) {
+          lender = town;
+          break;
+        }
+      }
+      if (lender) {
+        await upsert(lender);
         stats.borrowed++;
-        resolved.push({ planned, keys: [...keys, town.key] });
+        resolved.push({ planned, keys: [...keys, lender.key] });
       } else {
         stats.dropped++;
         dropped.push(planned);
@@ -168,13 +182,14 @@ export function createPlaceStore(deps: PlaceStoreDeps) {
 
 export type PlaceStore = ReturnType<typeof createPlaceStore>;
 
-// Nearest town with an article of its own, within reach of a place that has none.
-export function nearestTown(c: Candidate, towns: readonly Candidate[]): Candidate | undefined {
-  let best: { town: Candidate; d: number } | undefined;
-  for (const t of towns) {
-    if (t.key === c.key || !t.article) continue;
-    const d = haversineM(t.location, c.location);
-    if (d <= BORROW_TOWN_MAX_M && (!best || d < best.d)) best = { town: t, d };
-  }
-  return best?.town;
+// Towns with an article of their own within reach of a place that has none, nearest first.
+export function townsNear(c: Candidate, towns: readonly Candidate[]): Candidate[] {
+  return towns
+    .filter((t) => t.key !== c.key && t.article)
+    .map((t) => ({ t, d: haversineM(t.location, c.location) }))
+    .filter((x) => x.d <= BORROW_TOWN_MAX_M)
+    .sort((a, b) => a.d - b.d)
+    .map((x) => x.t);
 }
+
+export const nearestTown = (c: Candidate, towns: readonly Candidate[]): Candidate | undefined => townsNear(c, towns)[0];

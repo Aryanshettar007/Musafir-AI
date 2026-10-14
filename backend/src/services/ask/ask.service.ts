@@ -131,8 +131,9 @@ export function createAskService(deps: AskDeps): AskService {
       let toolUsed = false;
       if (result.value.missingData === "nearby_places") {
         toolUsed = true;
-        const query = result.value.placesQuery?.trim() || DEFAULT_PLACES_QUERY;
-        const searchResults = await searchPlaces(deps.maps, query, req.position, route);
+        const what = result.value.placesQuery?.trim() || DEFAULT_PLACES_QUERY;
+        const area = result.value.placesArea?.trim() || undefined;
+        const searchResults = await searchPlaces(deps.maps, what, area, req.position, route);
         result = await ask(buildPrompt({ context, history: historyText, question: transcript, searchResults }), true);
       }
       const llmMs = now() - llmStart;
@@ -187,10 +188,15 @@ function validateAnswer(a: Answer, language: LanguageId): string[] {
 }
 
 // A Places failure must not fail the question: the model is told the lookup was unavailable and says so.
-async function searchPlaces(maps: MapsClient, query: string, position: LatLng, route: Parameters<typeof formatSearchResults>[3]): Promise<string> {
+// Near the car: biased to the position. A named town ("hotels in Mysore", 135 km ahead): the town goes into the query
+// and there is no bias, which would pull results back to where the car is.
+async function searchPlaces(maps: MapsClient, what: string, area: string | undefined, position: LatLng, route: Parameters<typeof formatSearchResults>[3]): Promise<string> {
+  const query = area ? `${what} in ${area}` : what;
   try {
-    const { places } = await maps.searchText({ query, bias: { center: position, radiusM: SEARCH_RADIUS_M }, pageSize: SEARCH_RESULTS });
-    return formatSearchResults(query, places.slice(0, SEARCH_RESULTS), position, route);
+    const { places } = await maps.searchText(
+      area ? { query, pageSize: SEARCH_RESULTS } : { query, bias: { center: position, radiusM: SEARCH_RADIUS_M }, pageSize: SEARCH_RESULTS },
+    );
+    return formatSearchResults(query, places.slice(0, SEARCH_RESULTS), position, route, area);
   } catch (e) {
     if (!(e instanceof UpstreamError)) throw e;
     console.warn(`[ask] places search failed: ${e.message}`);

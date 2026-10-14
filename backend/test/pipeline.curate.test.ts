@@ -15,10 +15,10 @@ const cand = (km: number, over: Partial<Candidate> = {}): Candidate => ({
 
 // 10 slots of 10 km; a place in slots 1, 3, 5, 7 and 8 and a town in slot 3.
 const slots = buildSlots(
-  { strict: [cand(15), cand(35), cand(55), cand(75), cand(85)], relaxed: [], towns: [cand(37, { kind: "town", name: "Townville" })], regions: [] },
-  route, 6000,
+  { strict: [cand(15), cand(35), cand(55), cand(75), cand(85)], relaxed: [], local: [], towns: [cand(37, { kind: "town", name: "Townville" })], regions: [] },
+  route, 3600,
 );
-const input = { slots, interests: ["history", "food"] as const, durationS: 6000, totalM: route.totalM };
+const input = { slots, interests: ["history", "food"] as const, durationS: 3600, totalM: route.totalM };
 
 describe("curate", () => {
   it("sends the shortlists and the user's interests, and turns valid picks into items", async () => {
@@ -32,6 +32,8 @@ describe("curate", () => {
     expect(gemini.calls[0].purpose).toBe("curate");
     expect(gemini.calls[0].prompt).toContain("Listener interests: history, food");
     expect(gemini.calls[0].prompt).toContain("s3c0: Place at 35");
+    expect(gemini.calls[0].prompt).toContain("1000 reviews");
+    expect(gemini.calls[0].system).toMatch(/most famous/);
     expect(gemini.calls[0].prompt).toContain("s3t0: Townville | town");
     expect(gemini.calls[0].prompt).toContain("slot 4");
   });
@@ -46,7 +48,7 @@ describe("curate", () => {
   describe("explicit nulls", () => {
     // One place per 10 km slot, slots 0-9; `weak` lists the slots whose place ranks below CURATOR_NULL_MAX_RANK.
     const every = (weak: number[], towns: Candidate[] = []) =>
-      buildSlots({ strict: Array.from({ length: 10 }, (_, s) => cand(s * 10 + 5, { score: weak.includes(s) ? 2 : 4 })), relaxed: [], towns, regions: [] }, route, 6000);
+      buildSlots({ strict: Array.from({ length: 10 }, (_, s) => cand(s * 10 + 5, { score: weak.includes(s) ? 2 : 4 })), relaxed: [], local: [], towns, regions: [] }, route, 3600);
     const picks = (slotsPicked: number[], nulls: number[]) => ({
       picks: [
         ...slotsPicked.map((s) => ({ slot: s, candidateId: `s${s}c0`, type: "story", focus: "general" })),
@@ -60,20 +62,17 @@ describe("curate", () => {
       expect(await run(every([]), picks([0, 1, 2, 4, 5, 6, 7, 8, 9], [3]))).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
     });
 
-    it("honours a null on a weak place when a neighbouring slot has an item", async () => {
-      expect(await run(every([3]), picks([0, 1, 2, 4, 5, 6, 7, 8, 9], [3]))).toEqual([0, 1, 2, 4, 5, 6, 7, 8, 9]);
+    it("fills a null on a weak place too: every slot with a place gets audio", async () => {
+      expect(await run(every([3]), picks([0, 1, 2, 4, 5, 6, 7, 8, 9], [3]))).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+      expect(await run(every([3, 4, 5, 6, 7]), picks([0, 1, 2, 8, 9], [3, 4, 5, 6, 7]))).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
     });
 
-    it("fills a run of weak nulls so every empty slot keeps a neighbour with an item", async () => {
-      // Slots 3-7 weak and nulled, filled in route order: 3 touches slot 2, 4 has no neighbour with an item, 5 now
-      // touches 4, 6 doesn't touch anything yet, 7 touches 6 and 8.
-      expect(await run(every([3, 4, 5, 6, 7]), picks([0, 1, 2, 8, 9], [3, 4, 5, 6, 7]))).toEqual([0, 1, 2, 4, 6, 8, 9]);
-    });
-
-    it("counts a town-welcome as the slot's item", async () => {
+    it("counts a town-welcome as the slot's audio", async () => {
       const sl = every([3, 4, 5], [cand(45, { kind: "town", name: "Townville" })]);
       const answer = { picks: [...picks([0, 1, 2, 6, 7, 8, 9], [3, 4, 5]).picks, { slot: 4, candidateId: "s4t0", type: "town-welcome", focus: "general" }] };
-      expect(await run(sl, answer)).toEqual([0, 1, 2, 4, 6, 7, 8, 9]);
+      const items = (await curate(fakeGemini([answer]), { ...input, slots: sl })).items;
+      expect(items.filter((i) => Math.floor(i.anchorRouteDistanceM / 10_000) === 4).map((i) => i.type)).toEqual(["town-welcome"]);
+      expect(await run(sl, answer)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
     });
   });
 
@@ -93,7 +92,7 @@ describe("curate", () => {
   });
 
   it("does not call Gemini when nothing was found", async () => {
-    const empty = buildSlots({ strict: [], relaxed: [], towns: [], regions: [] }, route, 6000);
+    const empty = buildSlots({ strict: [], relaxed: [], local: [], towns: [], regions: [] }, route, 3600);
     const gemini = fakeGemini([]);
     expect(await curate(gemini, { ...input, slots: empty })).toMatchObject({ items: [], source: "fallback" });
     expect(gemini.calls).toHaveLength(0);

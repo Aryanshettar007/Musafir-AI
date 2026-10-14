@@ -11,17 +11,24 @@ export interface LanguageStyle {
   guide: string;
 }
 
+// Gnani reads a script with that language's voice, so every word must be in the script: English words are written as
+// they sound (फेमस, ಟೆಂಪಲ್), never in Latin letters, which the voice mispronounces or skips.
 const spoken = (language: string, script: string) =>
   `Natural spoken ${language} in ${script} script, the way a radio jockey talks to people in a car. Not bookish or formal. ` +
-  `Common English words (fort, temple, famous) may stay in Latin script. Write numbers as words.`;
+  `Write every word in ${script} script, including English words and names, spelled as they sound (never in Latin letters). ` +
+  `Write numbers as words.`;
 
 export const LANGUAGE_STYLES: Record<LanguageId, LanguageStyle> = {
   "en-IN": { script: "Latin", wordsPerMinute: 190, guide: "Warm, conversational Indian English. Spell out numbers and units." },
   "hi-IN": { script: "Devanagari", wordsPerMinute: 170, guide: spoken("Hindi", "Devanagari") },
+  // Hinglish = everyday Hindi with English words mixed in, written in Devanagari (2026-10-15): romanised text made the
+  // Hindi voice sound like it was reading English.
   "hi-en": {
-    script: "Latin",
+    script: "Devanagari",
     wordsPerMinute: 175,
-    guide: "Hinglish written fully in Latin script (romanised Hindi mixed with English), casual and friendly. No Devanagari.",
+    guide:
+      "Hinglish: casual, friendly everyday Hindi with common English words mixed in, written entirely in Devanagari script. " +
+      "Write the English words in Devanagari as they sound (रोड ट्रिप, फेमस, टेम्पल), never in Latin letters. Write numbers as words.",
   },
   "kn-IN": { script: "Kannada", wordsPerMinute: 115, guide: spoken("Kannada", "Kannada") },
   "ta-IN": { script: "Tamil", wordsPerMinute: 110, guide: spoken("Tamil", "Tamil") },

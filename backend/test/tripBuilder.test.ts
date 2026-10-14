@@ -10,7 +10,7 @@ import { createTripBuilder, type BuildEvent, type TripBuilder } from "../src/ser
 import type { SponsorProvider, SponsoredItemSpec } from "../src/services/sponsor/types";
 import { clearCollections, startMongo, stopMongo } from "./helpers/mongo";
 import { fakeGemini, fakeGnani, fakeMaps, memoryStorage } from "./helpers/fakes";
-import { at, fakeWikipedia, gplace, newTrip, pipelineGemini, PLACES, story } from "./tripBuilder.helpers";
+import { at, fakeWikipedia, gplace, newTrip, pipelineGemini, PLACES, story, WIKI } from "./tripBuilder.helpers";
 
 beforeAll(async () => {
   await startMongo();
@@ -92,6 +92,28 @@ describe("trip builder", () => {
     const fort = await Place.findOne({ googlePlaceId: "g-fort" }).lean();
     expect(fort?.facts?.url).toBe("https://en.wikipedia.org/wiki/Page_101");
     expect(fort?.google?.fetchedAt).toBeInstanceOf(Date);
+  });
+
+  it("never borrows from or welcomes to a town Wikipedia puts in the wrong place", async () => {
+    // "Misplaced Village" is nearer the temple than Townville, but Google knows it 400 km away.
+    const misplaced = { pageId: 105, title: "Misplaced Village", location: at(31, 200), description: "Village in Karnataka, India", length: 30000 };
+    const maps = fakeMaps({
+      searchNearby: async () => PLACES,
+      searchText: async (req) =>
+        req.query === "Misplaced Village" ? { places: [{ id: "g-far", name: "Misplaced Village", location: { lat: 15.75, lng: 75.83 }, types: ["locality"] }] } : { places: [] },
+    });
+    const { builder, events } = setup({ maps, wiki: fakeWikipedia({ hits: [...WIKI, misplaced] }) });
+    const trip = await newTrip("u1");
+    await builder.start(String(trip._id));
+    const t = await load(trip._id);
+
+    const temple = await Place.findOne({ googlePlaceId: "g-temple" }).lean();
+    const templeItem = t.items.find((i) => i.placeIds.some((p) => p.equals(temple!._id)))!;
+    const townville = await Place.findOne({ "wikipedia.pageId": 102 }).lean();
+    expect(templeItem.placeIds.map(String)).toEqual([String(temple!._id), String(townville!._id)]);
+    expect(t.items.map((i) => i.title)).not.toContain("Misplaced Village");
+    expect(await Place.findOne({ "wikipedia.pageId": 105, facts: { $exists: true } }).lean()).toBeNull();
+    expect(events.some((e) => e.kind === "warn" && /Misplaced Village/.test(e.message))).toBe(true);
   });
 
   it("removes an item that has neither an article nor a town nearby", async () => {

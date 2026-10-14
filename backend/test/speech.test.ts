@@ -88,13 +88,13 @@ describe("languageStyles", () => {
 describe("checkScript", () => {
   const kannada = "ಇದು ಶ್ರೀರಂಗಪಟ್ಟಣ ಕೋಟೆ. ಇದನ್ನು ಬಹಳ ಹಿಂದೆ ಕಟ್ಟಲಾಗಿತ್ತು.";
 
-  it("accepts clean Kannada, with English words mixed in", () => {
+  it("accepts clean Kannada, with English words written in Kannada script", () => {
     expect(checkScript(kannada, "kn-IN")).toEqual([]);
-    expect(checkScript(`${kannada} ಇದು ಒಂದು famous fort.`, "kn-IN")).toEqual([]);
+    expect(checkScript(`${kannada} ಇದು ಒಂದು ಫೇಮಸ್ ಫೋರ್ಟ್.`, "kn-IN")).toEqual([]);
   });
 
   it("flags Telugu letters in Kannada", () => {
-    const problems = checkScript(`${kannada} ఇది తెలుగు`, "kn-IN");
+    const problems = checkScript(`${kannada} ఇది`, "kn-IN");
     expect(problems).toHaveLength(1);
     expect(problems[0]).toMatch(/Contains Telugu letters .*Write only in Kannada script/);
   });
@@ -116,21 +116,23 @@ describe("checkScript", () => {
     expect(checkScript("ಕೋಟೆ ಎರಡು km ದೂರ", "kn-IN")[0]).toMatch(/Contains "km"/);
   });
 
-  it("flags Devanagari in Hinglish and in English", () => {
-    const problems = checkScript("Yeh bahut famous jagah hai, नमस्ते", "hi-en");
-    expect(problems).toHaveLength(1);
-    expect(problems[0]).toMatch(/Devanagari letters .*Latin script/);
+  it("flags Devanagari in English", () => {
     expect(checkScript("Hello नमस्ते", "en-IN")[0]).toMatch(/Devanagari/);
   });
 
-  it("accepts Hinglish in Latin script", () => {
-    expect(checkScript("Yeh kila bahut purana hai aur bahut famous bhi.", "hi-en")).toEqual([]);
+  it("wants Hinglish in Devanagari, English words included, so the Hindi voice reads it well", () => {
+    expect(checkScript("यह किला बहुत पुराना है और बहुत फेमस भी।", "hi-en")).toEqual([]);
+    const problems = checkScript("Yeh kila bahut purana hai aur bahut famous bhi.", "hi-en");
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/Devanagari script/);
   });
 
-  it("flags Indic text with fewer than 60 percent letters in the expected script", () => {
+  it("flags Indic text with fewer than 90 percent letters in the expected script", () => {
     const problems = checkScript("ಇದು the old fort of the great king and his big army", "kn-IN");
     expect(problems).toHaveLength(1);
-    expect(problems[0]).toMatch(/Only \d+% of the letters are Kannada script; at least 60% must be/);
+    expect(problems[0]).toMatch(/Only \d+% of the letters are Kannada script; at least 90% must be/);
+    // One English word in a Kannada sentence is already too much English.
+    expect(checkScript("ಇದು ಶ್ರೀರಂಗಪಟ್ಟಣದ ಒಂದು famous ಕೋಟೆ.", "kn-IN")).toHaveLength(1);
   });
 
   it("treats Hindi and Marathi as Devanagari and Kannada letters in Hindi as stray", () => {

@@ -1,10 +1,11 @@
 import type { InterestId } from "../catalog/interests";
 import type { SponsoredItemSpec } from "../services/sponsor/types";
 import {
-  FOOD_MIN_GAP_S, INTRO_TRIGGER_RADIUS_M, MAJOR_TOWN_LENGTH, SIDE_NONE_END_M, SPACING_PADDING_S, TARGET_SECONDS, TOWN_WELCOME_LEAD_M,
+  FOOD_MIN_GAP_S, INTRO_TRIGGER_RADIUS_M, MAJOR_TOWN_LENGTH, MUST_SEE_RATINGS, SIDE_NONE_END_M, SPACING_PADDING_S, TARGET_SECONDS,
+  TOWN_WELCOME_LEAD_M,
 } from "./rules";
 import { rank } from "./candidates";
-import { slotIndex, type Slot } from "./slots";
+import { slotIndex, type Pool, type Slot } from "./slots";
 import { placeKeysOf, type Candidate, type Focus, type PlannedItem, type RealItemType, type Side } from "./types";
 
 // Where an item is "about", per type (trip spec 5.4.5): closest approach (story, food), anchor member (episode),
@@ -62,6 +63,22 @@ export function fallbackPicks(slots: readonly Slot[], interests: readonly Intere
     if (top) out.push(plan(defaultType(top), top, focusFor(top, interests), slot, totalM));
     const town = slot.towns[0];
     if (town && (!top || (town.article?.length ?? 0) >= MAJOR_TOWN_LENGTH)) out.push(plan("town-welcome", town, "general", slot, totalM));
+  }
+  return out;
+}
+
+// Very famous places (MUST_SEE_RATINGS) that lost their slot to another pick still join the trip; spacing then keeps
+// the better of two that collide. Food is left to the food limit.
+export function addMustSee(picks: readonly PlannedItem[], pool: Pool, slots: readonly Slot[], interests: readonly InterestId[], totalM: number): PlannedItem[] {
+  const used = new Set(picks.flatMap(placeKeysOf));
+  const out = [...picks];
+  for (const c of [...pool.strict].sort((a, b) => rank(b) - rank(a))) {
+    if (c.kind === "food" || c.ratings < MUST_SEE_RATINGS) continue;
+    const keys = (c.members ?? [c]).map((m) => m.key);
+    if (keys.some((k) => used.has(k))) continue;
+    const slot = slots[slotIndex(c.routeDistanceM, totalM, slots.length)] ?? { fromM: 0 };
+    out.push(plan(defaultType(c), c, focusFor(c, interests), slot, totalM));
+    keys.forEach((k) => used.add(k));
   }
   return out;
 }

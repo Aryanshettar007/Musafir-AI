@@ -57,11 +57,13 @@ npx tsx scripts/demo/server.ts      # local map + live-mode demo at http://local
 - Scripts must spell out numbers AND abbreviations/units ("kilometres", not "km" — every voice mispronounces it).
 - **Only ONE in-flight Gnani request per API key** (429 RATE_LIMITED otherwise). Route every Gnani call through the single priority queue; never fire them in parallel.
 - TTS REST fails (generic 500) above ~2 000 chars per request — always chunk scripts on sentence boundaries (≤1 800 chars) and concatenate the mp3s.
+- Write every Indic language fully in its own script, English words included (फेमस, ಟೆಂಪಲ್). Hinglish (`hi-en`) is Devanagari, not romanised: Latin letters make the voice sound like it is reading English.
 
 ## Maps / Wikipedia gotchas (from spike 3, see backend/spikes/maps/FINDINGS.md)
 - Env var `GOOGLE_MAPS_API_KEY`. Routes API + Places API (New): the `X-Goog-FieldMask` header is mandatory and sets the billing SKU — request only the fields you need.
 - Google Maps Platform terms limit caching Places content: persist `place_id`, not names/ratings/reviews, long term.
 - Wikipedia API: send a descriptive User-Agent with a contact URL (generic UAs get 429), call sequentially, retry 429.
+- Wikipedia coordinates can be wrong (Belavanaki, a Gadag village, sits at Bengaluru's Majestic): towns are checked against Google before use (`services/trip/townCheck.ts`).
 
 ## Gemini gotchas (from spike 2, see backend/spikes/gemini/FINDINGS.md)
 - SDK `@google/genai`; env var `GEMINI_API_KEY`. **Free tier only, no Pro, no paid plan (decided 2026-10-10).** Use `gemini-3.5-flash-lite` for everything; fall back to `gemini-3.8-flash` (thinking `LOW`, it rejects `MINIMAL`) when lite fails. Free-tier flash = 5 requests/min per model; Pro = 0.

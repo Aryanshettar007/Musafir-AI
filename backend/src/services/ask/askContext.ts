@@ -142,15 +142,19 @@ export interface FoundPlace {
 }
 
 // Google Places results for this one answer (never stored): name, rating count, distance and side.
-export function formatSearchResults(query: string, places: readonly FoundPlace[], position: LatLng, route?: RouteIndex): string {
+// `area` = a town the passenger named: distance from the car and side of the road mean nothing there, so they're left out.
+export function formatSearchResults(query: string, places: readonly FoundPlace[], position: LatLng, route?: RouteIndex, area?: string): string {
   if (places.length === 0) return `PLACES SEARCH "${query}": no results.`;
   const lines = places.map((p) => {
-    const parts = [km(haversineM(position, p.location)) + " away"];
-    if (route) parts.push(`${projectOntoRoute(route, p.location).side} side of the road`);
+    const parts: string[] = [];
+    if (!area) {
+      parts.push(km(haversineM(position, p.location)) + " away");
+      if (route) parts.push(`${projectOntoRoute(route, p.location).side} side of the road`);
+    }
     if (p.userRatingCount !== undefined) parts.push(`${p.userRatingCount} reviews`);
-    return `- ${p.name} (${parts.join(", ")})`;
+    return parts.length > 0 ? `- ${p.name} (${parts.join(", ")})` : `- ${p.name}`;
   });
-  return `PLACES SEARCH "${query}" (near the car, from Google Maps):\n${lines.join("\n")}`;
+  return `PLACES SEARCH "${query}" (${area ? `in ${area}` : "near the car"}, from Google Maps):\n${lines.join("\n")}`;
 }
 
 // One line per utterance and no question markers, so app-sent text can't fake a prompt section.

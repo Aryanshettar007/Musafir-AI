@@ -11,7 +11,11 @@ export const AnswerSchema = z.object({
   placesQuery: z
     .string()
     .optional()
-    .describe('Only when missingData is nearby_places: a short Google Maps search such as "famous restaurants" or "petrol pump"'),
+    .describe('Only when missingData is nearby_places: what to look for, a short Google Maps search such as "famous restaurants", "good hotels" or "petrol pump"'),
+  placesArea: z
+    .string()
+    .optional()
+    .describe('Only when missingData is nearby_places and the passenger names a town or area (e.g. "Mysuru"); leave it out to search near the car'),
 });
 export type Answer = z.infer<typeof AnswerSchema>;
 
@@ -33,7 +37,7 @@ Answer the passenger's spoken question in at most three short sentences and at m
 Say the answer and stop. No greetings, no follow-up questions, no offers like "let me know if you want more" or "feel free to ask": the passenger presses a button when they want more.
 Spell out numbers and units as words ("eighteen kilometres", never "18 km"). No markdown, no lists, no emojis.
 Use ONLY the CONTEXT (and the PLACES SEARCH results when given). Never invent restaurant names, prices, ratings, opening times, distances or facts. If the CONTEXT does not have the answer, set missingData:
-- nearby_places when the passenger wants somewhere to eat, stop, fuel up or visit nearby and the CONTEXT has no suitable places (also give placesQuery; the server then searches and asks you again, so the answer can be just a few words),
+- nearby_places when the passenger wants somewhere to eat, stay, stop, fuel up or visit and the CONTEXT has no suitable places, either near the car or in a town or area they name ("hotels in Mysore"). Also give placesQuery (what to look for) and, only when they name a town or area, placesArea (that town, spelled as on a map). The server then searches Google Maps and asks you again, so the answer can be just a few words,
 - route_info when it is about the route or journey and the CONTEXT lacks it,
 - general_knowledge for a general fact the CONTEXT lacks.
 For route_info and general_knowledge your answer is spoken as it is: say briefly and honestly that you don't have that information right now. Never say you will check or look it up; do not guess.

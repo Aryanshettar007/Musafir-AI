@@ -17,7 +17,8 @@ const SCRIPT_REGEX: Record<Script, RegExp> = {
 };
 const LETTER_OR_MARK = /[\p{L}\p{M}]/u;
 
-const MIN_SCRIPT_RATIO = 0.6;
+// Nearly everything in the language's own script: Latin letters in an Indic script are read badly by the voice.
+const MIN_SCRIPT_RATIO = 0.9;
 const MIN_BUDGET_RATIO = 0.6;
 const MAX_BUDGET_RATIO = 1.3;
 
@@ -43,7 +44,7 @@ export function checkScript(text: string, language: LanguageId, opts: { wordBudg
       problems.push(
         expected === "Latin"
           ? `Contains ${script} letters (${sample}). Write only in Latin script (English letters).`
-          : `Contains ${script} letters (${sample}). Write only in ${expected} script (Latin letters are allowed for English words).`,
+          : `Contains ${script} letters (${sample}). Write only in ${expected} script, English words included.`,
       );
     }
   }
@@ -56,7 +57,7 @@ export function checkScript(text: string, language: LanguageId, opts: { wordBudg
       if (ratio < MIN_SCRIPT_RATIO) {
         problems.push(
           `Only ${Math.round(ratio * 100)}% of the letters are ${expected} script; at least ${MIN_SCRIPT_RATIO * 100}% must be. ` +
-            `Write the sentences in ${expected} script, not in English letters.`,
+            `Write every word in ${expected} script, English words and names included (as they sound), not in English letters.`,
         );
       }
     }

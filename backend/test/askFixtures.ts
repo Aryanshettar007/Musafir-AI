@@ -51,8 +51,9 @@ export async function makeTrip(userId: string, opts: { language?: "en-IN" | "kn-
 export const makePlace = (name: string, at: LatLng, facts = `${name} is a famous place.`) =>
   Place.create({ kind: "poi", name, location: toPoint(at), facts: { text: facts, source: "wikipedia", fetchedAt: new Date() } });
 
-export const answer = (text: string, extra: { missingData?: string; placesQuery?: string } = {}) => ({
+export const answer = (text: string, extra: { missingData?: string; placesQuery?: string; placesArea?: string } = {}) => ({
   answer: text,
   missingData: extra.missingData ?? "none",
   ...(extra.placesQuery ? { placesQuery: extra.placesQuery } : {}),
+  ...(extra.placesArea ? { placesArea: extra.placesArea } : {}),
 });

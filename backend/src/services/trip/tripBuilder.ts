@@ -22,6 +22,7 @@ import { countWords } from "../../pipeline/write";
 import { placeKeysOf, type PlannedItem } from "../../pipeline/types";
 import type { SponsorProvider } from "../sponsor/types";
 import { createPlaceStore, type PlaceStore, type ResolvedItem } from "./placeStore";
+import { createTownCheck } from "./townCheck";
 import { createStoryProducer } from "./storyProducer";
 
 export type TripRow = TripDoc & { _id: Types.ObjectId };
@@ -156,7 +157,9 @@ export function createTripBuilder(deps: TripBuilderDeps): TripBuilder {
     });
 
     // Facts, now that the final items are known; an item that can't get facts is replaced from its slot or removed.
-    const store = createPlaceStore({ wikipedia: deps.wikipedia, exclude: labelTokens(trip.origin.label, trip.destination.label), warn });
+    const store = createPlaceStore({
+      wikipedia: deps.wikipedia, townIsReal: createTownCheck(deps.maps, warn), exclude: labelTokens(trip.origin.label, trip.destination.label), warn,
+    });
     const first = await store.resolveItems(items, prepared.towns);
     const resolved = await refill(first, { store, selection, items, interests: trip.prefs.interests, towns: prepared.towns, totalM: route.totalM, v, warn });
     if (!resolved.some((r) => !r.planned.locked)) throw new BuildFailure("NOTHING_BUILT", "No place along the route had facts to write from.");
