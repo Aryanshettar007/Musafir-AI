@@ -44,11 +44,11 @@ export default function OnboardingScreen() {
   const isDark = scheme === 'dark';
 
   const [name, setName] = useState(user?.displayName || '');
-  const [gender, setGender] = useState('Male');
-  const [age, setAge] = useState<string>(DEFAULT_AGE_RANGE);
-  const [preferredLanguage, setPreferredLanguage] = useState('English');
-  const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
-  const [voice, setVoice] = useState('Nalini');
+  const [gender, setGender] = useState('');
+  const [age, setAge] = useState<string>(DEFAULT_AGE_RANGE || '');
+  const [preferredLanguage, setPreferredLanguage] = useState('');
+  const [voiceGender, setVoiceGender] = useState<'male' | 'female' | ''>('');
+  const [voice, setVoice] = useState('');
   const [selectedInterests, setSelectedInterests] = useState<string[]>([
     ...DEFAULT_INTERESTS,
   ]);
@@ -98,8 +98,8 @@ export default function OnboardingScreen() {
       return;
     }
 
-    if (!preferredLanguage) {
-      setValidationError('Please select your preferred audio language.');
+    if (!preferredLanguage || !voice) {
+      setValidationError('Please select your preferred audio language and voice model.');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
@@ -129,7 +129,7 @@ export default function OnboardingScreen() {
         gender,
         age: selectedAge,
         preferredAudio: preferredLanguage,
-        voiceGender,
+        voiceGender: voiceGender || 'female',
         voice,
         interests: selectedInterests,
       };
@@ -164,6 +164,7 @@ export default function OnboardingScreen() {
     age.trim().length > 0 &&
     Boolean(gender) &&
     Boolean(preferredLanguage) &&
+    Boolean(voice) &&
     selectedInterests.length > 0;
 
   return (
@@ -214,6 +215,7 @@ export default function OnboardingScreen() {
                 <SelectRow
                   label="Age *"
                   title="Select Age Range"
+                  placeholder="Select age range"
                   value={age}
                   options={AGE_RANGES}
                   onSelect={(val) => {
@@ -225,6 +227,7 @@ export default function OnboardingScreen() {
                 <SelectRow
                   label="Gender *"
                   title="Select Gender"
+                  placeholder="Select gender"
                   value={gender}
                   options={GENDERS}
                   onSelect={(val) => {
@@ -235,8 +238,9 @@ export default function OnboardingScreen() {
 
                 <AudioLanguageRow
                   label="Audio Language *"
+                  placeholder="Select language & voice"
                   language={preferredLanguage}
-                  voiceGender={voiceGender}
+                  voiceGender={voiceGender || undefined}
                   voice={voice}
                   onConfirm={(sel) => {
                     setPreferredLanguage(sel.language);
@@ -249,6 +253,7 @@ export default function OnboardingScreen() {
                 <MultiSelectRow
                   label="Interests *"
                   title="Travel Interests"
+                  placeholder="Select travel interests"
                   values={selectedInterests}
                   options={INTERESTS}
                   onToggle={toggleInterest}
@@ -258,12 +263,14 @@ export default function OnboardingScreen() {
                 <View style={styles.actions}>
                   <Pressable
                     onPress={handleComplete}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || !isFormFilled}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: isSubmitting || !isFormFilled }}
                     style={({ pressed }) => [
                       styles.submitButton,
                       {
                         backgroundColor: colors.primaryButtonBg,
-                        opacity: isSubmitting ? 0.7 : !isFormFilled ? 0.6 : pressed ? 0.85 : 1,
+                        opacity: isSubmitting || !isFormFilled ? 0.4 : pressed ? 0.85 : 1,
                       },
                     ]}>
                     {isSubmitting ? (

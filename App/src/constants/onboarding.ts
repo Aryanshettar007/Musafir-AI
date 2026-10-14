@@ -17,7 +17,7 @@ export const AGE_RANGES = [
 ] as const;
 
 export type AgeRange = (typeof AGE_RANGES)[number];
-export const DEFAULT_AGE_RANGE: AgeRange = '18 – 24';
+export const DEFAULT_AGE_RANGE: AgeRange | '' = '';
 
 export const PREFERRED_LANGUAGES = [
   'English',
@@ -49,4 +49,4 @@ export const INTERESTS = [
 
 export type InterestId = (typeof INTERESTS)[number]['id'];
 export type Interest = InterestId;
-export const DEFAULT_INTERESTS: InterestId[] = ['history', 'food'];
+export const DEFAULT_INTERESTS: InterestId[] = [];

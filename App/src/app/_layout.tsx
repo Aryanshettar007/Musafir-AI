@@ -27,10 +27,6 @@ export default function RootLayout() {
               options={{ headerShown: false, presentation: 'card', gestureEnabled: false }}
             />
             <Stack.Screen
-              name="legal"
-              options={{ headerShown: false, presentation: 'modal' }}
-            />
-            <Stack.Screen
               name="privacy"
               options={{ headerShown: false, presentation: 'modal' }}
             />

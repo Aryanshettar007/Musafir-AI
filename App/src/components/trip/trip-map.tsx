@@ -18,6 +18,7 @@ import { TripSimulator } from './trip-simulator';
 export interface LiveTranscriptData {
   question?: string;
   answerText: string;
+  audioUri?: string;
 }
 
 export interface TripMapProps {
@@ -39,7 +40,6 @@ export interface TripMapProps {
     [key: string]: string;
   };
   isDark: boolean;
-  onBack?: () => void;
   onRecenter: () => void;
   isSimulating?: boolean;
   onToggleSimulate?: () => void;
@@ -57,6 +57,7 @@ export interface TripMapProps {
   liveTranscript?: LiveTranscriptData | null;
   isLivePlaying?: boolean;
   onDismissLiveTranscript?: () => void;
+  onReportLiveTranscript?: (transcript: LiveTranscriptData) => void;
 }
 
 export function TripMap({
@@ -68,7 +69,6 @@ export function TripMap({
   sheetHeight,
   colors,
   isDark,
-  onBack,
   onRecenter,
   isSimulating = false,
   onToggleSimulate,
@@ -86,6 +86,7 @@ export function TripMap({
   liveTranscript,
   isLivePlaying,
   onDismissLiveTranscript,
+  onReportLiveTranscript,
 }: TripMapProps) {
   const [selectedPlace, setSelectedPlace] = React.useState<TripItem | null>(null);
 
@@ -236,24 +237,6 @@ export function TripMap({
       {/* Destination header pill & live transcript overlay */}
       <SafeAreaView edges={['top']} style={styles.topContainer} pointerEvents="box-none">
         <View style={styles.topBarRow} pointerEvents="box-none">
-          {onBack && (
-            <Pressable
-              style={({ pressed }) => [
-                styles.topBtn,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                  borderWidth: isDark ? 1 : 0,
-                  opacity: pressed ? 0.75 : 1,
-                  cursor: Platform.OS === 'web' ? 'pointer' : undefined,
-                } as any,
-              ]}
-              onPress={onBack}
-              accessibilityLabel="Exit trip session"
-              accessibilityRole="button">
-              <Ionicons name="arrow-back" size={20} color={colors.text} />
-            </Pressable>
-          )}
           <View
             style={[
               styles.tripHeaderPill,
@@ -300,6 +283,11 @@ export function TripMap({
             colors={colors}
             isDark={isDark}
             onDismiss={onDismissLiveTranscript}
+            onReport={
+              onReportLiveTranscript
+                ? () => onReportLiveTranscript(liveTranscript)
+                : undefined
+            }
           />
         )}
       </SafeAreaView>
@@ -395,12 +383,14 @@ function LiveTranscriptOverlay({
   colors,
   isDark,
   onDismiss,
+  onReport,
 }: {
   transcript: LiveTranscriptData;
   isLivePlaying?: boolean;
   colors: any;
   isDark: boolean;
   onDismiss?: () => void;
+  onReport?: () => void;
 }) {
   const slideAnim = React.useRef(new Animated.Value(-12)).current;
   const opacityAnim = React.useRef(new Animated.Value(0)).current;
@@ -504,6 +494,21 @@ function LiveTranscriptOverlay({
       <Text style={[styles.transcriptAnswerText, { color: colors.text }]} numberOfLines={4}>
         {transcript.answerText}
       </Text>
+
+      {/* Subtle report action below transcript */}
+      {onReport && (
+        <View style={styles.transcriptFooterRow}>
+          <Pressable
+            onPress={onReport}
+            hitSlop={8}
+            style={({ pressed }) => [styles.transcriptReportBtn, pressed && { opacity: 0.6 }]}>
+            <Ionicons name="flag-outline" size={11} color={colors.textSecondary} />
+            <Text style={[styles.transcriptReportText, { color: colors.textSecondary }]}>
+              Report AI answer
+            </Text>
+          </Pressable>
+        </View>
+      )}
     </Animated.View>
   );
 }
@@ -749,5 +754,23 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     lineHeight: 18,
     fontWeight: '500',
+  },
+  transcriptFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 6,
+  },
+  transcriptReportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+  },
+  transcriptReportText: {
+    fontSize: 11,
+    fontWeight: '500',
+    textDecorationLine: 'underline',
   },
 });

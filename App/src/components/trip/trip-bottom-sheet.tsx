@@ -60,6 +60,7 @@ export interface TripBottomSheetProps {
   onLiveRecordingStart?: () => void;
   isLiveLoading?: boolean;
   isLivePlaying?: boolean;
+  onReportContent?: (item?: TripItem | null) => void;
 }
 
 export function TripBottomSheet({
@@ -91,6 +92,7 @@ export function TripBottomSheet({
   onLiveRecordingStart,
   isLiveLoading = false,
   isLivePlaying = false,
+  onReportContent,
 }: TripBottomSheetProps) {
   const [isTranscriptOpen, setIsTranscriptOpen] = useState(false);
 
@@ -379,6 +381,25 @@ export function TripBottomSheet({
           </Pressable>
         </View>
 
+        {/* SUBTLE REPORT CONTENT ACTION BELOW EXIT / END SESSION */}
+        <View style={styles.reportSessionWrapper}>
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onReportContent?.(activeItem);
+            }}
+            style={({ pressed }) => [
+              styles.reportActionRow,
+              pressed && { opacity: 0.6 },
+            ]}
+            hitSlop={8}>
+            <Ionicons name="flag-outline" size={12} color={colors.textSecondary} />
+            <Text style={[styles.reportActionText, { color: colors.textSecondary }]}>
+              Report AI story or narration
+            </Text>
+          </Pressable>
+        </View>
+
         <View style={{ height: Platform.OS === 'ios' ? 44 : 28 }} />
       </ScrollView>
     </Animated.View>
@@ -571,6 +592,24 @@ const styles = StyleSheet.create({
   transcriptBodyText: {
     fontSize: 14,
     lineHeight: 22,
+  },
+  reportSessionWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  reportActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  reportActionText: {
+    fontSize: 12,
+    fontWeight: '500',
+    textDecorationLine: 'underline',
   },
   emptyContainer: {
     alignItems: 'center',

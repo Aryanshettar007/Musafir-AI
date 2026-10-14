@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import { auth } from '@/config/firebase';
-import { Trip, TripSummary, ListenEvent } from '@/services/trip-service';
+import { Trip, TripSummary, ListenEvent, sanitizeTripSummaries } from '@/services/trip-service';
 
 const STORAGE_KEY_PREFIX = '@musafir_offline_trip_';
 const OFFLINE_TRIP_IDS_KEY = '@musafir_offline_trip_ids';
@@ -125,7 +125,8 @@ export async function loadCachedRecentTrips(userId?: string): Promise<TripSummar
       raw = await AsyncStorage.getItem(CACHED_RECENT_TRIPS_KEY);
     }
     if (raw) {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      return sanitizeTripSummaries(parsed);
     }
   } catch (err) {
     console.warn('[OfflineTripService] Error loading cached recent trips:', err);

@@ -49,10 +49,7 @@ export function LegalLinks({
     } catch {
       // Ignore if haptics fail
     }
-    router.push({
-      pathname: '/legal',
-      params: { type },
-    });
+    router.push(type === 'privacy' ? '/privacy' : '/terms');
   };
 
   if (variant === 'agreement') {

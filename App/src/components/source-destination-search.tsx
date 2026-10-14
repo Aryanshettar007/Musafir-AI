@@ -12,6 +12,7 @@ import {
   TextInput,
   Pressable,
   ActivityIndicator,
+  Keyboard,
   ScrollView,
   Platform,
   StyleProp,
@@ -199,6 +200,7 @@ export const SourceDestinationSearch = forwardRef<
   const handleSelectSuggestion = useCallback(
     (suggestion: PlaceSuggestion) => {
       Haptics.selectionAsync();
+      Keyboard.dismiss();
       if (activeField === 'source') {
         onSelectSourceSuggestion(suggestion);
       } else {

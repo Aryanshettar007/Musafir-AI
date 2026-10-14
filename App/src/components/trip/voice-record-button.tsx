@@ -22,6 +22,7 @@ import {
 } from 'expo-audio';
 
 import { askMusafir, AskHistoryTurn } from '@/services/trip-service';
+import { PermissionModal } from '@/components/permission-modal';
 
 export interface LiveResponseData {
   transcript: string;
@@ -82,6 +83,7 @@ export function VoiceRecordButton({
   // States: 'idle' | 'recording' | 'loading' | 'playing'
   const [buttonState, setButtonState] = useState<'idle' | 'recording' | 'loading' | 'playing'>('idle');
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
+  const [showMicModal, setShowMicModal] = useState(false);
 
   // Refs for tracking recording lifecycle and history turns (in memory only, per Step 6)
   const isRecordingRef = useRef(false);
@@ -450,17 +452,9 @@ export function VoiceRecordButton({
     try {
       // 2. Permission check
       const { status } = await getRecordingPermissionsAsync();
-      let granted = status === 'granted';
-      if (!granted) {
-        const perm = await requestRecordingPermissionsAsync();
-        granted = perm.granted;
-      }
-      if (!granted) {
-        Alert.alert(
-          'Microphone Permission',
-          'Please allow microphone access in settings to speak with Musafir.'
-        );
+      if (status !== 'granted') {
         resetToIdle();
+        setShowMicModal(true);
         return;
       }
 
@@ -522,7 +516,25 @@ export function VoiceRecordButton({
     isExternalLoading ||
     isExternalPlaying;
 
-  const handlePress = useCallback(() => {
+  const handleConfirmMicPermission = useCallback(async () => {
+    setShowMicModal(false);
+    try {
+      const perm = await requestRecordingPermissionsAsync();
+      if (perm.granted) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        startRecording();
+      } else {
+        Alert.alert(
+          'Microphone Permission',
+          'Please allow microphone access in your device settings to speak with Musafir AI.'
+        );
+      }
+    } catch (err) {
+      console.warn('[VoiceRecordButton] Error requesting mic permission:', err);
+    }
+  }, [startRecording]);
+
+  const handlePress = useCallback(async () => {
     if (isInteractionDisabled) return;
 
     if (buttonState === 'recording') {
@@ -533,6 +545,17 @@ export function VoiceRecordButton({
     }
 
     if (buttonState === 'idle') {
+      try {
+        const { status } = await getRecordingPermissionsAsync();
+        if (status !== 'granted') {
+          setShowMicModal(true);
+          return;
+        }
+      } catch {
+        setShowMicModal(true);
+        return;
+      }
+
       // First press: Start recording & fluid waveform animations immediately
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       startRecording();
@@ -730,6 +753,14 @@ export function VoiceRecordButton({
           )}
         </Animated.View>
       </Pressable>
+
+      {/* RATIONALE PERMISSION MODAL FOR MICROPHONE */}
+      <PermissionModal
+        visible={showMicModal}
+        type="microphone"
+        onConfirm={handleConfirmMicPermission}
+        onDismiss={() => setShowMicModal(false)}
+      />
     </View>
   );
 }

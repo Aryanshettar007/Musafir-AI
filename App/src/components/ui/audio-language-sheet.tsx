@@ -40,6 +40,7 @@ export interface AudioLanguageRowProps {
   language?: string; // language label or id
   voiceGender?: 'male' | 'female';
   voice?: string;
+  placeholder?: string;
   onConfirm: (selection: AudioLanguageSelection) => void;
   disabled?: boolean;
   hideDivider?: boolean;
@@ -48,9 +49,10 @@ export interface AudioLanguageRowProps {
 
 export function AudioLanguageRow({
   label = 'Audio Language',
-  language = 'English',
-  voiceGender = 'female',
-  voice = 'Nalini',
+  language,
+  voiceGender,
+  voice,
+  placeholder = 'Select language & voice',
   onConfirm,
   disabled = false,
   hideDivider = false,
@@ -60,12 +62,13 @@ export function AudioLanguageRow({
   const isDark = scheme === 'dark';
   const [isOpen, setIsOpen] = useState(false);
 
-  // Formatted display text: e.g. "English • Nalini" or "Hinglish • Nalini"
-  const rawLang = mapLanguageToLabel(language);
+  // Formatted display text: e.g. "English • Nalini" or placeholder
+  const rawLang = language ? mapLanguageToLabel(language) : '';
   const displayLang = rawLang.replace(/\s*\([^)]*\)/g, '').trim() || rawLang;
-  const displayText = voice
+  const hasSelection = Boolean(displayLang && voice);
+  const displayText = hasSelection
     ? `${displayLang} • ${voice}`
-    : displayLang;
+    : placeholder;
 
   const colors = {
     textPrimary: isDark ? '#FFFFFF' : '#000000',
@@ -87,7 +90,10 @@ export function AudioLanguageRow({
         <Text style={[styles.rowLabel, { color: colors.textSecondary }]}>{label}</Text>
         <View style={styles.rowInteractiveValue}>
           <Text
-            style={[styles.rowValueText, { color: colors.textPrimary }]}
+            style={[
+              styles.rowValueText,
+              { color: hasSelection ? colors.textPrimary : colors.textSecondary },
+            ]}
             numberOfLines={1}
             ellipsizeMode="tail">
             {displayText}
@@ -123,8 +129,8 @@ export interface AudioLanguageSheetModalProps {
 export function AudioLanguageSheetModal({
   visible,
   onClose,
-  initialLanguage = 'English',
-  initialGender = 'female',
+  initialLanguage,
+  initialGender,
   initialVoice = '',
   onApply,
 }: AudioLanguageSheetModalProps) {
@@ -136,7 +142,7 @@ export function AudioLanguageSheetModal({
     initialGender || 'female'
   );
   const [selectedLangId, setSelectedLangId] = useState<string>(() =>
-    mapLanguage(initialLanguage)
+    initialLanguage ? mapLanguage(initialLanguage) : 'en-IN'
   );
   const [selectedVoice, setSelectedVoice] = useState<string>(initialVoice || '');
 
@@ -180,7 +186,7 @@ export function AudioLanguageSheetModal({
   // Sync state when modal opens
   useEffect(() => {
     if (visible) {
-      const targetLangId = mapLanguage(initialLanguage);
+      const targetLangId = initialLanguage ? mapLanguage(initialLanguage) : 'en-IN';
       setSelectedGender(initialGender || 'female');
       setSelectedLangId(targetLangId);
       setSelectedVoice(initialVoice || '');
@@ -219,8 +225,8 @@ export function AudioLanguageSheetModal({
       setVoices(list);
       setLoadingVoices(false);
 
-      // If current selected voice is not in the new list, auto-select recommended or first
-      if (list.length > 0) {
+      // If current selected voice is not in the new list, auto-select only if a voice was already chosen
+      if (list.length > 0 && selectedVoice) {
         const stillValid = list.some((v) => v.name === selectedVoice && v.gender === selectedGender);
         if (!stillValid) {
           const recommended = list.find((v) => v.recommended) || list[0];

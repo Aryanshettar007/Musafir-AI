@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import * as Location from 'expo-location';
 import { api } from './api';
 import { auth } from '@/config/firebase';
 import { buildApiUrl } from '@/config/api';
@@ -122,8 +123,8 @@ export interface TripSummary {
   status: TripStatus;
   stage?: 'discovering' | 'curating' | 'producing' | 'done';
   progress: { ready: number; failed: number; total: number };
-  origin: { label: string };
-  destination: { label: string };
+  origin: { label: string; lat?: number; lng?: number };
+  destination: { label: string; lat?: number; lng?: number };
   route?: { distanceM: number; durationS: number };
   createdAt: string;
 }
@@ -171,16 +172,119 @@ export async function startTrip(params: StartTripParams): Promise<{ tripId: stri
   return res?.data ?? res;
 }
 
+/**
+ * Formats a reverse-geocoded address into a human-readable, full location name.
+ * Avoids raw street numbers, "Current Location", "Unnamed Road", and duplicate names.
+ * Example: "100 Feet Rd, Indiranagar, Bengaluru" or "Indiranagar, Bengaluru"
+ */
+export function formatAddressFromGeocode(item: Location.LocationGeocodedAddress): string {
+  const parts: string[] = [];
+
+  const add = (val?: string | null) => {
+    if (!val) return;
+    const trimmed = val.trim();
+    if (
+      trimmed &&
+      !parts.some((p) => p.toLowerCase() === trimmed.toLowerCase()) &&
+      !/current location/i.test(trimmed) &&
+      !/unnamed/i.test(trimmed)
+    ) {
+      parts.push(trimmed);
+    }
+  };
+
+  // 1. Landmark or POI name
+  if (item.name && item.name !== item.street && isNaN(Number(item.name))) {
+    add(item.name);
+  }
+
+  // 2. Street (with street number if present)
+  if (item.street) {
+    const streetName = item.streetNumber ? `${item.streetNumber} ${item.street}` : item.street;
+    add(streetName);
+  } else if (item.name && isNaN(Number(item.name))) {
+    add(item.name);
+  }
+
+  // 3. District / Subregion / Neighborhood
+  add(item.district || item.subregion);
+
+  // 4. City / Town
+  add(item.city);
+
+  // 5. Region (state/province) if city wasn't available
+  if (!item.city && item.region) {
+    add(item.region);
+  }
+
+  return parts.join(', ');
+}
+
+/**
+ * Resolves a coordinate pair into a full human-readable address name using device reverse geocoding.
+ */
+export async function resolveLocationName(coords: { latitude: number; longitude: number }): Promise<string | null> {
+  if (Platform.OS === 'web') return null;
+  try {
+    const results = await Location.reverseGeocodeAsync(coords);
+    if (results && results.length > 0) {
+      const formatted = formatAddressFromGeocode(results[0]);
+      if (formatted) return formatted;
+    }
+  } catch (err) {
+    console.warn('[resolveLocationName] Error reverse geocoding:', err);
+  }
+  return null;
+}
+
+/**
+ * Sanitizes recent trips by resolving any "Current location" labels to full location names.
+ */
+export async function sanitizeTripSummaries(trips: TripSummary[]): Promise<TripSummary[]> {
+  if (!Array.isArray(trips)) return [];
+  const updated = await Promise.all(
+    trips.map(async (trip) => {
+      if (/current location/i.test(trip.origin?.label?.trim() || '')) {
+        const lat = trip.origin?.lat;
+        const lng = trip.origin?.lng;
+        if (lat != null && lng != null) {
+          const resolved = await resolveLocationName({ latitude: lat, longitude: lng });
+          if (resolved) {
+            return {
+              ...trip,
+              origin: { ...trip.origin, label: resolved },
+            };
+          }
+        }
+      }
+      return trip;
+    })
+  );
+  return updated;
+}
+
 // ─── Get Trip ──────────────────────────────────────────────────────────────────
 export async function getTrip(tripId: string): Promise<Trip> {
   const res = await api.get<any>(`/trips/${tripId}`);
-  return res?.data ?? res;
+  const trip = res?.data ?? res;
+  if (trip && /current location/i.test(trip.origin?.label?.trim() || '')) {
+    const lat = trip.origin?.lat;
+    const lng = trip.origin?.lng;
+    if (lat != null && lng != null) {
+      const resolved = await resolveLocationName({ latitude: lat, longitude: lng });
+      if (resolved) {
+        trip.origin.label = resolved;
+      }
+    }
+  }
+  return trip;
 }
 
 // ─── Get Recent Trips ──────────────────────────────────────────────────────────
 export async function getRecentTrips(limit = 20): Promise<TripSummary[]> {
   const res = await api.get<any>(`/trips?limit=${limit}`);
-  return res?.data ?? res ?? [];
+  const list = res?.data ?? res ?? [];
+  return sanitizeTripSummaries(list);
 }
 
 // ─── Post Listens ──────────────────────────────────────────────────────────────

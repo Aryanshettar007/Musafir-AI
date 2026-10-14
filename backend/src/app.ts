@@ -6,6 +6,7 @@ import { requireAuth } from "./middleware/auth";
 import { errorHandler, notFoundHandler } from "./middleware/error";
 import { catalogRoutes } from "./routes/catalog.routes";
 import { meRoutes } from "./routes/me.routes";
+import { reportsRouter } from "./routes/reports.routes";
 
 export interface AppOptions {
   verifyIdToken: VerifyIdToken;
@@ -48,6 +49,7 @@ export function createApp({ verifyIdToken, storage, corsOrigins, routers }: AppO
   app.use(requireAuth(verifyIdToken));
   app.use(catalogRoutes(storage));
   app.use("/me", meRoutes);
+  app.use("/reports", reportsRouter());
   for (const { path, router } of routers ?? []) app.use(path, router);
 
   app.use(notFoundHandler);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { Image } from 'expo-image';
 
 import { ThemedText } from '@/components/themed-text';
@@ -29,9 +29,18 @@ export function SocialAuthButtons({ onError, disabled }: SocialAuthButtonsProps)
 
   const [appleLoading, setAppleLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [isAppleAvailable, setIsAppleAvailable] = useState(Platform.OS === 'ios');
+
+  useEffect(() => {
+    if (Platform.OS === 'ios') {
+      AppleAuthentication.isAvailableAsync()
+        .then((available) => setIsAppleAvailable(available))
+        .catch(() => setIsAppleAvailable(false));
+    }
+  }, []);
 
   const isBusy = disabled || appleLoading || googleLoading;
-  const isIOS = Platform.OS === 'ios';
+  const showApple = Platform.OS === 'ios' && isAppleAvailable;
 
   const handlePostAuth = async () => {
     try {
@@ -100,42 +109,41 @@ export function SocialAuthButtons({ onError, disabled }: SocialAuthButtonsProps)
       </View>
 
       <View style={styles.buttonsContainer}>
-        {isIOS && (
-          <Pressable
-            disabled={isBusy}
-            onPress={handleApplePress}
-            accessibilityRole="button"
-            accessibilityLabel="Continue with Apple"
-            style={({ pressed }) => [
-              styles.socialButton,
-              {
-                backgroundColor: isDark ? '#ffffff' : '#000000',
-                opacity: isBusy ? 0.6 : pressed ? 0.85 : 1,
-              },
-            ]}>
-            {appleLoading ? (
-              <ActivityIndicator
-                size="small"
-                color={isDark ? '#000000' : '#ffffff'}
-              />
-            ) : (
-              <View style={styles.buttonContent}>
-                <Ionicons
-                  name="logo-apple"
-                  size={19}
+        {showApple && (
+          <View
+            style={[
+              styles.appleButtonWrapper,
+              isBusy && styles.buttonDisabled,
+            ]}
+            pointerEvents={isBusy ? 'none' : 'auto'}>
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+              buttonStyle={
+                isDark
+                  ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                  : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+              }
+              cornerRadius={8}
+              style={styles.appleButton}
+              onPress={handleApplePress}
+            />
+            {appleLoading && (
+              <View
+                style={[
+                  styles.loadingOverlay,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(255, 255, 255, 0.85)'
+                      : 'rgba(0, 0, 0, 0.75)',
+                  },
+                ]}>
+                <ActivityIndicator
+                  size="small"
                   color={isDark ? '#000000' : '#ffffff'}
-                  style={styles.icon}
                 />
-                <Text
-                  style={[
-                    styles.buttonText,
-                    { color: isDark ? '#000000' : '#ffffff' },
-                  ]}>
-                  Continue with Apple
-                </Text>
               </View>
             )}
-          </Pressable>
+          </View>
         )}
 
         <Pressable
@@ -205,6 +213,25 @@ const styles = StyleSheet.create({
     gap: 10,
     width: '100%',
   },
+  appleButtonWrapper: {
+    width: '100%',
+    height: 44,
+    position: 'relative',
+    overflow: 'hidden',
+    borderRadius: 8,
+  },
+  appleButton: {
+    width: '100%',
+    height: 44,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   socialButton: {
     height: 44,
     borderRadius: 8,
@@ -218,9 +245,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-  },
-  icon: {
-    marginTop: -1,
   },
   googleIcon: {
     width: 18,

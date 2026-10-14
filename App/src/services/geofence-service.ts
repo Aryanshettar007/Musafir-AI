@@ -140,8 +140,8 @@ export async function startBackgroundGeofencing(items: TripItem[]): Promise<void
   registeredItemsCache = items;
 
   try {
-    // 1. Request foreground & background permissions
-    const fg = await Location.requestForegroundPermissionsAsync();
+    // 1. Check foreground & background permissions (handled via UI PermissionModal)
+    const fg = await Location.getForegroundPermissionsAsync();
     if (fg.status !== 'granted') {
       console.warn('[GeofenceService] Foreground location permission not granted');
       return;
@@ -149,7 +149,7 @@ export async function startBackgroundGeofencing(items: TripItem[]): Promise<void
 
     let hasBgPermission = false;
     try {
-      const bg = await Location.requestBackgroundPermissionsAsync();
+      const bg = await Location.getBackgroundPermissionsAsync();
       hasBgPermission = bg.status === 'granted';
     } catch {
       // Background location permissions might not be available in Expo Go or Web

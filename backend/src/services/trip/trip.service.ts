@@ -265,16 +265,20 @@ export function createTripService(deps: TripServiceDeps) {
         .sort({ createdAt: -1 })
         .limit(limit)
         .lean();
-      return trips.map((t) => ({
-        id: String(t._id),
-        status: t.status,
-        ...(t.stage ? { stage: t.stage } : {}),
-        progress: progressOf(t.items),
-        origin: { label: t.origin.label },
-        destination: { label: t.destination.label },
-        route: t.route ? { distanceM: t.route.distanceM, durationS: t.route.durationS } : undefined,
-        createdAt: t.createdAt ? t.createdAt.toISOString() : new Date().toISOString(),
-      }));
+      return trips.map((t) => {
+        const originCoord = t.origin?.location ? fromPoint(t.origin.location) : undefined;
+        const destCoord = t.destination?.location ? fromPoint(t.destination.location) : undefined;
+        return {
+          id: String(t._id),
+          status: t.status,
+          ...(t.stage ? { stage: t.stage } : {}),
+          progress: progressOf(t.items),
+          origin: { label: t.origin.label, ...(originCoord ? { lat: originCoord.lat, lng: originCoord.lng } : {}) },
+          destination: { label: t.destination.label, ...(destCoord ? { lat: destCoord.lat, lng: destCoord.lng } : {}) },
+          route: t.route ? { distanceM: t.route.distanceM, durationS: t.route.durationS } : undefined,
+          createdAt: t.createdAt ? t.createdAt.toISOString() : new Date().toISOString(),
+        };
+      });
     },
   };
 }

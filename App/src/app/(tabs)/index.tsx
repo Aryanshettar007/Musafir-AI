@@ -39,6 +39,7 @@ import {
   RouteOption,
   loadCachedRecentTrips,
   saveCachedRecentTrips,
+  resolveLocationName,
 } from '@/services/trip-service';
 import {
   SourceDestinationSearch,
@@ -47,6 +48,7 @@ import {
 } from '@/components/source-destination-search';
 import { AudioLanguageSheetModal } from '@/components/ui/audio-language-sheet';
 import { MoodSelectSheetModal } from '@/components/ui/mood-select-sheet';
+import { PermissionModal } from '@/components/permission-modal';
 import { DEFAULT_INTERESTS } from '@/constants/onboarding';
 import { mapLanguage, mapLanguageToLabel, updateProfileOnBackend } from '@/services/user-service';
 
@@ -184,6 +186,7 @@ export default function HomeScreen() {
   const [selectedMoods, setSelectedMoods] = useState<string[]>([...DEFAULT_INTERESTS]);
   const [isAudioModalVisible, setIsAudioModalVisible] = useState<boolean>(false);
   const [isMoodModalVisible, setIsMoodModalVisible] = useState<boolean>(false);
+  const [isLocationModalVisible, setIsLocationModalVisible] = useState<boolean>(false);
 
   // DRAGGABLE SHEET ANIMATION & PAN RESPONDER
   const sheetHeight = useRef(new Animated.Value(COLLAPSED_SHEET_HEIGHT)).current;
@@ -388,10 +391,24 @@ export default function HomeScreen() {
   }, []);
 
   // Select a destination autocomplete suggestion
-  const handleSelectDestinationSuggestion = useCallback((suggestion: PlaceSuggestion) => {
-    setSelectedSuggestion(suggestion);
-    setDestinationPoint({ text: suggestion.primaryText, coords: null, isGps: false });
-  }, []);
+  const handleSelectDestinationSuggestion = useCallback(
+    (suggestion: PlaceSuggestion) => {
+      Keyboard.dismiss();
+      searchRef.current?.dismissSuggestions();
+      setSelectedSuggestion(suggestion);
+      setDestinationPoint({ text: suggestion.primaryText, coords: null, isGps: false });
+
+      // Bring bottom sheet down so user can clearly see the map and different routes
+      currentHeightRef.current = COLLAPSED_SHEET_HEIGHT;
+      Animated.spring(sheetHeight, {
+        toValue: COLLAPSED_SHEET_HEIGHT,
+        useNativeDriver: false,
+        friction: 8,
+        tension: 50,
+      }).start();
+    },
+    [sheetHeight]
+  );
 
   // Handle route selection (via card or map polyline tap)
   const handleSelectRoute = useCallback(
@@ -407,7 +424,12 @@ export default function HomeScreen() {
           const destCoord = points[points.length - 1];
           setDestinationPoint((prev) => ({ ...prev, coords: destCoord }));
           mapRef.current?.fitToCoordinates(points, {
-            edgePadding: { top: 90, right: 60, bottom: 260, left: 60 },
+            edgePadding: {
+              top: 90,
+              right: 60,
+              bottom: Math.round(COLLAPSED_SHEET_HEIGHT) + 30,
+              left: 60,
+            },
             animated: true,
           });
         }
@@ -422,12 +444,50 @@ export default function HomeScreen() {
       Alert.alert('Choose a destination', 'Pick a destination from the suggestions first.');
       return;
     }
+
+    let originLabel = '';
+    if (selectedSourceSuggestion) {
+      originLabel = selectedSourceSuggestion.secondaryText
+        ? `${selectedSourceSuggestion.primaryText}, ${selectedSourceSuggestion.secondaryText}`
+        : selectedSourceSuggestion.primaryText;
+    } else {
+      const candidate =
+        sourcePoint.text && !/current location/i.test(sourcePoint.text.trim())
+          ? sourcePoint.text
+          : deviceGpsAddress && !/current location/i.test(deviceGpsAddress.trim())
+          ? deviceGpsAddress
+          : '';
+
+      if (candidate) {
+        originLabel = candidate;
+      } else {
+        const coords = sourcePoint.coords || deviceGpsCoords;
+        if (coords) {
+          const resolved = await resolveLocationName(coords);
+          if (resolved) {
+            originLabel = resolved;
+            setDeviceGpsAddress(resolved);
+            setSourcePoint((prev) => ({ ...prev, text: resolved }));
+          }
+        }
+      }
+    }
+
+    if (!originLabel || /current location/i.test(originLabel.trim())) {
+      const coords = sourcePoint.coords || deviceGpsCoords;
+      if (coords) {
+        originLabel = `Location (${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)})`;
+      } else {
+        originLabel = 'Starting Point';
+      }
+    }
+
     const origin = selectedSourceSuggestion
-      ? { placeId: selectedSourceSuggestion.placeId, label: selectedSourceSuggestion.primaryText }
+      ? { placeId: selectedSourceSuggestion.placeId, label: originLabel }
       : sourcePoint.isGps && deviceGpsCoords
-      ? { lat: deviceGpsCoords.latitude, lng: deviceGpsCoords.longitude, label: 'Current location' }
+      ? { lat: deviceGpsCoords.latitude, lng: deviceGpsCoords.longitude, label: originLabel }
       : sourcePoint.coords
-      ? { lat: sourcePoint.coords.latitude, lng: sourcePoint.coords.longitude, label: sourcePoint.text }
+      ? { lat: sourcePoint.coords.latitude, lng: sourcePoint.coords.longitude, label: originLabel }
       : null;
 
     if (!origin) {
@@ -515,20 +575,16 @@ export default function HomeScreen() {
     fetchCurrentLocation();
   }, []);
 
-  const fetchCurrentLocation = async () => {
+  const applyFallbackLocation = () => {
+    const fallback = { latitude: DEFAULT_COORDS.latitude, longitude: DEFAULT_COORDS.longitude };
+    setDeviceGpsCoords(fallback);
+    setDeviceGpsAddress('Bengaluru, Karnataka');
+    setSourcePoint({ text: 'Bengaluru, Karnataka', coords: fallback, isGps: true });
+  };
+
+  const getAndApplyCurrentPosition = async () => {
     try {
       setIsLoadingLocation(true);
-      const { status } = await Location.requestForegroundPermissionsAsync();
-
-      if (status !== 'granted') {
-        setIsLoadingLocation(false);
-        const fallback = { latitude: DEFAULT_COORDS.latitude, longitude: DEFAULT_COORDS.longitude };
-        setDeviceGpsCoords(fallback);
-        setDeviceGpsAddress('Bengaluru, Karnataka');
-        setSourcePoint({ text: 'Bengaluru, Karnataka', coords: fallback, isGps: true });
-        return;
-      }
-
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
@@ -541,22 +597,9 @@ export default function HomeScreen() {
       setDeviceGpsCoords(current);
 
       let formatted = 'Current Location';
-      if (Platform.OS !== 'web') {
-        try {
-          const reverseGeocode = await Location.reverseGeocodeAsync(current);
-          if (reverseGeocode && reverseGeocode.length > 0) {
-            const item = reverseGeocode[0];
-            const parts = [
-              item.name || item.street,
-              item.district || item.subregion || item.city,
-            ].filter(Boolean);
-            if (parts.length > 0) {
-              formatted = parts.join(', ');
-            }
-          }
-        } catch {
-          formatted = 'Current Location';
-        }
+      const resolved = await resolveLocationName(current);
+      if (resolved) {
+        formatted = resolved;
       }
 
       setDeviceGpsAddress(formatted);
@@ -574,17 +617,62 @@ export default function HomeScreen() {
         1000
       );
     } catch {
-      const fallback = { latitude: DEFAULT_COORDS.latitude, longitude: DEFAULT_COORDS.longitude };
-      setDeviceGpsCoords(fallback);
-      setSourcePoint({ text: 'Current Location', coords: fallback, isGps: true });
+      applyFallbackLocation();
     } finally {
       setIsLoadingLocation(false);
     }
   };
 
+  const fetchCurrentLocation = async () => {
+    try {
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status === 'granted') {
+        await getAndApplyCurrentPosition();
+      } else {
+        setIsLocationModalVisible(true);
+        applyFallbackLocation();
+      }
+    } catch {
+      applyFallbackLocation();
+    }
+  };
+
+  const handleConfirmLocationPermission = async () => {
+    setIsLocationModalVisible(false);
+    try {
+      setIsLoadingLocation(true);
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        await getAndApplyCurrentPosition();
+      } else {
+        applyFallbackLocation();
+      }
+    } catch {
+      applyFallbackLocation();
+    } finally {
+      setIsLoadingLocation(false);
+    }
+  };
+
+  const handleDismissLocationPermission = () => {
+    setIsLocationModalVisible(false);
+    applyFallbackLocation();
+  };
+
   // Re-center map to user GPS coordinates
-  const handleRecenter = () => {
+  const handleRecenter = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setIsLocationModalVisible(true);
+        return;
+      }
+    } catch {
+      setIsLocationModalVisible(true);
+      return;
+    }
+
     if (deviceGpsCoords) {
       mapRef.current?.animateToRegion(
         {
@@ -596,13 +684,24 @@ export default function HomeScreen() {
         700
       );
     } else {
-      fetchCurrentLocation();
+      await getAndApplyCurrentPosition();
     }
   };
 
   // SET SOURCE TO CURRENT LOCATION (GPS)
-  const handleSetSourceToGps = () => {
+  const handleSetSourceToGps = async () => {
     Haptics.selectionAsync();
+
+    try {
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setIsLocationModalVisible(true);
+        return;
+      }
+    } catch {
+      setIsLocationModalVisible(true);
+      return;
+    }
 
     // Prevent identical source and destination
     if (destinationPoint.isGps) {
@@ -615,12 +714,23 @@ export default function HomeScreen() {
     }
 
     setSelectedSourceSuggestion(null);
+    let currentSourceText = deviceGpsAddress;
     const nextSource: LocationPoint = {
-      text: deviceGpsAddress,
+      text: currentSourceText,
       coords: deviceGpsCoords,
       isGps: true,
     };
     setSourcePoint(nextSource);
+
+    // If address is still unresolved, resolve it in the background
+    if (deviceGpsCoords && (!currentSourceText || /current location/i.test(currentSourceText.trim()))) {
+      resolveLocationName(deviceGpsCoords).then((resolved) => {
+        if (resolved) {
+          setDeviceGpsAddress(resolved);
+          setSourcePoint((prev) => (prev.isGps ? { ...prev, text: resolved } : prev));
+        }
+      });
+    }
 
     if (deviceGpsCoords && destinationPoint.coords) {
       mapRef.current?.fitToCoordinates([deviceGpsCoords, destinationPoint.coords], {
@@ -655,12 +765,23 @@ export default function HomeScreen() {
     }
 
     setSelectedSuggestion(null);
+    let currentDestText = deviceGpsAddress;
     const nextDest: LocationPoint = {
-      text: deviceGpsAddress,
+      text: currentDestText,
       coords: deviceGpsCoords,
       isGps: true,
     };
     setDestinationPoint(nextDest);
+
+    // If address is still unresolved, resolve it in the background
+    if (deviceGpsCoords && (!currentDestText || /current location/i.test(currentDestText.trim()))) {
+      resolveLocationName(deviceGpsCoords).then((resolved) => {
+        if (resolved) {
+          setDeviceGpsAddress(resolved);
+          setDestinationPoint((prev) => (prev.isGps ? { ...prev, text: resolved } : prev));
+        }
+      });
+    }
 
     if (sourcePoint.coords && deviceGpsCoords) {
       mapRef.current?.fitToCoordinates([sourcePoint.coords, deviceGpsCoords], {
@@ -824,8 +945,25 @@ export default function HomeScreen() {
           if (points.length > 0) {
             setDestinationPoint((prev) => ({ ...prev, coords: points[points.length - 1] }));
             setSourcePoint((prev) => (prev.isGps ? prev : { ...prev, coords: points[0] }));
+
+            // Ensure sheet is brought down so the user can clearly see the routes on the map
+            if (currentHeightRef.current > COLLAPSED_SHEET_HEIGHT + 20) {
+              currentHeightRef.current = COLLAPSED_SHEET_HEIGHT;
+              Animated.spring(sheetHeight, {
+                toValue: COLLAPSED_SHEET_HEIGHT,
+                useNativeDriver: false,
+                friction: 8,
+                tension: 50,
+              }).start();
+            }
+
             mapRef.current?.fitToCoordinates(points, {
-              edgePadding: { top: 90, right: 60, bottom: 260, left: 60 },
+              edgePadding: {
+                top: 90,
+                right: 60,
+                bottom: Math.round(COLLAPSED_SHEET_HEIGHT) + 30,
+                left: 60,
+              },
               animated: true,
             });
           }
@@ -1247,6 +1385,81 @@ export default function HomeScreen() {
             </View>
           )}
 
+          {/* ROUTE SELECTION OPTIONS */}
+          {!isLoadingRoutes && availableRoutes.length > 0 && (
+            <View style={styles.routeSelectorWrapper}>
+              <View style={styles.routeSelectorHeader}>
+                <Text style={[styles.routeSelectorTitle, { color: colors.textSecondary }]}>
+                  {availableRoutes.length > 1
+                    ? `Routes (${availableRoutes.length} available)`
+                    : 'Route Details'}
+                </Text>
+                {availableRoutes.length > 1 && (
+                  <Text style={[styles.routeSelectorHint, { color: colors.accent }]}>
+                    Tap to select
+                  </Text>
+                )}
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.routeSelectorScroll}>
+                {availableRoutes.map((route, idx) => {
+                  const isSelected = selectedRouteIndex === idx;
+                  const durationMins = Math.max(1, Math.round(route.durationS / 60));
+                  const km = (route.distanceM / 1000).toFixed(1);
+                  return (
+                    <Pressable
+                      key={route.id}
+                      onPress={() => handleSelectRoute(idx)}
+                      style={({ pressed }) => [
+                        styles.routeCard,
+                        {
+                          backgroundColor: isSelected
+                            ? isDark
+                              ? 'rgba(0, 122, 255, 0.18)'
+                              : '#EBF3FF'
+                            : colors.surfaceAlt,
+                          borderColor: isSelected ? colors.accent : colors.cardBorder,
+                        },
+                        pressed && { opacity: 0.8 },
+                      ]}>
+                      <View style={styles.routeCardTop}>
+                        <Ionicons
+                          name={isSelected ? 'radio-button-on' : 'radio-button-off'}
+                          size={15}
+                          color={isSelected ? colors.accent : colors.textSecondary}
+                        />
+                        <Text
+                          style={[
+                            styles.routeCardLabel,
+                            { color: isSelected ? colors.accent : colors.text },
+                          ]}>
+                          {idx === 0 ? 'Fastest' : `Route ${idx + 1}`}
+                        </Text>
+                      </View>
+                      <View style={styles.routeCardStats}>
+                        <Text style={[styles.routeCardTime, { color: colors.text }]}>
+                          {durationMins} min
+                        </Text>
+                        <Text style={[styles.routeCardDistance, { color: colors.textSecondary }]}>
+                          {km} km
+                        </Text>
+                      </View>
+                      {route.description ? (
+                        <Text
+                          style={[styles.routeCardVia, { color: colors.textSecondary }]}
+                          numberOfLines={1}>
+                          via {route.description}
+                        </Text>
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
           {/* START TRIP BUTTON */}
           {selectedSuggestion && (
             <Pressable
@@ -1412,6 +1625,14 @@ export default function HomeScreen() {
             console.warn('[HomeScreen] Failed to save updated mood preferences:', err);
           }
         }}
+      />
+
+      {/* LOCATION PERMISSION RATIONALE MODAL */}
+      <PermissionModal
+        visible={isLocationModalVisible}
+        type="location"
+        onConfirm={handleConfirmLocationPermission}
+        onDismiss={handleDismissLocationPermission}
       />
     </View>
   );
@@ -1819,5 +2040,69 @@ const styles = StyleSheet.create({
   floatingRouteCountText: {
     fontSize: 11,
     fontWeight: '700',
+  },
+
+  // Route selector in bottom sheet
+  routeSelectorWrapper: {
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  routeSelectorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    paddingHorizontal: 2,
+  },
+  routeSelectorTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  routeSelectorHint: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  routeSelectorScroll: {
+    gap: 8,
+    paddingRight: 4,
+  },
+  routeCard: {
+    borderRadius: 14,
+    borderWidth: 1.5,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    minWidth: 130,
+    maxWidth: 180,
+  },
+  routeCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  routeCardLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  routeCardStats: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+    marginBottom: 2,
+  },
+  routeCardTime: {
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  routeCardDistance: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  routeCardVia: {
+    fontSize: 11,
+    fontWeight: '400',
   },
 });

@@ -105,7 +105,7 @@ export function mapLanguageToLabel(langId?: string): string {
  * Normalizes UI Interests selection or legacy storage strings to valid backend Interest IDs.
  */
 export function normalizeInterestIds(interests?: string[]): string[] {
-  if (!interests || interests.length === 0) return ['history', 'food'];
+  if (!interests || interests.length === 0) return [];
 
   const mapping: Record<string, string> = {
     'Adventure & Trekking': 'adventure',
@@ -135,7 +135,7 @@ export function normalizeInterestIds(interests?: string[]): string[] {
   const mapped = interests
     .map((i) => mapping[i])
     .filter((id): id is string => Boolean(id));
-  return mapped.length > 0 ? [...new Set(mapped)] : ['history', 'food'];
+  return mapped.length > 0 ? [...new Set(mapped)] : [];
 }
 
 function mapInterests(interests?: string[]): string[] {

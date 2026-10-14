@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  BackHandler,
   Dimensions,
   PanResponder,
   Platform,
@@ -51,6 +52,9 @@ import {
   subscribeToGeofence,
   subscribeToBackgroundLocation,
 } from '@/services/geofence-service';
+import { PermissionModal } from '@/components/permission-modal';
+import { ReportModal, ReportTargetInfo } from '@/components/trip/report-modal';
+import { submitContentReport, CreateReportPayload } from '@/services/report-service';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const MIN_SHEET_HEIGHT = 160;
@@ -101,6 +105,8 @@ export default function TripScreen() {
   const [polylineCoords, setPolylineCoords] = useState<{ latitude: number; longitude: number }[]>([]);
   const [, setDownloadedBytes] = useState(0);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [showBgLocationModal, setShowBgLocationModal] = useState(false);
   // Temporary developer fake GPS and faster audio (commented out)
   // const [isSimulating, setIsSimulating] = useState(false);
   // const isSimulatingRef = useRef(false);
@@ -113,11 +119,70 @@ export default function TripScreen() {
   const [audioDuration, setAudioDuration] = useState(0);
 
   // ─── Live Mode State & Player Synchronization ─────────────────────────────
-  const [liveTranscript, setLiveTranscript] = useState<{ question?: string; answerText: string } | null>(null);
+  const [liveTranscript, setLiveTranscript] = useState<{ question?: string; answerText: string; audioUri?: string } | null>(null);
   const [isLivePlaying, setIsLivePlaying] = useState(false);
   const wasPlayingStoryRef = useRef(false);
   const liveDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const livePlaybackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ─── AI Moderation / Reporting State (Apple Guideline 1.2 & Google Play GenAI) ───
+  const [reportTarget, setReportTarget] = useState<ReportTargetInfo | null>(null);
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+
+  const handleOpenStoryReport = useCallback(
+    (item?: TripItem | null) => {
+      const targetItem = item || playingItem || lastPlayedItem;
+      setReportTarget({
+        tripId: typeof tripId === 'string' ? tripId : undefined,
+        itemId: targetItem?.id,
+        itemTitle: targetItem?.title || 'Trip Audio Narration',
+        transcriptSnippet: targetItem?.transcript,
+        audioUrl: targetItem?.audio?.url,
+        contentType: 'story',
+      });
+    },
+    [tripId, playingItem, lastPlayedItem]
+  );
+
+  const handleOpenLiveTranscriptReport = useCallback(
+    (data: { question?: string; answerText: string; audioUri?: string }) => {
+      setReportTarget({
+        tripId: typeof tripId === 'string' ? tripId : undefined,
+        itemTitle: data.question ? `Q: ${data.question}` : 'Live Voice Answer',
+        transcriptSnippet: data.answerText,
+        audioUrl: data.audioUri || liveTranscript?.audioUri,
+        contentType: 'live_qa',
+      });
+    },
+    [tripId, liveTranscript]
+  );
+
+  const handleSubmitReport = useCallback(
+    async (payload: CreateReportPayload) => {
+      setIsSubmittingReport(true);
+      try {
+        await submitContentReport(payload);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert(
+          'Report Submitted',
+          'Thank you for reporting this content. Musafir AI maintains zero tolerance for objectionable material and our moderation team will review this report promptly.',
+          [{ text: 'OK' }]
+        );
+        setReportTarget(null);
+      } catch (err: any) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert(
+          'Report Failed',
+          err?.message ||
+            'Unable to submit your report right now. Please check your connection and try again.',
+          [{ text: 'OK' }]
+        );
+      } finally {
+        setIsSubmittingReport(false);
+      }
+    },
+    []
+  );
 
   const handleLivePlaybackFinished = useCallback(() => {
     if (livePlaybackTimeoutRef.current) {
@@ -173,6 +238,7 @@ export default function TripScreen() {
       setLiveTranscript({
         question: data.transcript,
         answerText: data.answerText,
+        audioUri: data.audioUri,
       });
       setIsLivePlaying(true);
 
@@ -495,7 +561,15 @@ export default function TripScreen() {
   useEffect(() => {
     if (trip?.items && trip.items.length > 0) {
       audioQueueRef.current.setItems(trip.items);
-      startBackgroundGeofencing(trip.items);
+      (async () => {
+        try {
+          const fg = await Location.getForegroundPermissionsAsync();
+          const bg = await Location.getBackgroundPermissionsAsync();
+          if (fg.status === 'granted' && bg.status === 'granted') {
+            startBackgroundGeofencing(trip.items);
+          }
+        } catch {}
+      })();
     }
   }, [trip?.items]);
 
@@ -714,8 +788,76 @@ export default function TripScreen() {
   );
   handleLocationUpdateRef.current = handleLocationUpdate;
 
+  const startLocationWatcher = useCallback(async () => {
+    try {
+      const current = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      if (current) {
+        handleLocationUpdate({
+          latitude: current.coords.latitude,
+          longitude: current.coords.longitude,
+        });
+      }
+
+      locationSubscription.current?.remove();
+      locationSubscription.current = await Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.High, distanceInterval: 15 },
+        (loc) => {
+          handleLocationUpdate({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+        }
+      );
+    } catch (err) {
+      console.warn('Location tracking error:', err);
+    }
+  }, [handleLocationUpdate]);
+
+  const checkBackgroundPermission = useCallback(async () => {
+    if (Platform.OS === 'web') return;
+    try {
+      const { status } = await Location.getBackgroundPermissionsAsync();
+      if (status !== 'granted') {
+        setShowBgLocationModal(true);
+      } else if (trip?.items && trip.items.length > 0) {
+        startBackgroundGeofencing(trip.items);
+      }
+    } catch {
+      // Background location might not be supported (e.g. Expo Go or simulator)
+    }
+  }, [trip?.items]);
+
+  const handleConfirmLocationPermission = useCallback(async () => {
+    setShowLocationModal(false);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        await startLocationWatcher();
+        await checkBackgroundPermission();
+      }
+    } catch (err) {
+      console.warn('Error requesting foreground location permission:', err);
+    }
+  }, [checkBackgroundPermission, startLocationWatcher]);
+
+  const handleConfirmBgLocationPermission = useCallback(async () => {
+    setShowBgLocationModal(false);
+    try {
+      const { status } = await Location.requestBackgroundPermissionsAsync();
+      if (status === 'granted' && trip?.items && trip.items.length > 0) {
+        startBackgroundGeofencing(trip.items);
+      }
+    } catch (err) {
+      console.warn('Error requesting background location permission:', err);
+    }
+  }, [trip?.items]);
+
   const handleResetToGPS = useCallback(async () => {
     try {
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setShowLocationModal(true);
+        return;
+      }
       const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       if (current) {
         handleLocationUpdate({ latitude: current.coords.latitude, longitude: current.coords.longitude });
@@ -728,25 +870,14 @@ export default function TripScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') return;
-
-        const current = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-        if (current) {
-          handleLocationUpdate({
-            latitude: current.coords.latitude,
-            longitude: current.coords.longitude,
-          });
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          setShowLocationModal(true);
+          return;
         }
 
-        locationSubscription.current = await Location.watchPositionAsync(
-          { accuracy: Location.Accuracy.High, distanceInterval: 15 },
-          (loc) => {
-            handleLocationUpdate({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
-          }
-        );
+        await startLocationWatcher();
+        await checkBackgroundPermission();
       } catch (err) {
         console.warn('Location tracking error:', err);
       }
@@ -755,7 +886,7 @@ export default function TripScreen() {
     return () => {
       locationSubscription.current?.remove();
     };
-  }, [handleLocationUpdate]);
+  }, [checkBackgroundPermission, startLocationWatcher]);
 
   // ─── Fit map to route ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -811,6 +942,15 @@ export default function TripScreen() {
     );
   }, [exitTrip]);
 
+  // Intercept hardware back button so users can only exit via 'Exit Session'
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleExitSession();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [handleExitSession]);
+
   if (error) {
     return (
       <SafeAreaView style={[styles.centered, { backgroundColor: colors.background }]}>
@@ -864,7 +1004,6 @@ export default function TripScreen() {
         sheetHeight={sheetHeight}
         colors={colors}
         isDark={isDark}
-        onBack={handleExitSession}
         onRecenter={handleRecenter}
         // Temporary developer fake GPS & faster audio (commented out)
         // isSimulating={isSimulating}
@@ -883,6 +1022,7 @@ export default function TripScreen() {
         liveTranscript={liveTranscript}
         isLivePlaying={isLivePlaying}
         onDismissLiveTranscript={() => setLiveTranscript(null)}
+        onReportLiveTranscript={handleOpenLiveTranscriptReport}
       />
 
       {/* ── DRAGGABLE BOTTOM SHEET ── */}
@@ -921,6 +1061,32 @@ export default function TripScreen() {
         onLiveRecordingStart={handleLiveRecordingStart}
         onLiveResponse={handleLiveResponse}
         isLivePlaying={isLivePlaying}
+        onReportContent={handleOpenStoryReport}
+      />
+
+      {/* FOREGROUND LOCATION PERMISSION MODAL */}
+      <PermissionModal
+        visible={showLocationModal}
+        type="location"
+        onConfirm={handleConfirmLocationPermission}
+        onDismiss={() => setShowLocationModal(false)}
+      />
+
+      {/* BACKGROUND LOCATION PERMISSION MODAL */}
+      <PermissionModal
+        visible={showBgLocationModal}
+        type="backgroundLocation"
+        onConfirm={handleConfirmBgLocationPermission}
+        onDismiss={() => setShowBgLocationModal(false)}
+      />
+
+      {/* AI CONTENT MODERATION / REPORTING MODAL (Apple Guideline 1.2 & Google Play GenAI) */}
+      <ReportModal
+        visible={Boolean(reportTarget)}
+        target={reportTarget}
+        isSubmitting={isSubmittingReport}
+        onSubmit={handleSubmitReport}
+        onDismiss={() => setReportTarget(null)}
       />
     </View>
   );
