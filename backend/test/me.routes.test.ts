@@ -4,7 +4,11 @@ import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../src/app";
 import { User } from "../src/models/user.model";
+import { Trip } from "../src/models/trip.model";
+import { Listen } from "../src/models/listen.model";
+import { Report } from "../src/models/report.model";
 import { VoiceDemo } from "../src/models/voiceDemo.model";
+import { newTrip } from "./tripBuilder.helpers";
 
 // Fake verifier: the token is "uid:<uid>". Real tokens are checked by firebase-admin in production.
 const app = createApp({
@@ -37,6 +41,9 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await User.deleteMany({});
+  await Trip.deleteMany({});
+  await Listen.deleteMany({});
+  await Report.deleteMany({});
 });
 
 describe("auth", () => {
@@ -150,6 +157,65 @@ describe("PATCH /me", () => {
     const res = await request(app).patch("/me").set(as("u1")).send({ language: "kn-IN", musicMode: "off" });
     expect(res.status).toBe(200);
     expect(res.body.data).toMatchObject({ name: "Aryan", language: "kn-IN", voice: "Girish", musicMode: "off" });
+  });
+});
+
+describe("DELETE /me", () => {
+  it("requires authentication", async () => {
+    const res = await request(app).delete("/me");
+    expect(res.status).toBe(401);
+  });
+
+  it("deletes user profile, trips, listens, and reports, leaving other users untouched", async () => {
+    await request(app).put("/me").set(as("u1")).send({ name: "User One", language: "kn-IN" });
+    await request(app).put("/me").set(as("u2")).send({ name: "User Two", language: "en-IN" });
+
+    await newTrip("u1");
+    await newTrip("u2");
+
+    await Report.create({
+      userId: "u1",
+      tripId: new mongoose.Types.ObjectId(),
+      itemId: new mongoose.Types.ObjectId(),
+      reason: "inaccurate",
+      details: "Wrong story",
+    });
+    await Report.create({
+      userId: "u2",
+      tripId: new mongoose.Types.ObjectId(),
+      itemId: new mongoose.Types.ObjectId(),
+      reason: "inappropriate",
+      details: "Bad story",
+    });
+
+    expect(await User.countDocuments()).toBe(2);
+    expect(await Trip.countDocuments()).toBe(2);
+    expect(await Report.countDocuments()).toBe(2);
+
+    const res = await request(app).delete("/me").set(as("u1")).send({});
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, message: "Account and associated data deleted successfully." });
+
+    expect(await User.findOne({ firebaseUid: "u1" })).toBeNull();
+    expect(await Trip.findOne({ userId: "u1" })).toBeNull();
+    expect(await Report.findOne({ userId: "u1" })).toBeNull();
+
+    expect(await User.findOne({ firebaseUid: "u2" })).not.toBeNull();
+    expect(await Trip.findOne({ userId: "u2" })).not.toBeNull();
+    expect(await Report.findOne({ userId: "u2" })).not.toBeNull();
+  });
+
+  it("succeeds even if the user has no profile or trips", async () => {
+    const res = await request(app).delete("/me").set(as("u_nonexistent")).send({});
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  it("also works on DELETE /me/account", async () => {
+    await request(app).put("/me").set(as("u_acc")).send({ name: "Test" });
+    const res = await request(app).delete("/me/account").set(as("u_acc")).send({});
+    expect(res.status).toBe(200);
+    expect(await User.findOne({ firebaseUid: "u_acc" })).toBeNull();
   });
 });
 

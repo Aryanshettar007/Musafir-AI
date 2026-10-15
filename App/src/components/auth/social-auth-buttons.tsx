@@ -9,12 +9,14 @@ import {
 } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { Image } from 'expo-image';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
+import { auth } from '@/config/firebase';
 import { useAuth } from '@/context/auth-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { syncUserSignIn } from '@/services/user-service';
-import { useRouter } from 'expo-router';
 
 export interface SocialAuthButtonsProps {
   onError?: (errorMessage: string) => void;
@@ -42,13 +44,27 @@ export function SocialAuthButtons({ onError, disabled }: SocialAuthButtonsProps)
   const isBusy = disabled || appleLoading || googleLoading;
   const showApple = Platform.OS === 'ios' && isAppleAvailable;
 
-  const handlePostAuth = async () => {
+  const handlePostAuth = async (authedUser?: any) => {
     try {
       const syncResult = await syncUserSignIn();
       if (syncResult.hasProfile) {
         router.replace('/(tabs)');
       } else {
-        router.replace('/(onboarding)');
+        const cachedName = await AsyncStorage.getItem('@musafir_social_name');
+        const resolvedName =
+          authedUser?.displayName ||
+          auth.currentUser?.displayName ||
+          cachedName ||
+          '';
+
+        if (resolvedName && resolvedName.trim()) {
+          router.replace({
+            pathname: '/(onboarding)',
+            params: { name: resolvedName.trim() },
+          });
+        } else {
+          router.replace('/(onboarding)');
+        }
       }
     } catch {
       router.replace('/(onboarding)');
@@ -59,8 +75,8 @@ export function SocialAuthButtons({ onError, disabled }: SocialAuthButtonsProps)
     if (isBusy) return;
     try {
       setAppleLoading(true);
-      await signInWithApple();
-      await handlePostAuth();
+      const user = await signInWithApple();
+      await handlePostAuth(user);
     } catch (err: any) {
       if (err?.message && err.message !== 'Sign-in cancelled.') {
         onError?.(err.message);
@@ -74,8 +90,8 @@ export function SocialAuthButtons({ onError, disabled }: SocialAuthButtonsProps)
     if (isBusy) return;
     try {
       setGoogleLoading(true);
-      await signInWithGoogle();
-      await handlePostAuth();
+      const user = await signInWithGoogle();
+      await handlePostAuth(user);
     } catch (err: any) {
       if (err?.message && err.message !== 'Sign-in cancelled.') {
         onError?.(err.message);
@@ -175,9 +191,10 @@ export function SocialAuthButtons({ onError, disabled }: SocialAuthButtonsProps)
                 accessibilityLabel="Google logo"
               />
               <Text
+                numberOfLines={1}
                 style={[
                   styles.buttonText,
-                  { color: isDark ? '#fafafa' : '#09090b' },
+                  { color: isDark ? '#ffffff' : '#000000' },
                 ]}>
                 Continue with Google
               </Text>
@@ -247,12 +264,13 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   googleIcon: {
-    width: 18,
-    height: 18,
+    width: 17,
+    height: 17,
   },
   buttonText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
-    letterSpacing: -0.1,
+    letterSpacing: -0.2,
+    includeFontPadding: false,
   },
 });

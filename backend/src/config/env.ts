@@ -45,6 +45,11 @@ const EnvSchema = z.object({
   MAX_ROUTE_KM: z.coerce.number().positive().default(1200),
   // Wikimedia policy: generic user agents get 429'd; identify the app with a contact URL.
   WIKIPEDIA_USER_AGENT: z.string().min(1).default("MusafirAI/0.1 (https://github.com/Aryanshettar007/Musafir-AI)"),
+  // Sign in with Apple token revocation (App Store Guideline 5.1.1(v))
+  APPLE_TEAM_ID: z.string().optional(),
+  APPLE_KEY_ID: z.string().optional(),
+  APPLE_CLIENT_ID: z.string().optional(),
+  APPLE_PRIVATE_KEY: z.string().optional(),
 }).superRefine((e, ctx) => {
   if (e.STORAGE_DRIVER !== "s3") return;
   for (const key of ["S3_ENDPOINT", "S3_REGION", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"] as const) {

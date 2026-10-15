@@ -19,6 +19,7 @@ import { updateProfile } from 'firebase/auth';
 
 import { ThemedView } from '@/components/themed-view';
 import { LegalLinks } from '@/components/legal-links';
+import { DeleteAccountModal } from '@/components/ui/delete-account-modal';
 import { AudioLanguageRow } from '@/components/ui/audio-language-sheet';
 import {
   InputRow,
@@ -69,6 +70,7 @@ export default function ProfileScreen() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isClearingCache, setIsClearingCache] = useState(false);
   const [offlineStorageText, setOfflineStorageText] = useState<string>('0 B');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   // Load existing onboarding / profile data
   useEffect(() => {
@@ -397,6 +399,7 @@ export default function ProfileScreen() {
               values={interests}
               options={INTERESTS}
               onToggle={toggleInterest}
+              onChangeValues={setInterests}
             />
 
             {/* Save Button */}
@@ -492,12 +495,38 @@ export default function ProfileScreen() {
                 <Text style={[styles.appInfoText, { color: colors.textSecondary }]}>
                   Musafir AI • v1.0.0
                 </Text>
-                <LegalLinks variant="compact" />
+                <LegalLinks variant="compact">
+                  <Text style={[styles.bullet, { color: isDark ? '#48484A' : '#C7C7CC' }]}>•</Text>
+                  <Pressable
+                    onPress={() => setShowDeleteModal(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Delete Account"
+                    hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                    style={({ pressed }) => pressed && { opacity: 0.6 }}>
+                    <Text
+                      style={[
+                        styles.deleteAccountLinkText,
+                        { color: isDark ? '#D1D1D6' : '#2C2C2E' },
+                      ]}>
+                      Delete Account
+                    </Text>
+                  </Pressable>
+                </LegalLinks>
               </View>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
+
+      {/* Delete Account Modal */}
+      <DeleteAccountModal
+        visible={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onSuccess={() => {
+          setShowDeleteModal(false);
+          router.replace('/(auth)/login');
+        }}
+      />
     </ThemedView>
   );
 }
@@ -624,5 +653,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     letterSpacing: -0.2,
+  },
+  bullet: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  deleteAccountLinkText: {
+    fontSize: 12,
+    fontWeight: '500',
+    letterSpacing: -0.1,
   },
 });

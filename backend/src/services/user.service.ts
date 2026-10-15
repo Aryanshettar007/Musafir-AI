@@ -1,6 +1,13 @@
 import { User, type UserDoc } from "../models/user.model";
+import { Trip } from "../models/trip.model";
+import { Listen } from "../models/listen.model";
+import { Report } from "../models/report.model";
 import { notFound } from "../errors";
 import { resolveProfile, type Profile, type ProfileInput } from "./profile";
+import { revokeAppleAuthorizationCode } from "../clients/apple";
+import { revokeGoogleToken } from "../clients/googleAuth";
+import { getApps } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 
 export interface Identity {
   uid: string;
@@ -48,6 +55,58 @@ export async function patchProfile(identity: Identity, input: ProfileInput): Pro
   );
   if (!updated) throw profileNotFound();
   return toDto(updated);
+}
+
+export interface DeleteAccountInput {
+  appleAuthorizationCode?: string;
+  googleToken?: string;
+}
+
+// DELETE /me: deletes user data from MongoDB (User, Trips, Listens, Reports) and revokes social auth tokens.
+export async function deleteAccount(
+  identity: Identity,
+  input?: DeleteAccountInput,
+): Promise<{ deleted: boolean }> {
+  const uid = identity.uid;
+
+  // 1. Delete all user data across all collections in MongoDB
+  await Promise.all([
+    User.deleteOne({ firebaseUid: uid }),
+    Trip.deleteMany({ userId: uid }),
+    Listen.deleteMany({ userId: uid }),
+    Report.deleteMany({ userId: uid }),
+  ]);
+
+  // 2. Revoke Apple token if authorization code provided
+  if (input?.appleAuthorizationCode) {
+    try {
+      await revokeAppleAuthorizationCode(input.appleAuthorizationCode);
+    } catch (err) {
+      console.warn("[deleteAccount] Apple revocation error:", err);
+    }
+  }
+
+  // 3. Revoke Google token if provided
+  if (input?.googleToken) {
+    try {
+      await revokeGoogleToken(input.googleToken);
+    } catch (err) {
+      console.warn("[deleteAccount] Google revocation error:", err);
+    }
+  }
+
+  // 4. If Firebase Admin has admin credentials, delete from Firebase Auth too
+  try {
+    const apps = getApps();
+    if (apps.length > 0) {
+      await getAuth(apps[0]).deleteUser(uid);
+    }
+  } catch (err: unknown) {
+    // Expected when firebase-admin is only configured for ID token verification without service account credentials.
+    // Client SDK will perform deleteUser(currentUser).
+  }
+
+  return { deleted: true };
 }
 
 function profileNotFound() {

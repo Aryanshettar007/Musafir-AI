@@ -1,5 +1,5 @@
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -39,11 +39,20 @@ const STORAGE_KEY = '@musafir_user_profile';
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ name?: string }>();
   const { user } = useAuth();
   const scheme = useColorScheme();
   const isDark = scheme === 'dark';
 
-  const [name, setName] = useState(user?.displayName || '');
+  const initialName =
+    (typeof params.name === 'string' && params.name.trim()) ||
+    user?.displayName ||
+    auth.currentUser?.displayName ||
+    user?.providerData?.[0]?.displayName ||
+    auth.currentUser?.providerData?.[0]?.displayName ||
+    '';
+
+  const [name, setName] = useState(initialName);
   const [gender, setGender] = useState('');
   const [age, setAge] = useState<string>(DEFAULT_AGE_RANGE || '');
   const [preferredLanguage, setPreferredLanguage] = useState('');
@@ -54,6 +63,67 @@ export default function OnboardingScreen() {
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  // Auto-populate name from social sign-in or cached storage if not set yet
+  useEffect(() => {
+    let isMounted = true;
+
+    async function resolveName() {
+      if (name && name.trim()) return;
+
+      if (typeof params.name === 'string' && params.name.trim()) {
+        if (isMounted) setName(params.name.trim());
+        return;
+      }
+
+      const candidate =
+        user?.displayName ||
+        auth.currentUser?.displayName ||
+        user?.providerData?.[0]?.displayName ||
+        auth.currentUser?.providerData?.[0]?.displayName;
+
+      if (candidate && candidate.trim()) {
+        if (isMounted) setName(candidate.trim());
+        return;
+      }
+
+      try {
+        const cachedSocial = await AsyncStorage.getItem('@musafir_social_name');
+        if (cachedSocial && cachedSocial.trim()) {
+          if (isMounted) setName(cachedSocial.trim());
+          return;
+        }
+
+        const cachedApple = await AsyncStorage.getItem('@musafir_apple_name');
+        if (cachedApple && cachedApple.trim()) {
+          if (isMounted) setName(cachedApple.trim());
+          return;
+        }
+
+        const cachedGoogle = await AsyncStorage.getItem('@musafir_google_name');
+        if (cachedGoogle && cachedGoogle.trim()) {
+          if (isMounted) setName(cachedGoogle.trim());
+          return;
+        }
+
+        const cachedProfile = await AsyncStorage.getItem(STORAGE_KEY);
+        if (cachedProfile) {
+          const parsed = JSON.parse(cachedProfile);
+          if (parsed?.name && parsed.name.trim()) {
+            if (isMounted) setName(parsed.name.trim());
+          }
+        }
+      } catch (e) {
+        // Non-critical
+      }
+    }
+
+    resolveName();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [params.name, user]);
 
   // Dynamic Uber palette
   const colors = {
@@ -137,6 +207,7 @@ export default function OnboardingScreen() {
       // 1. Save locally to AsyncStorage
       try {
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(onboardingData));
+        await AsyncStorage.setItem('@musafir_social_name', trimmedName);
       } catch (storageErr) {
         console.warn('[Onboarding Complete] Error saving to AsyncStorage:', storageErr);
       }
@@ -257,6 +328,10 @@ export default function OnboardingScreen() {
                   values={selectedInterests}
                   options={INTERESTS}
                   onToggle={toggleInterest}
+                  onChangeValues={(newInterests) => {
+                    setSelectedInterests(newInterests);
+                    if (validationError) setValidationError(null);
+                  }}
                 />
 
                 {/* Submit Action */}
