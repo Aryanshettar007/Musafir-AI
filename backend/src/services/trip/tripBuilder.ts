@@ -232,7 +232,7 @@ export function createTripBuilder(deps: TripBuilderDeps): TripBuilder {
           })
         : undefined;
       const out = await producer.produce({
-        tripId, type: item.type as Exclude<typeof item.type, "sponsored">, placeIds: item.placeIds, language: trip.prefs.language, voice: trip.prefs.voice,
+        tripId, userId: trip.userId, type: item.type as Exclude<typeof item.type, "sponsored">, placeIds: item.placeIds, language: trip.prefs.language, voice: trip.prefs.voice,
         focus: item.focus, side: item.side, targetSeconds: item.targetSeconds, interests: trip.prefs.interests, tripFacts,
       });
       const trig = triggerFor(route, {

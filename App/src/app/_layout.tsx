@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { AuthProvider } from '@/context/auth-context';
+import { PreferencesProvider } from '@/context/preferences-context';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -16,8 +17,9 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <AuthProvider>
-          <AnimatedSplashOverlay />
-          <Stack screenOptions={{ headerShown: false }}>
+          <PreferencesProvider>
+            <AnimatedSplashOverlay />
+            <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="index" options={{ headerShown: false }} />
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
             <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
@@ -35,6 +37,7 @@ export default function RootLayout() {
               options={{ headerShown: false, presentation: 'modal' }}
             />
           </Stack>
+          </PreferencesProvider>
         </AuthProvider>
       </ThemeProvider>
     </SafeAreaProvider>

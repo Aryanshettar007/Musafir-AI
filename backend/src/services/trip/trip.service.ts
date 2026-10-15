@@ -111,7 +111,7 @@ export function createTripService(deps: TripServiceDeps) {
           ? { moods: input.moods }
           : {}),
       };
-      const prefs = resolveProfile(profileOf(user), effectivePrefsInput);
+      const prefs = await resolveProfile(profileOf(user), effectivePrefsInput, identity.uid);
 
       const building = await Trip.findOne({ userId: identity.uid, status: "building" }).lean();
       if (building) {

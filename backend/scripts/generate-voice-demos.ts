@@ -23,7 +23,7 @@ const LINES: Record<LanguageId, (name: string, gender: VoiceGender) => string> =
   "hi-IN": (name, gender) =>
     `नमस्ते, मैं ${name} हूँ, आपका मुसाफ़िर सफ़र का साथी। आराम से बैठिए, सफ़र का मज़ा लीजिए, कहानियाँ मैं ${gender === "male" ? "सुनाऊँगा" : "सुनाऊँगी"}।`,
   "hi-en": (name, gender) =>
-    `Hi, main ${name} hoon, aapka Musafir travel companion. Aaram se baithiye, ride enjoy kijiye, stories main ${gender === "male" ? "sunaunga" : "sunaungi"}.`,
+    `Hey there! Main ${name} hoon, aapka Musafir travel companion. Let's make your journey awesome, raaste ke best spots aur stories main ${gender === "male" ? "bataunga" : "bataungi"}!`,
   "kn-IN": (name) => `ನಮಸ್ಕಾರ, ನಾನು ${name}, ನಿಮ್ಮ ಮುಸಾಫಿರ್ ಪ್ರಯಾಣದ ಜೊತೆಗಾರ. ಆರಾಮವಾಗಿ ಕುಳಿತು ಪ್ರಯಾಣವನ್ನು ಎಂಜಾಯ್ ಮಾಡಿ.`,
   "ta-IN": (name) => `வணக்கம், நான் ${name}, உங்கள் முசாஃபிர் பயணத் துணை. நிம்மதியாக உட்கார்ந்து பயணத்தை ரசியுங்கள்.`,
   "te-IN": (name, gender) =>

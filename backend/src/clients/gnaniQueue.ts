@@ -1,4 +1,4 @@
-import type { GnaniClient } from "./gnani";
+import type { GnaniClient, SpeakerEmbedding } from "./gnani";
 import { withRetry } from "./upstream";
 
 export type GnaniPriority = "interactive" | "background";
@@ -8,6 +8,10 @@ export type GnaniPriority = "interactive" | "background";
 export interface GnaniService {
   tts(req: Parameters<GnaniClient["tts"]>[0], opts: { priority: GnaniPriority }): Promise<Buffer>;
   stt(req: Parameters<GnaniClient["stt"]>[0], opts: { priority: GnaniPriority }): Promise<{ transcript: string }>;
+  voiceCloneEmbeddings(
+    req: Parameters<GnaniClient["voiceCloneEmbeddings"]>[0],
+    opts: { priority: GnaniPriority }
+  ): Promise<SpeakerEmbedding>;
 }
 
 export interface GnaniQueueOptions {
@@ -54,5 +58,6 @@ export function createGnaniQueue(client: GnaniClient, opts: GnaniQueueOptions = 
   return {
     tts: (req, { priority }) => enqueue(priority, () => client.tts(req)),
     stt: (req, { priority }) => enqueue(priority, () => client.stt(req)),
+    voiceCloneEmbeddings: (req, { priority }) => enqueue(priority, () => client.voiceCloneEmbeddings(req)),
   };
 }

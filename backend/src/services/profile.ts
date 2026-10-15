@@ -41,7 +41,10 @@ export interface Profile {
  *   hand-picked a non-default voice that still fits.
  * - voice and voiceGender must agree.
  */
-export function resolveProfile(existing: Profile | null, input: ProfileInput): Profile {
+import mongoose from "mongoose";
+import { CustomVoice } from "../models/customVoice.model";
+
+export async function resolveProfile(existing: Profile | null, input: ProfileInput, userId?: string): Promise<Profile> {
   const gender = input.gender ?? existing?.gender ?? "unspecified";
   const language = input.language ?? existing?.language ?? DEFAULT_LANGUAGE;
 
@@ -50,11 +53,22 @@ export function resolveProfile(existing: Profile | null, input: ProfileInput): P
 
   if (voice !== undefined) {
     const found = findVoice(voice);
-    if (!found) throw badRequest("UNKNOWN_VOICE", `Unknown voice "${voice}". See GET /voices.`);
-    if (voiceGender !== undefined && voiceGender !== found.gender) {
-      throw badRequest("VOICE_GENDER_MISMATCH", `${voice} is a ${found.gender} voice, not ${voiceGender}.`);
+    if (found) {
+      if (voiceGender !== undefined && voiceGender !== found.gender) {
+        throw badRequest("VOICE_GENDER_MISMATCH", `${voice} is a ${found.gender} voice, not ${voiceGender}.`);
+      }
+      voiceGender = found.gender;
+    } else {
+      let customVoice: { name: string; gender: string } | null = null;
+      if (mongoose.connection.readyState === 1) {
+        const query = userId ? { userId, name: voice } : { name: voice };
+        customVoice = await CustomVoice.findOne(query).lean();
+      }
+      if (!customVoice) {
+        throw badRequest("UNKNOWN_VOICE", `Unknown voice "${voice}". See GET /voices.`);
+      }
+      voiceGender = (customVoice.gender as VoiceGender) || voiceGender || "male";
     }
-    voiceGender = found.gender;
   } else {
     voiceGender ??= existing?.voiceGender ?? (gender === "female" ? "female" : "male");
     voice = keepOrRecommend(existing, language, voiceGender);
@@ -82,8 +96,8 @@ export function resolveProfile(existing: Profile | null, input: ProfileInput): P
 // so a user who never customised moves from Deepak (English) to Girish when they switch to Kannada.
 function keepOrRecommend(existing: Profile | null, language: LanguageId, voiceGender: VoiceGender): string {
   if (existing && existing.voiceGender === voiceGender) {
-    const wasDefault = RECOMMENDED_VOICES[existing.language][existing.voiceGender] === existing.voice;
-    if (!wasDefault) return existing.voice;
+    const wasDefault = RECOMMENDED_VOICES[existing.language]?.[existing.voiceGender] === existing.voice;
+    if (!wasDefault && existing.voice) return existing.voice;
   }
   return RECOMMENDED_VOICES[language][voiceGender];
 }

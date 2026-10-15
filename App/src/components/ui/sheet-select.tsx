@@ -181,7 +181,7 @@ export function MultiSelectRow({
   onChangeValues,
   title,
   disabled = false,
-  showPills = true,
+  showPills = false,
   hideDivider = false,
   style,
 }: MultiSelectRowProps) {
@@ -239,8 +239,6 @@ export function MultiSelectRow({
   const displayText =
     values.length === 0
       ? placeholder
-      : isAllSelected
-      ? `All selected (${values.length})`
       : `${values.length} selected`;
 
   return (

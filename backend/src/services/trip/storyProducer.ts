@@ -17,6 +17,7 @@ export type StoryRow = StoryDoc & { _id: Types.ObjectId };
 
 export interface StoryRequest {
   tripId: string;
+  userId?: string;
   type: Exclude<ItemType, "sponsored">;
   placeIds: Types.ObjectId[];
   language: LanguageId;
@@ -63,7 +64,7 @@ export function createStoryProducer(deps: StoryProducerDeps) {
       type: req.type, language: req.language, voice: req.voice, focus: req.focus, side: req.side, targetSeconds: req.targetSeconds,
       interests: req.interests, places, tripFacts: req.tripFacts,
     });
-    const audio = await narrate(deps.gnani, { text: written.script, voice: req.voice, language: req.language, priority: "background" });
+    const audio = await narrate(deps.gnani, { text: written.script, voice: req.voice, language: req.language, priority: "background", userId: req.userId });
     const _id = new Types.ObjectId();
     const storageKey = `stories/${req.language}/${_id}.mp3`;
     await deps.storage.put(storageKey, audio.audio, "audio/mpeg");

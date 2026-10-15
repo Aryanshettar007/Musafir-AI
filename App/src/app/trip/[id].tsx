@@ -18,7 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import MapView from 'react-native-maps';
 import { File } from 'expo-file-system';
 import * as Location from 'expo-location';
-import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
+import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync, setIsAudioActiveAsync } from 'expo-audio';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
 
@@ -118,6 +119,10 @@ export default function TripScreen() {
   const [currentPosition, setCurrentPosition] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
 
+  // Audio system music interruption preference (false = duckOthers, true = doNotMix)
+  const [pauseSystemMusic, setPauseSystemMusic] = useState(false);
+  const pauseSystemMusicRef = useRef(false);
+
   // ─── Live Mode State & Player Synchronization ─────────────────────────────
   const [liveTranscript, setLiveTranscript] = useState<{ question?: string; answerText: string; audioUri?: string } | null>(null);
   const [isLivePlaying, setIsLivePlaying] = useState(false);
@@ -195,6 +200,8 @@ export default function TripScreen() {
     if (wasPlayingStoryRef.current) {
       audioQueueRef.current.resume();
       wasPlayingStoryRef.current = false;
+    } else if (pauseSystemMusicRef.current) {
+      setIsAudioActiveAsync(false).catch(() => {});
     }
 
     // Auto-dismiss the temporary transcript card after reading grace period (3.5s)
@@ -244,6 +251,9 @@ export default function TripScreen() {
 
       // Play spoken answer
       try {
+        if (pauseSystemMusicRef.current) {
+          setIsAudioActiveAsync(true).catch(() => {});
+        }
         livePlayer.replace({ uri: data.audioUri });
         livePlayer.play();
       } catch (err) {
@@ -409,20 +419,45 @@ export default function TripScreen() {
     }
   };
 
-  // ─── Configure background playback & audio ducking ─────────────────────────
+  // ─── Configure background playback & audio interruption mode ───────────────
   useEffect(() => {
     (async () => {
       try {
+        const stored = await AsyncStorage.getItem('@musafir_pause_system_music');
+        const shouldPause = stored === 'true';
+        setPauseSystemMusic(shouldPause);
+        pauseSystemMusicRef.current = shouldPause;
         await setAudioModeAsync({
           playsInSilentMode: true,
           shouldPlayInBackground: true,
-          interruptionMode: 'duckOthers',
+          interruptionMode: shouldPause ? 'doNotMix' : 'duckOthers',
         });
       } catch (err) {
-        console.warn('Error setting audio mode:', err);
+        console.warn('Error configuring audio mode settings:', err);
       }
     })();
   }, []);
+
+  const handleTogglePauseSystemMusic = useCallback(
+    async (value: boolean) => {
+      setPauseSystemMusic(value);
+      pauseSystemMusicRef.current = value;
+      try {
+        await AsyncStorage.setItem('@musafir_pause_system_music', value ? 'true' : 'false');
+        await setAudioModeAsync({
+          playsInSilentMode: true,
+          shouldPlayInBackground: true,
+          interruptionMode: value ? 'doNotMix' : 'duckOthers',
+        });
+        if (!value && !isPlaying) {
+          await setIsAudioActiveAsync(false).catch(() => {});
+        }
+      } catch (err) {
+        console.warn('Error updating audio interruption preference:', err);
+      }
+    },
+    [isPlaying]
+  );
 
   // ─── Pulse animation for building state ────────────────────────────────────
   useEffect(() => {
@@ -498,6 +533,9 @@ export default function TripScreen() {
           if (!playUri) {
             throw new Error('Audio file not ready');
           }
+          if (pauseSystemMusicRef.current) {
+            await setIsAudioActiveAsync(true).catch(() => {});
+          }
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           player.replace({ uri: playUri });
           try {
@@ -520,8 +558,14 @@ export default function TripScreen() {
         } catch (err) {
           console.warn('[TripAudioQueue] Error pausing item:', err);
         }
+        if (pauseSystemMusicRef.current) {
+          setIsAudioActiveAsync(false).catch(() => {});
+        }
       },
       onResumeItem: () => {
+        if (pauseSystemMusicRef.current) {
+          setIsAudioActiveAsync(true).catch(() => {});
+        }
         try {
           if (player) {
             player.play();
@@ -537,6 +581,9 @@ export default function TripScreen() {
           }
         } catch (err) {
           // Native shared object may not be initialized or already released
+        }
+        if (pauseSystemMusicRef.current) {
+          setIsAudioActiveAsync(false).catch(() => {});
         }
       },
       onListenEvent: (itemId, event) => {
@@ -909,8 +956,20 @@ export default function TripScreen() {
       clearInterval(pollRef.current);
       pollRef.current = null;
     }
+    try {
+      setIsAudioActiveAsync(false);
+    } catch {}
     router.replace('/(tabs)');
   }, [player, router]);
+
+  // Ensure audio focus is cleanly released if screen unmounts
+  useEffect(() => {
+    return () => {
+      try {
+        setIsAudioActiveAsync(false);
+      } catch {}
+    };
+  }, []);
 
   const handleExitSession = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1062,6 +1121,8 @@ export default function TripScreen() {
         onLiveResponse={handleLiveResponse}
         isLivePlaying={isLivePlaying}
         onReportContent={handleOpenStoryReport}
+        pauseSystemMusic={pauseSystemMusic}
+        onTogglePauseSystemMusic={handleTogglePauseSystemMusic}
       />
 
       {/* FOREGROUND LOCATION PERMISSION MODAL */}

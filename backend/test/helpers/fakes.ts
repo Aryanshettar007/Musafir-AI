@@ -85,6 +85,13 @@ export function fakeGnani(opts: { transcript?: string } = {}): FakeGnani {
       calls.push({ kind: "stt", priority });
       return { transcript: opts.transcript ?? "fake transcript" };
     },
+    async voiceCloneEmbeddings(_req, _opts) {
+      return {
+        embedding: "fake-base64-embedding",
+        shape: [1, 768],
+        dtype: "torch.bfloat16",
+      };
+    },
   };
 }
 

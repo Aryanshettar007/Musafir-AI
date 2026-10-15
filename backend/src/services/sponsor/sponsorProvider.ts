@@ -1,3 +1,4 @@
+import { findVoice, RECOMMENDED_VOICES } from "../../catalog/voices";
 import type { LatLng } from "../../geo";
 import { Sponsor } from "../../models/sponsor.model";
 import { fromPoint } from "../../models/point";
@@ -38,7 +39,8 @@ export function createSponsorProvider(deps: { ads: SponsorAds }): SponsorProvide
         }
         if (!best) return null;
 
-        const ad = await deps.ads.ensureAd(best.slug, language, voice);
+        const adVoice = findVoice(voice) ? voice : RECOMMENDED_VOICES[language]["male"];
+        const ad = await deps.ads.ensureAd(best.slug, language, adVoice);
         return {
           sponsorSlug: best.slug,
           sponsorName: best.name,

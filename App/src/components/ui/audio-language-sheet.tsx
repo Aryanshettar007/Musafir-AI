@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { createAudioPlayer } from 'expo-audio';
+import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { Image } from 'expo-image';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -27,6 +27,35 @@ import {
 } from '@/services/catalog-service';
 import { mapLanguageToLabel, mapLanguage } from '@/services/user-service';
 import { getCachedAudioUri } from '@/services/audio-cache';
+
+function getInitials(name: string): string {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+const AVATAR_PALETTE = [
+  '#3B82F6',
+  '#8B5CF6',
+  '#EC4899',
+  '#10B981',
+  '#F59E0B',
+  '#6366F1',
+  '#06B6D4',
+  '#F97316',
+];
+
+function getAvatarColor(name: string): string {
+  if (!name) return AVATAR_PALETTE[0];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
+}
 
 export interface AudioLanguageSelection {
   language: string; // e.g. 'en-IN' or 'English'
@@ -227,7 +256,7 @@ export function AudioLanguageSheetModal({
 
       // If current selected voice is not in the new list, auto-select only if a voice was already chosen
       if (list.length > 0 && selectedVoice) {
-        const stillValid = list.some((v) => v.name === selectedVoice && v.gender === selectedGender);
+        const stillValid = list.some((v) => v.name === selectedVoice && (v.isCustom || v.gender === selectedGender));
         if (!stillValid) {
           const recommended = list.find((v) => v.recommended) || list[0];
           setSelectedVoice(recommended.name);
@@ -285,6 +314,11 @@ export function AudioLanguageSheetModal({
     setLoadingVoice(voiceModel.name);
 
     try {
+      await setAudioModeAsync({
+        allowsRecording: false,
+        playsInSilentMode: true,
+      });
+
       const cacheKey = `${selectedLangId}_${voiceModel.name}`;
       const sourceUri = await getCachedAudioUri(voiceModel.demoUrl, cacheKey);
 
@@ -361,6 +395,10 @@ export function AudioLanguageSheetModal({
     languages.find((l) => l.id === selectedLangId)?.label ||
     mapLanguageToLabel(selectedLangId);
 
+  const isCustomVoiceSelected = Boolean(
+    voices.find((v) => v.name === selectedVoice)?.isCustom
+  );
+
   return (
     <Modal
       visible={visible}
@@ -406,6 +444,7 @@ export function AudioLanguageSheetModal({
               </Text>
               <View style={styles.genderRow}>
                 <Pressable
+                  disabled={isCustomVoiceSelected}
                   onPress={() => handleGenderSelect('male')}
                   style={[
                     styles.genderPill,
@@ -414,6 +453,7 @@ export function AudioLanguageSheetModal({
                         selectedGender === 'male'
                           ? colors.activePillBg
                           : colors.inactivePillBg,
+                      opacity: isCustomVoiceSelected ? 0.4 : 1,
                     },
                   ]}>
                   <Ionicons
@@ -437,9 +477,19 @@ export function AudioLanguageSheetModal({
                     ]}>
                     Male
                   </Text>
+                  {isCustomVoiceSelected && (
+                    <View
+                      pointerEvents="none"
+                      style={[
+                        styles.diagonalStrike,
+                        { backgroundColor: isDark ? '#E4E4E7' : '#52525B' },
+                      ]}
+                    />
+                  )}
                 </Pressable>
 
                 <Pressable
+                  disabled={isCustomVoiceSelected}
                   onPress={() => handleGenderSelect('female')}
                   style={[
                     styles.genderPill,
@@ -448,6 +498,7 @@ export function AudioLanguageSheetModal({
                         selectedGender === 'female'
                           ? colors.activePillBg
                           : colors.inactivePillBg,
+                      opacity: isCustomVoiceSelected ? 0.4 : 1,
                     },
                   ]}>
                   <Ionicons
@@ -471,6 +522,15 @@ export function AudioLanguageSheetModal({
                     ]}>
                     Female
                   </Text>
+                  {isCustomVoiceSelected && (
+                    <View
+                      pointerEvents="none"
+                      style={[
+                        styles.diagonalStrike,
+                        { backgroundColor: isDark ? '#E4E4E7' : '#52525B' },
+                      ]}
+                    />
+                  )}
                 </Pressable>
               </View>
             </View>
@@ -573,12 +633,37 @@ export function AudioLanguageSheetModal({
                                 : 'transparent',
                             },
                           ]}>
-                          <Image
-                            source={getVoiceAvatarSource(v.name)}
-                            style={styles.avatarImage}
-                            contentFit="cover"
-                            transition={150}
-                          />
+                          {v.isCustom && !v.avatarUrl ? (
+                            <View
+                              style={[
+                                styles.avatarImage,
+                                {
+                                  backgroundColor: getAvatarColor(v.name),
+                                  justifyContent: 'center',
+                                  alignItems: 'center',
+                                },
+                              ]}>
+                              <Text
+                                style={{
+                                  color: '#FFFFFF',
+                                  fontWeight: '700',
+                                  fontSize: 16,
+                                }}>
+                                {getInitials(v.name)}
+                              </Text>
+                            </View>
+                          ) : (
+                            <Image
+                              source={
+                                v.isCustom && v.avatarUrl
+                                  ? { uri: v.avatarUrl }
+                                  : getVoiceAvatarSource(v.name)
+                              }
+                              style={styles.avatarImage}
+                              contentFit="cover"
+                              transition={150}
+                            />
+                          )}
                           {isSelected && (
                             <View
                               style={[
@@ -611,7 +696,7 @@ export function AudioLanguageSheetModal({
                               {v.name}
                             </Text>
 
-                            {v.recommended && (
+                            {v.recommended && !v.isCustom && (
                               <View
                                 style={[
                                   styles.recommendedBadge,
@@ -638,8 +723,11 @@ export function AudioLanguageSheetModal({
                               styles.voiceSub,
                               { color: colors.textSecondary },
                             ]}>
-                            {currentLangLabel} •{' '}
-                            {v.gender === 'male' ? 'Male Voice' : 'Female Voice'}
+                            {v.isCustom
+                              ? 'Custom Voice'
+                              : `${currentLangLabel} • ${
+                                  v.gender === 'male' ? 'Male Voice' : 'Female Voice'
+                                }`}
                           </Text>
                         </View>
 
@@ -808,6 +896,18 @@ const styles = StyleSheet.create({
     gap: 8,
     height: 44,
     borderRadius: 10,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  diagonalStrike: {
+    position: 'absolute',
+    top: '50%',
+    left: '-20%',
+    right: '-20%',
+    height: 2,
+    marginTop: -1,
+    transform: [{ rotate: '-15deg' }],
+    zIndex: 10,
   },
   genderPillText: {
     fontSize: 14,
@@ -895,6 +995,7 @@ const styles = StyleSheet.create({
   voiceName: {
     fontSize: 15,
   },
+
   recommendedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
