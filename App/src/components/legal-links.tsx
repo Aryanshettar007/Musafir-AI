@@ -24,6 +24,7 @@ export interface LegalLinksProps {
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
   showIcon?: boolean;
+  children?: React.ReactNode;
 }
 
 export function LegalLinks({
@@ -31,6 +32,7 @@ export function LegalLinks({
   style,
   textStyle,
   showIcon = true,
+  children,
 }: LegalLinksProps) {
   const router = useRouter();
   const scheme = useColorScheme();
@@ -117,6 +119,8 @@ export function LegalLinks({
           />
         )}
       </Pressable>
+
+      {children}
     </View>
   );
 }
@@ -126,6 +130,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    flexWrap: 'wrap',
     gap: 8,
   },
   agreementContainer: {

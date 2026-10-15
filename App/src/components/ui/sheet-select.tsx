@@ -164,6 +164,7 @@ export interface MultiSelectRowProps {
   placeholder?: string;
   options: readonly string[] | readonly SelectOption[];
   onToggle: (value: string) => void;
+  onChangeValues?: (values: string[]) => void;
   title?: string;
   disabled?: boolean;
   showPills?: boolean;
@@ -177,6 +178,7 @@ export function MultiSelectRow({
   placeholder = 'Select',
   options,
   onToggle,
+  onChangeValues,
   title,
   disabled = false,
   showPills = true,
@@ -200,9 +202,45 @@ export function MultiSelectRow({
     primaryButtonText: isDark ? '#000000' : '#FFFFFF',
   };
 
+  const allOptionValues = formatted.map((opt) => opt.value);
+  const isAllSelected =
+    formatted.length > 0 && allOptionValues.every((val) => values.includes(val));
+
+  const handleToggleSelectAll = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (isAllSelected) {
+      if (onChangeValues) {
+        onChangeValues([]);
+      } else {
+        values.forEach((v) => onToggle(v));
+      }
+    } else {
+      if (onChangeValues) {
+        onChangeValues([...allOptionValues]);
+      } else {
+        allOptionValues.forEach((val) => {
+          if (!values.includes(val)) {
+            onToggle(val);
+          }
+        });
+      }
+    }
+  };
+
+  const handleClearAll = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (onChangeValues) {
+      onChangeValues([]);
+    } else {
+      values.forEach((v) => onToggle(v));
+    }
+  };
+
   const displayText =
     values.length === 0
       ? placeholder
+      : isAllSelected
+      ? `All selected (${values.length})`
       : `${values.length} selected`;
 
   return (
@@ -272,12 +310,78 @@ export function MultiSelectRow({
                   {title || label}
                 </Text>
                 <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
-                  {values.length} selected
+                  {isAllSelected
+                    ? `All ${formatted.length} selected`
+                    : values.length === 0
+                    ? `Choose your preferences`
+                    : `${values.length} of ${formatted.length} selected`}
                 </Text>
               </View>
               <Pressable hitSlop={12} onPress={() => setIsOpen(false)}>
                 <Ionicons name="close" size={20} color={colors.textPrimary} />
               </Pressable>
+            </View>
+
+            {/* Quick Actions: Select All / Clear */}
+            <View
+              style={[
+                styles.modalActionBar,
+                { borderBottomColor: colors.divider },
+              ]}>
+              <Pressable
+                onPress={handleToggleSelectAll}
+                hitSlop={6}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: isAllSelected }}
+                style={({ pressed }) => [
+                  styles.selectAllRow,
+                  pressed && { opacity: 0.65 },
+                ]}>
+                <View
+                  style={[
+                    styles.checkbox,
+                    {
+                      borderColor: isAllSelected
+                        ? colors.textPrimary
+                        : colors.textSecondary,
+                      backgroundColor: isAllSelected
+                        ? colors.textPrimary
+                        : 'transparent',
+                    },
+                  ]}>
+                  {isAllSelected && (
+                    <Ionicons
+                      name="checkmark"
+                      size={13}
+                      color={colors.primaryButtonText}
+                    />
+                  )}
+                </View>
+                <Text
+                  style={[
+                    styles.selectAllText,
+                    {
+                      color: colors.textPrimary,
+                      fontWeight: isAllSelected ? '600' : '500',
+                    },
+                  ]}>
+                  {isAllSelected ? 'Deselect All' : `Select All (${formatted.length})`}
+                </Text>
+              </Pressable>
+
+              {values.length > 0 && !isAllSelected && (
+                <Pressable
+                  onPress={handleClearAll}
+                  hitSlop={8}
+                  style={({ pressed }) => [
+                    styles.clearButton,
+                    pressed && { opacity: 0.65 },
+                  ]}>
+                  <Text style={[styles.clearButtonText, { color: colors.textSecondary }]}>
+                    Clear
+                  </Text>
+                </Pressable>
+              )}
             </View>
 
             <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
@@ -331,7 +435,9 @@ export function MultiSelectRow({
                 onPress={() => setIsOpen(false)}
                 style={[styles.modalDoneButton, { backgroundColor: colors.primaryButtonBg }]}>
                 <Text style={[styles.modalDoneButtonText, { color: colors.primaryButtonText }]}>
-                  Done ({values.length})
+                  {isAllSelected
+                    ? `Done (All ${values.length})`
+                    : `Done (${values.length})`}
                 </Text>
               </Pressable>
             </View>
@@ -549,6 +655,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  modalActionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  selectAllRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 4,
+  },
+  selectAllText: {
+    fontSize: 14,
+    letterSpacing: -0.1,
+  },
+  clearButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  clearButtonText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
   modalDoneButton: {
     height: 48,

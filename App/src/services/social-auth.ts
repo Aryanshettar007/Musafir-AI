@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import * as Crypto from 'expo-crypto';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   auth,
   GoogleAuthProvider,
@@ -68,16 +69,63 @@ export async function performAppleSignIn(): Promise<User> {
 
     const userCredential = await signInWithCredential(auth, credential);
 
-    // Apple only transmits the full name during the user's initial authorization
+    // Apple transmits the full name during the user's initial authorization
+    let appleName = '';
     if (appleCredential.fullName) {
-      const givenName = appleCredential.fullName.givenName || '';
-      const familyName = appleCredential.fullName.familyName || '';
-      const fullName = `${givenName} ${familyName}`.trim();
-      if (fullName && !userCredential.user.displayName) {
+      const parts = [
+        appleCredential.fullName.givenName,
+        appleCredential.fullName.middleName,
+        appleCredential.fullName.familyName,
+      ].filter(Boolean);
+      appleName = parts.join(' ').trim() || appleCredential.fullName.nickname || '';
+    }
+
+    if (appleName) {
+      try {
+        await AsyncStorage.setItem('@musafir_social_name', appleName);
+        await AsyncStorage.setItem('@musafir_apple_name', appleName);
+      } catch (storageErr) {
+        console.warn('[performAppleSignIn] Error caching Apple name:', storageErr);
+      }
+
+      try {
+        await updateProfile(userCredential.user, { displayName: appleName });
+      } catch (profileErr) {
+        console.warn('[performAppleSignIn] Error updating profile displayName:', profileErr);
+      }
+
+      try {
+        Object.defineProperty(userCredential.user, 'displayName', {
+          value: appleName,
+          configurable: true,
+          writable: true,
+        });
+      } catch {}
+    } else {
+      // Subsequent Apple sign-ins: Apple sends null for fullName.
+      // Check if userCredential has displayName, or fall back to cached Apple name
+      const fallbackName =
+        userCredential.user.displayName ||
+        (await AsyncStorage.getItem('@musafir_apple_name')) ||
+        (await AsyncStorage.getItem('@musafir_social_name'));
+
+      if (fallbackName && fallbackName.trim()) {
+        const cleanName = fallbackName.trim();
         try {
-          await updateProfile(userCredential.user, { displayName: fullName });
-        } catch {
-          // Non-critical: continue even if display name update fails
+          await AsyncStorage.setItem('@musafir_social_name', cleanName);
+        } catch {}
+
+        if (!userCredential.user.displayName) {
+          try {
+            await updateProfile(userCredential.user, { displayName: cleanName });
+          } catch {}
+          try {
+            Object.defineProperty(userCredential.user, 'displayName', {
+              value: cleanName,
+              configurable: true,
+              writable: true,
+            });
+          } catch {}
         }
       }
     }
@@ -110,6 +158,12 @@ export async function performGoogleSignIn(): Promise<User> {
         provider,
         browserPopupRedirectResolver
       );
+      if (userCredential.user.displayName) {
+        try {
+          await AsyncStorage.setItem('@musafir_social_name', userCredential.user.displayName);
+          await AsyncStorage.setItem('@musafir_google_name', userCredential.user.displayName);
+        } catch {}
+      }
       return userCredential.user;
     } catch (error: any) {
       if (error?.code === 'auth/popup-closed-by-user') {
@@ -163,6 +217,45 @@ export async function performGoogleSignIn(): Promise<User> {
 
     const credential = GoogleAuthProvider.credential(idToken);
     const userCredential = await signInWithCredential(auth, credential);
+
+    // Extract name from Google sign-in response
+    const googleUser =
+      response.type === 'success'
+        ? response.data?.user
+        : (response as any)?.data?.user || (response as any)?.user;
+
+    const googleName =
+      googleUser?.name ||
+      [googleUser?.givenName, googleUser?.familyName].filter(Boolean).join(' ').trim() ||
+      userCredential.user.displayName ||
+      '';
+
+    if (googleName && googleName.trim()) {
+      const cleanName = googleName.trim();
+      try {
+        await AsyncStorage.setItem('@musafir_social_name', cleanName);
+        await AsyncStorage.setItem('@musafir_google_name', cleanName);
+      } catch (storageErr) {
+        console.warn('[performGoogleSignIn] Error caching Google name:', storageErr);
+      }
+
+      if (!userCredential.user.displayName || userCredential.user.displayName !== cleanName) {
+        try {
+          await updateProfile(userCredential.user, { displayName: cleanName });
+        } catch (profileErr) {
+          console.warn('[performGoogleSignIn] Error updating displayName:', profileErr);
+        }
+      }
+
+      try {
+        Object.defineProperty(userCredential.user, 'displayName', {
+          value: cleanName,
+          configurable: true,
+          writable: true,
+        });
+      } catch {}
+    }
+
     return userCredential.user;
   } catch (error: any) {
     if (error?.message === 'Sign-in cancelled.') {

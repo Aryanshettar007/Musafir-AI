@@ -72,12 +72,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const refreshUser = (updatedUser?: User | null) => {
+    const target = updatedUser || auth.currentUser;
+    if (target) {
+      const cloned = Object.assign(
+        Object.create(Object.getPrototypeOf(target)),
+        target
+      ) as User;
+      setUser(cloned);
+    } else {
+      setUser(null);
+    }
+  };
+
   const signInWithGoogle = async (): Promise<User> => {
     setError(null);
     try {
       const { performGoogleSignIn } = await import('@/services/social-auth');
       const authedUser = await performGoogleSignIn();
-      setUser(authedUser);
+      refreshUser(authedUser);
       return authedUser;
     } catch (err: any) {
       if (err?.message !== 'Sign-in cancelled.') {
@@ -92,7 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { performAppleSignIn } = await import('@/services/social-auth');
       const authedUser = await performAppleSignIn();
-      setUser(authedUser);
+      refreshUser(authedUser);
       return authedUser;
     } catch (err: any) {
       if (err?.message !== 'Sign-in cancelled.') {
@@ -107,6 +120,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await signOut(auth);
       setUser(null);
+      try {
+        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+        await AsyncStorage.multiRemove([
+          '@musafir_social_name',
+          '@musafir_google_name',
+        ]);
+      } catch {}
     } catch (err) {
       const friendlyMessage = getFirebaseErrorMessage(err);
       setError(friendlyMessage);
