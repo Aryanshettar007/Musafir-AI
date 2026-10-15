@@ -12,7 +12,11 @@
       "icon": "./assets/images/ios-icon-default.png",
       "googleServicesFile": "./src/config/GoogleService-Info.plist",
       "infoPlist": {
-        "UIBackgroundModes": ["location", "audio"],
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": [
+          "location",
+          "audio"
+        ],
         "NSLocationWhenInUseUsageDescription": "Musafir AI uses your location to discover nearby travel highlights and trigger audio guides.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Musafir AI needs background location access to trigger audio stories automatically as you travel.",
         "NSMicrophoneUsageDescription": "Musafir AI needs microphone access so you can speak to the narrator, ask questions during your trip, and record audio samples to create your custom cloned voice.",
@@ -22,15 +26,27 @@
     "android": {
       "package": "com.musafir.app",
       "googleServicesFile": "./src/config/google-services.json",
-
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCJPd8b6s_DbW1sNxkbb7VwCuc7KjQJ8bo"
+        }
+      },
       "permissions": [
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_BACKGROUND_LOCATION",
-        "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_LOCATION",
-        "FOREGROUND_SERVICE_MEDIA_PLAYBACK",
-        "RECORD_AUDIO"
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE_LOCATION"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#FCF7ED",
@@ -39,7 +55,6 @@
       },
       "predictiveBackGestureEnabled": false
     },
-    
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
@@ -84,7 +99,11 @@
       "reactCompiler": true
     },
     "extra": {
-      "backendUrl": "http://192.168.1.30:3000"
+      "backendUrl": "https://musafir-ai.onrender.com",
+      "router": {},
+      "eas": {
+        "projectId": "edbad38a-f972-4542-bd2b-b8f90b8b1108"
+      }
     }
   }
 }
