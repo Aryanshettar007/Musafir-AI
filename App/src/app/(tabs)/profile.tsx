@@ -14,27 +14,26 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { updateProfile } from 'firebase/auth';
 
 import { ThemedView } from '@/components/themed-view';
 import { LegalLinks } from '@/components/legal-links';
 import { DeleteAccountModal } from '@/components/ui/delete-account-modal';
 import { AudioLanguageRow } from '@/components/ui/audio-language-sheet';
+import { MoodSelectRow } from '@/components/ui/mood-select-sheet';
 import {
   InputRow,
-  MultiSelectRow,
   SelectRow,
 } from '@/components/ui/sheet-select';
 import { auth } from '@/config/firebase';
 import {
   AGE_RANGES,
-  DEFAULT_INTERESTS,
   GENDERS,
-  INTERESTS,
 } from '@/constants/onboarding';
 import { BottomTabInset } from '@/constants/theme';
 import { useAuth } from '@/context/auth-context';
+import { usePreferences } from '@/context/preferences-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
   updateProfileOnBackend,
@@ -54,14 +53,21 @@ export default function ProfileScreen() {
   const scheme = useColorScheme();
   const isDark = scheme === 'dark';
 
+  // User Preferences (synced globally with Home Screen via PreferencesContext)
+  const {
+    preferredAudio,
+    voiceGender,
+    voice,
+    selectedMoods,
+    setAudioPreference,
+    setMoodPreferences,
+    refreshPreferences,
+  } = usePreferences();
+
   // Profile / Onboarding State
   const [name, setName] = useState('');
   const [gender, setGender] = useState('Male');
   const [age, setAge] = useState('');
-  const [preferredAudio, setPreferredAudio] = useState('English');
-  const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
-  const [voice, setVoice] = useState('Nalini');
-  const [interests, setInterests] = useState<string[]>([...DEFAULT_INTERESTS]);
 
   // UI state
   const [loadingInitial, setLoadingInitial] = useState(true);
@@ -71,6 +77,13 @@ export default function ProfileScreen() {
   const [isClearingCache, setIsClearingCache] = useState(false);
   const [offlineStorageText, setOfflineStorageText] = useState<string>('0 B');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  // Re-sync preferences on focus to ensure Profile stays 100% in sync with Home
+  useFocusEffect(
+    useCallback(() => {
+      refreshPreferences();
+    }, [refreshPreferences])
+  );
 
   // Load existing onboarding / profile data
   useEffect(() => {
@@ -84,10 +97,6 @@ export default function ProfileScreen() {
 
           if (data.gender) setGender(data.gender);
           if (data.age) setAge(mapAgeToRange(data.age));
-          if (data.preferredAudio) setPreferredAudio(mapLanguageToLabel(data.preferredAudio));
-          if (data.voiceGender) setVoiceGender(data.voiceGender);
-          if (data.voice) setVoice(data.voice);
-          if (Array.isArray(data.interests)) setInterests(normalizeInterestIds(data.interests));
         } else if (user?.displayName) {
           setName(user.displayName);
         }
@@ -98,12 +107,6 @@ export default function ProfileScreen() {
           if (backendRes.hasProfile && backendRes.profile) {
             const p = backendRes.profile;
             if (p.age !== undefined && p.age !== null) setAge(mapAgeToRange(p.age));
-            if (p.language) setPreferredAudio(mapLanguageToLabel(p.language));
-            if (p.voiceGender) setVoiceGender(p.voiceGender);
-            if (p.voice) setVoice(p.voice);
-            if (Array.isArray(p.interests) && p.interests.length > 0) {
-              setInterests(normalizeInterestIds(p.interests));
-            }
           }
         } catch {
           // Non-critical background sync
@@ -131,7 +134,7 @@ export default function ProfileScreen() {
         preferredAudio,
         voiceGender,
         voice,
-        interests,
+        interests: selectedMoods,
       };
 
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(profilePayload));
@@ -163,12 +166,7 @@ export default function ProfileScreen() {
     }
   };
 
-  // Toggle single interest in multi-select
-  const toggleInterest = (item: string) => {
-    setInterests((prev) =>
-      prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
-    );
-  };
+
 
   // Calculate storage usage on mount and after actions
   const refreshStorageUsage = useCallback(async () => {
@@ -382,24 +380,21 @@ export default function ProfileScreen() {
             />
 
             <AudioLanguageRow
-              label="Audio Language"
+              label="Audio Model"
               language={preferredAudio}
               voiceGender={voiceGender}
               voice={voice}
-              onConfirm={(sel) => {
-                setPreferredAudio(sel.language);
-                setVoiceGender(sel.voiceGender);
-                setVoice(sel.voice);
+              onConfirm={async (sel) => {
+                await setAudioPreference(sel);
               }}
             />
 
-            <MultiSelectRow
-              label="Interests"
-              title="Travel Interests"
-              values={interests}
-              options={INTERESTS}
-              onToggle={toggleInterest}
-              onChangeValues={setInterests}
+            <MoodSelectRow
+              label="Mood"
+              selectedMoods={selectedMoods}
+              onApply={async (moods) => {
+                await setMoodPreferences(moods);
+              }}
             />
 
             {/* Save Button */}

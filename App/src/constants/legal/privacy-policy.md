@@ -1,4 +1,4 @@
-**Last updated October 14, 2026**
+**Last updated October 15, 2026**
 
 This Privacy Notice for Musafir AI ("**we**," "**us**," or "**our**"), describes how and why we might access, collect, store, use, and/or share ("**process**") your personal information when you use our services ("**Services**"), including when you:
 
@@ -60,6 +60,8 @@ We collect personal information that you voluntarily provide to us when you regi
 * email addresses
 * passwords
 * location
+* photos and profile avatars (voluntarily selected and uploaded by you for custom voice avatars and profile personalization)
+* audio recordings and voice samples (voluntarily recorded or uploaded by you when using voice cloning features)
 * device local cache
 * travel profile
 * age range
@@ -71,6 +73,7 @@ We collect personal information that you voluntarily provide to us when you regi
 **Application Data.** If you use our application(s), we also may collect the following information if you choose to provide us with access or permission:
 
 * *Geolocation Information.* We may request access or permission to track location-based information from your mobile device, either continuously or while you are using our mobile application(s), to provide certain location-based services. If you wish to change our access or permissions, you may do so in your device's settings.
+* *Photos and Media.* If you choose to personalize a custom voice model with a custom avatar image, our application allows you to select a photo from your photo library. We only receive and access the specific photo that you explicitly pick and authorize; our application does not request or obtain access to your full photo library.
 
 This information is primarily needed to maintain the security and operation of our application(s), for troubleshooting, and for our internal analytics and reporting purposes.
 
@@ -89,6 +92,7 @@ We process your personal information for a variety of reasons, depending on how 
 
 * **To facilitate account creation and authentication and otherwise manage user accounts.** We may process your information so you can create and log in to your account, as well as keep your account in working order.
 * **To deliver and facilitate delivery of services to the user.** We may process your information to provide you with the requested service.
+* **To personalize custom voices and avatar displays.** We process your voluntarily uploaded photos and audio samples solely to generate custom voice embeddings, display your selected avatar, and personalize travel audio narrations for your account.
 
 ---
 

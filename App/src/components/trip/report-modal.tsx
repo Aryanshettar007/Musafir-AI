@@ -302,14 +302,6 @@ export function ReportModal({
               onChangeText={setDetails}
               maxLength={500}
             />
-
-            {/* Zero Tolerance Policy Notice (Apple & Google Play Compliance) */}
-            <View style={[styles.policyBox, { borderColor: colors.border }]}>
-              <Ionicons name="shield-checkmark" size={14} color="#34C759" />
-              <Text style={[styles.policyText, { color: colors.textSecondary }]}>
-                Musafir AI enforces zero tolerance for objectionable or abusive content. Reports are reviewed by human moderators within 24 hours.
-              </Text>
-            </View>
           </ScrollView>
 
           {/* Action Buttons */}

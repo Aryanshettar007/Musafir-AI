@@ -8,11 +8,6 @@ const memoryCache = new Map<string, string>();
  * Generate a deterministic local filename for an audio URL or key.
  */
 function getCacheFilename(url: string, key?: string): string {
-  if (key) {
-    const cleanKey = key.replace(/[^a-zA-Z0-9_-]/g, '_');
-    return `voice_demo_${cleanKey}.mp3`;
-  }
-
   // Strip query parameters
   const cleanUrl = url.split('?')[0];
   let hash = 0;
@@ -20,8 +15,15 @@ function getCacheFilename(url: string, key?: string): string {
     hash = (hash << 5) - hash + cleanUrl.charCodeAt(i);
     hash |= 0;
   }
+  const hashStr = Math.abs(hash).toString(36);
+
+  if (key) {
+    const cleanKey = key.replace(/[^a-zA-Z0-9_-]/g, '_');
+    return `voice_demo_${cleanKey}_${hashStr}.mp3`;
+  }
+
   const filename = cleanUrl.split('/').pop()?.replace(/[^a-zA-Z0-9._-]/g, '_') || 'demo.mp3';
-  return `voice_demo_${Math.abs(hash)}_${filename.endsWith('.mp3') ? filename : `${filename}.mp3`}`;
+  return `voice_demo_${hashStr}_${filename.endsWith('.mp3') ? filename : `${filename}.mp3`}`;
 }
 
 /**
@@ -37,8 +39,10 @@ export async function getCachedAudioUri(url: string, key?: string): Promise<stri
     return url;
   }
 
+  const memKey = key ? `${key}_${url}` : url;
+
   // 1. Check in-memory cache
-  const cachedUri = memoryCache.get(url);
+  const cachedUri = memoryCache.get(memKey);
   if (cachedUri) {
     try {
       const fileInfo = await FileSystem.getInfoAsync(cachedUri);
@@ -46,7 +50,7 @@ export async function getCachedAudioUri(url: string, key?: string): Promise<stri
         return cachedUri;
       }
     } catch {
-      memoryCache.delete(url);
+      memoryCache.delete(memKey);
     }
   }
 
@@ -64,14 +68,14 @@ export async function getCachedAudioUri(url: string, key?: string): Promise<stri
     // 3. Check if file is already stored on disk
     const fileInfo = await FileSystem.getInfoAsync(localTargetUri);
     if (fileInfo.exists && (fileInfo as any).size > 0) {
-      memoryCache.set(url, localTargetUri);
+      memoryCache.set(memKey, localTargetUri);
       return localTargetUri;
     }
 
     // 4. Download file temporarily to local cache
     const downloadResult = await FileSystem.downloadAsync(url, localTargetUri);
     if (downloadResult && downloadResult.status === 200 && downloadResult.uri) {
-      memoryCache.set(url, downloadResult.uri);
+      memoryCache.set(memKey, downloadResult.uri);
       return downloadResult.uri;
     }
   } catch (error) {

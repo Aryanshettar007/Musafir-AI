@@ -18,6 +18,7 @@ import { DownloadProgressIndicator } from './download-progress-indicator';
 import { SpotifyScrubber } from './spotify-scrubber';
 import { OscillatingText } from './oscillating-text';
 import { VoiceRecordButton, LiveResponseData } from './voice-record-button';
+import { AudioSettingsModal } from './audio-settings-modal';
 
 export interface TripBottomSheetProps {
   sheetHeight: Animated.Value;
@@ -61,6 +62,8 @@ export interface TripBottomSheetProps {
   isLiveLoading?: boolean;
   isLivePlaying?: boolean;
   onReportContent?: (item?: TripItem | null) => void;
+  pauseSystemMusic?: boolean;
+  onTogglePauseSystemMusic?: (val: boolean) => void;
 }
 
 export function TripBottomSheet({
@@ -93,8 +96,11 @@ export function TripBottomSheet({
   isLiveLoading = false,
   isLivePlaying = false,
   onReportContent,
+  pauseSystemMusic = false,
+  onTogglePauseSystemMusic,
 }: TripBottomSheetProps) {
   const [isTranscriptOpen, setIsTranscriptOpen] = useState(false);
+  const [isAudioSettingsOpen, setIsAudioSettingsOpen] = useState(false);
 
   const activeItem = playingItem || lastPlayedItem;
   const isPlayingActive = playingItem != null && isPlaying && !isPaused;
@@ -221,95 +227,112 @@ export function TripBottomSheet({
               isDark={isDark}
             />
 
-            {/* CONTROLS ROW (Sleek Uber / Apple style) */}
+            {/* CONTROLS ROW: setting, stop, pause/play, replay, mic in single container */}
             <View style={styles.controlsRow}>
-              {/* Centered Primary Controls: Stop, Play/Pause (Center), Reset */}
-              <View style={styles.centerControlsGroup}>
-                {/* Stop button */}
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.stopBtnCircle,
-                    {
-                      backgroundColor: colors.surface2,
-                      opacity: pressed ? 0.75 : 1,
-                    },
-                  ]}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    onStopPlaying();
-                  }}>
-                  <Ionicons name="stop" size={17} color={colors.text} />
-                </Pressable>
-
-                {/* Main Play / Pause Circle (EXACT SCREEN CENTER) */}
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.playPauseBtnCircle,
-                    {
-                      backgroundColor: isDark ? '#FFFFFF' : '#000000',
-                      opacity: pressed ? 0.85 : 1,
-                    },
-                  ]}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    onTogglePlayPause();
-                  }}>
-                  <Ionicons
-                    name={isPlayingActive ? 'pause' : 'play'}
-                    size={26}
-                    color={isDark ? '#000000' : '#FFFFFF'}
-                    style={{ marginLeft: isPlayingActive ? 0 : 2 }}
-                  />
-                </Pressable>
-
-                {/* Reset / Replay / Skip button */}
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.stopBtnCircle,
-                    {
-                      backgroundColor: colors.surface2,
-                      opacity: pressed ? 0.75 : 1,
-                    },
-                  ]}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    if (onSkipPlaying && queue.length > 0) {
-                      onSkipPlaying();
-                    } else {
-                      onSeek?.(0);
-                    }
-                  }}>
-                  <Ionicons
-                    name={queue.length > 0 ? 'play-skip-forward' : 'refresh'}
-                    size={17}
-                    color={colors.text}
-                  />
-                </Pressable>
-              </View>
-
-              {/* Voice Record Button on the extreme right */}
-              <View style={styles.extremeRightControl}>
-                <VoiceRecordButton
-                  colors={colors}
-                  isDark={isDark}
-                  size={44}
-                  tripId={trip.id}
-                  userLocation={userLocation}
-                  fallbackCoords={
-                    trip.origin.lat != null && trip.origin.lng != null
-                      ? { latitude: trip.origin.lat, longitude: trip.origin.lng }
-                      : null
-                  }
-                  onRecordingStart={() => {
-                    onStopPlaying();
-                    onLiveRecordingStart?.();
-                  }}
-                  onRecordingComplete={onVoiceRecordingComplete}
-                  onLiveResponse={onLiveResponse}
-                  isExternalLoading={isLiveLoading}
-                  isExternalPlaying={isLivePlaying}
+              {/* 1. Setting Button */}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.controlBtnCircle,
+                  {
+                    backgroundColor: colors.surface2,
+                    opacity: pressed ? 0.75 : 1,
+                  },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Audio Settings"
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setIsAudioSettingsOpen(true);
+                }}>
+                <Ionicons
+                  name="options-outline"
+                  size={19}
+                  color={colors.text}
                 />
-              </View>
+              </Pressable>
+
+              {/* 2. Stop Button */}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.controlBtnCircle,
+                  {
+                    backgroundColor: colors.surface2,
+                    opacity: pressed ? 0.75 : 1,
+                  },
+                ]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  onStopPlaying();
+                }}>
+                <Ionicons name="stop" size={17} color={colors.text} />
+              </Pressable>
+
+              {/* 3. Main Play / Pause Circle */}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.playPauseBtnCircle,
+                  {
+                    backgroundColor: isDark ? '#FFFFFF' : '#000000',
+                    opacity: pressed ? 0.85 : 1,
+                  },
+                ]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  onTogglePlayPause();
+                }}>
+                <Ionicons
+                  name={isPlayingActive ? 'pause' : 'play'}
+                  size={26}
+                  color={isDark ? '#000000' : '#FFFFFF'}
+                  style={{ marginLeft: isPlayingActive ? 0 : 2 }}
+                />
+              </Pressable>
+
+              {/* 4. Reset / Replay / Skip Button */}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.controlBtnCircle,
+                  {
+                    backgroundColor: colors.surface2,
+                    opacity: pressed ? 0.75 : 1,
+                  },
+                ]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  if (onSkipPlaying && queue.length > 0) {
+                    onSkipPlaying();
+                  } else {
+                    onSeek?.(0);
+                  }
+                }}>
+                <Ionicons
+                  name={queue.length > 0 ? 'play-skip-forward' : 'refresh'}
+                  size={17}
+                  color={colors.text}
+                />
+              </Pressable>
+
+              {/* 5. Voice Record Mic Button */}
+              <VoiceRecordButton
+                colors={colors}
+                isDark={isDark}
+                size={44}
+                tripId={trip.id}
+                userLocation={userLocation}
+                fallbackCoords={
+                  trip.origin.lat != null && trip.origin.lng != null
+                    ? { latitude: trip.origin.lat, longitude: trip.origin.lng }
+                    : null
+                }
+                onRecordingStart={() => {
+                  onStopPlaying();
+                  onLiveRecordingStart?.();
+                }}
+                onRecordingComplete={onVoiceRecordingComplete}
+                onLiveResponse={onLiveResponse}
+                isExternalLoading={isLiveLoading}
+                isExternalPlaying={isLivePlaying}
+              />
             </View>
 
             {/* SEPARATOR LINE */}
@@ -356,6 +379,31 @@ export function TripBottomSheet({
             <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
               Audio stories play automatically as you arrive at each spot along your route.
             </Text>
+            {/* Quick audio settings pill when waiting for stories */}
+            <Pressable
+              style={({ pressed }) => [
+                styles.emptyAudioSettingsPill,
+                {
+                  backgroundColor: colors.surface2,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.75 : 1,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Audio Settings"
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setIsAudioSettingsOpen(true);
+              }}>
+              <Ionicons
+                name="options-outline"
+                size={14}
+                color={pauseSystemMusic ? colors.accent : colors.textSecondary}
+              />
+              <Text style={[styles.emptyAudioSettingsText, { color: colors.textSecondary }]}>
+                Audio: {pauseSystemMusic ? 'Pause Music' : 'Lower Music'}
+              </Text>
+            </Pressable>
           </View>
         )}
 
@@ -402,6 +450,16 @@ export function TripBottomSheet({
 
         <View style={{ height: Platform.OS === 'ios' ? 44 : 28 }} />
       </ScrollView>
+
+      {/* ── AUDIO SETTINGS BOTTOM SHEET MODAL ── */}
+      <AudioSettingsModal
+        visible={isAudioSettingsOpen}
+        onDismiss={() => setIsAudioSettingsOpen(false)}
+        pauseSystemMusic={pauseSystemMusic}
+        onTogglePauseSystemMusic={(val) => onTogglePauseSystemMusic?.(val)}
+        colors={colors}
+        isDark={isDark}
+      />
     </Animated.View>
   );
 }
@@ -526,27 +584,15 @@ const styles = StyleSheet.create({
   },
   // Controls
   controlsRow: {
-    position: 'relative',
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     paddingVertical: 6,
+    paddingHorizontal: 2,
     minHeight: 62,
   },
-  centerControlsGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 24,
-  },
-  extremeRightControl: {
-    position: 'absolute',
-    right: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stopBtnCircle: {
+  controlBtnCircle: {
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -664,5 +710,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     letterSpacing: -0.2,
+  },
+  emptyAudioSettingsPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginTop: 8,
+  },
+  emptyAudioSettingsText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

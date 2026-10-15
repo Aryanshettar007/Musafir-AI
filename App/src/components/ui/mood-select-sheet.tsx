@@ -6,6 +6,8 @@ import {
   StyleSheet,
   Text,
   View,
+  StyleProp,
+  ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -209,7 +211,104 @@ export function MoodSelectSheetModal({
   );
 }
 
+export interface MoodSelectRowProps {
+  label?: string;
+  selectedMoods: string[];
+  onApply: (moods: string[]) => void;
+  disabled?: boolean;
+  hideDivider?: boolean;
+  style?: StyleProp<ViewStyle>;
+}
+
+export function MoodSelectRow({
+  label = 'Mood',
+  selectedMoods = [],
+  onApply,
+  disabled = false,
+  hideDivider = false,
+  style,
+}: MoodSelectRowProps) {
+  const scheme = useColorScheme();
+  const isDark = scheme === 'dark';
+  const [isOpen, setIsOpen] = useState(false);
+
+  const colors = {
+    textPrimary: isDark ? '#FFFFFF' : '#000000',
+    textSecondary: isDark ? '#A0A0A0' : '#6E6E6E',
+    divider: isDark ? '#1C1C1E' : '#EEEEEE',
+  };
+
+  const count = selectedMoods.length;
+  const displayText = count === 0 ? 'Select mood' : `${count} mood selected`;
+
+  return (
+    <>
+      <Pressable
+        disabled={disabled}
+        onPress={() => setIsOpen(true)}
+        style={({ pressed }) => [
+          styles.row,
+          !hideDivider && { borderBottomColor: colors.divider },
+          { opacity: disabled ? 0.5 : pressed ? 0.7 : 1 },
+          style,
+        ]}>
+        <Text style={[styles.rowLabel, { color: colors.textSecondary }]}>{label}</Text>
+        <View style={styles.rowInteractiveValue}>
+          <Text
+            style={[
+              styles.rowValueText,
+              { color: count > 0 ? colors.textPrimary : colors.textSecondary },
+            ]}
+            numberOfLines={1}
+            ellipsizeMode="tail">
+            {displayText}
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+        </View>
+      </Pressable>
+
+      <MoodSelectSheetModal
+        visible={isOpen}
+        onClose={() => setIsOpen(false)}
+        selectedMoods={selectedMoods}
+        onApply={(moods) => {
+          onApply(moods);
+          setIsOpen(false);
+        }}
+      />
+    </>
+  );
+}
+
 const styles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 15,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  rowLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+    width: 125,
+    flexShrink: 0,
+  },
+  rowInteractiveValue: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 6,
+    minWidth: 0,
+    marginLeft: 8,
+  },
+  rowValueText: {
+    fontSize: 15,
+    fontWeight: '500',
+    flexShrink: 1,
+    textAlign: 'right',
+  },
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',

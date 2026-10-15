@@ -27,6 +27,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/context/auth-context';
+import { usePreferences } from '@/context/preferences-context';
 import { darkMapStyle } from '@/constants/map-theme';
 import { api, BACKEND_URL } from '@/services/api';
 import {
@@ -179,11 +180,16 @@ export default function HomeScreen() {
   // Toggle view all recent destinations
   const [showAllDestinations, setShowAllDestinations] = useState<boolean>(false);
 
-  // User Audio Preferences & Mood
-  const [preferredAudio, setPreferredAudio] = useState<string>('English');
-  const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
-  const [voice, setVoice] = useState<string>('Nalini');
-  const [selectedMoods, setSelectedMoods] = useState<string[]>([...DEFAULT_INTERESTS]);
+  // User Audio Preferences & Mood (synced globally via PreferencesContext)
+  const {
+    preferredAudio,
+    voiceGender,
+    voice,
+    selectedMoods,
+    setAudioPreference,
+    setMoodPreferences,
+    refreshPreferences,
+  } = usePreferences();
   const [isAudioModalVisible, setIsAudioModalVisible] = useState<boolean>(false);
   const [isMoodModalVisible, setIsMoodModalVisible] = useState<boolean>(false);
   const [isLocationModalVisible, setIsLocationModalVisible] = useState<boolean>(false);
@@ -343,33 +349,13 @@ export default function HomeScreen() {
     loadRecentTrips(true);
   }, [loadRecentTrips]);
 
-  // Re-fetch fresh trips from backend whenever Home screen comes into focus
+  // Re-fetch fresh trips and refresh preferences whenever Home screen comes into focus
   useFocusEffect(
     useCallback(() => {
       loadRecentTrips(false);
-    }, [loadRecentTrips])
+      refreshPreferences();
+    }, [loadRecentTrips, refreshPreferences])
   );
-
-  // Load user audio preferences from local storage on mount
-  useEffect(() => {
-    async function loadAudioPreferences() {
-      try {
-        const raw = await AsyncStorage.getItem('@musafir_user_profile');
-        if (raw) {
-          const data = JSON.parse(raw);
-          if (data.preferredAudio) setPreferredAudio(mapLanguageToLabel(data.preferredAudio));
-          if (data.voiceGender) setVoiceGender(data.voiceGender);
-          if (data.voice) setVoice(data.voice);
-          if (data.interests && Array.isArray(data.interests) && data.interests.length > 0) {
-            setSelectedMoods(data.interests);
-          }
-        }
-      } catch {
-        // Non-critical background read
-      }
-    }
-    loadAudioPreferences();
-  }, []);
 
   // Expand bottom sheet when user focuses on either source or destination input
   const handleFocusField = useCallback(() => {
@@ -1581,25 +1567,8 @@ export default function HomeScreen() {
         initialGender={voiceGender}
         initialVoice={voice}
         onApply={async (selection) => {
-          setPreferredAudio(selection.language);
-          setVoiceGender(selection.voiceGender);
-          setVoice(selection.voice);
           setIsAudioModalVisible(false);
-
-          try {
-            const raw = await AsyncStorage.getItem('@musafir_user_profile');
-            const existing = raw ? JSON.parse(raw) : {};
-            const updated = {
-              ...existing,
-              preferredAudio: selection.language,
-              voiceGender: selection.voiceGender,
-              voice: selection.voice,
-            };
-            await AsyncStorage.setItem('@musafir_user_profile', JSON.stringify(updated));
-            updateProfileOnBackend(updated).catch(() => {});
-          } catch (err) {
-            console.warn('[HomeScreen] Failed to save updated audio preference:', err);
-          }
+          await setAudioPreference(selection);
         }}
       />
 
@@ -1609,21 +1578,8 @@ export default function HomeScreen() {
         onClose={() => setIsMoodModalVisible(false)}
         selectedMoods={selectedMoods}
         onApply={async (moods) => {
-          setSelectedMoods(moods);
           setIsMoodModalVisible(false);
-
-          try {
-            const raw = await AsyncStorage.getItem('@musafir_user_profile');
-            const existing = raw ? JSON.parse(raw) : {};
-            const updated = {
-              ...existing,
-              interests: moods,
-            };
-            await AsyncStorage.setItem('@musafir_user_profile', JSON.stringify(updated));
-            updateProfileOnBackend(updated).catch(() => {});
-          } catch (err) {
-            console.warn('[HomeScreen] Failed to save updated mood preferences:', err);
-          }
+          await setMoodPreferences(moods);
         }}
       />
 

@@ -327,6 +327,7 @@ export default function OnboardingScreen() {
                   placeholder="Select travel interests"
                   values={selectedInterests}
                   options={INTERESTS}
+                  showPills={false}
                   onToggle={toggleInterest}
                   onChangeValues={(newInterests) => {
                     setSelectedInterests(newInterests);

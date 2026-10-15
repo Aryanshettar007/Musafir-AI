@@ -27,6 +27,9 @@ function gatedClient() {
       await wait("stt");
       return { transcript: "hi" };
     },
+    async voiceCloneEmbeddings() {
+      return { embedding: "fake", shape: [1, 768], dtype: "torch.bfloat16" };
+    },
   };
   const release = async (label: string) => {
     // Let the queue reach the call first.
@@ -80,6 +83,7 @@ describe("createGnaniQueue", () => {
         return Buffer.from(text);
       },
       stt: async () => ({ transcript: "" }),
+      voiceCloneEmbeddings: async () => ({ embedding: "fake", shape: [1, 768], dtype: "torch.bfloat16" }),
     };
     const queue = createGnaniQueue(client, fast);
     const [a, b] = await Promise.all([queue.tts(tts("a"), { priority: "background" }), queue.tts(tts("b"), { priority: "background" })]);
@@ -95,6 +99,7 @@ describe("createGnaniQueue", () => {
         return Buffer.from(text);
       },
       stt: async () => ({ transcript: "" }),
+      voiceCloneEmbeddings: async () => ({ embedding: "fake", shape: [1, 768], dtype: "torch.bfloat16" }),
     };
     const queue = createGnaniQueue(client, { ...fast, attempts: 2 });
     const bad = queue.tts(tts("bad"), { priority: "background" });
@@ -111,6 +116,7 @@ describe("createGnaniQueue", () => {
         throw new UpstreamError("gnani", 400, "bad voice", false);
       },
       stt: async () => ({ transcript: "" }),
+      voiceCloneEmbeddings: async () => ({ embedding: "fake", shape: [1, 768], dtype: "torch.bfloat16" }),
     };
     await expect(createGnaniQueue(client, fast).tts(tts("x"), { priority: "interactive" })).rejects.toThrow("bad voice");
     expect(calls).toBe(1);

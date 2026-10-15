@@ -1,4 +1,4 @@
-**Last updated October 14, 2026**
+**Last updated October 15, 2026**
 
 ## AGREEMENT TO OUR LEGAL TERMS
 
@@ -140,6 +140,12 @@ We provide accessible in-app reporting mechanisms for users to flag any inapprop
 * **In-App Reporting Action:** Users can tap the "Report content" or flag action available directly below any story transcript or live narration card during their trip.
 * **Prompt Review:** All user reports are reviewed by our moderation team within twenty-four (24) hours.
 * **Enforcement:** Musafir AI reserves the right to immediately filter, modify, or remove any objectionable content, and to suspend or permanently terminate access for users who violate these policies.
+
+### User-Uploaded Media, Photos, and Audio Recordings
+When using profile customization or custom voice cloning features, you may optionally choose to upload a photo for your voice avatar and/or record or upload reference audio samples ("**User Media**").
+* You represent and warrant that you own or possess all necessary rights, licenses, and permissions to upload any photo, image, voice sample, or audio recording to the Services.
+* You agree not to upload any photograph, image, or audio recording that infringes upon the intellectual property, privacy, publicity, or other rights of any individual or entity, or that depicts objectionable, unlawful, or offensive material.
+* Uploaded photos and audio samples are collected and processed solely to render your voice profile avatar and generate speaker embeddings for custom audio narrations.
 
 ---
 

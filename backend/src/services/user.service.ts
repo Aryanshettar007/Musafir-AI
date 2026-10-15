@@ -29,7 +29,7 @@ export async function getProfile(identity: Identity): Promise<ProfileDto> {
 
 // PUT /me: onboarding. Creates the profile, or replaces it with `input` on top of defaults.
 export async function putProfile(identity: Identity, input: ProfileInput): Promise<{ profile: ProfileDto; created: boolean }> {
-  const profile = resolveProfile(null, input);
+  const profile = await resolveProfile(null, input, identity.uid);
   const result = await User.findOneAndUpdate(
     { firebaseUid: identity.uid },
     {
@@ -47,7 +47,7 @@ export async function putProfile(identity: Identity, input: ProfileInput): Promi
 export async function patchProfile(identity: Identity, input: ProfileInput): Promise<ProfileDto> {
   const existing = await User.findOne({ firebaseUid: identity.uid }).lean();
   if (!existing) throw profileNotFound();
-  const profile = resolveProfile(toProfile(existing), input);
+  const profile = await resolveProfile(toProfile(existing), input, identity.uid);
   const updated = await User.findOneAndUpdate(
     { firebaseUid: identity.uid },
     { $set: { ...profile, email: identity.email ?? existing.email } },

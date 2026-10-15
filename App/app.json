@@ -15,7 +15,8 @@
         "UIBackgroundModes": ["location", "audio"],
         "NSLocationWhenInUseUsageDescription": "Musafir AI uses your location to discover nearby travel highlights and trigger audio guides.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Musafir AI needs background location access to trigger audio stories automatically as you travel.",
-        "NSMicrophoneUsageDescription": "Musafir AI needs microphone access so you can speak to the narrator and ask questions during your trip."
+        "NSMicrophoneUsageDescription": "Musafir AI needs microphone access so you can speak to the narrator, ask questions during your trip, and record audio samples to create your custom cloned voice.",
+        "NSPhotoLibraryUsageDescription": "Musafir AI only accesses the photo you select to use as a profile picture for your custom voice."
       }
     },
     "android": {
@@ -70,7 +71,13 @@
         }
       ],
       "expo-apple-authentication",
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Musafir AI needs access to your photo library to let you select a profile picture for your custom voice."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

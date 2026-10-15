@@ -1,6 +1,6 @@
-import React from 'react';
 import {
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,19 +15,30 @@ import { ThemedView } from '@/components/themed-view';
 import { Colors, BottomTabInset } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { CREATOR_PACKS, CreatorPack } from '@/constants/creator-packs';
+import { VoiceCloneSection } from '@/components/explore/voice-clone-section';
+import { PartnerExperiencesSection } from '@/components/explore/partner-experiences-section';
 
 export default function ExploreScreen() {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
   const insets = useSafeAreaInsets();
 
-  // Handle Creator Pack preview tap (same as original Home behavior)
+  // Handle Creator Pack preview tap
   const handleCreatorPackPress = (pack: CreatorPack) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Alert.alert(
-      pack.title,
-      `Curated by ${pack.creatorName}\n${pack.storiesCount} geo-tagged audio stories • ${pack.duration}\n\nAudio stories will automatically trigger as you navigate along this route!`
-    );
+    const title = pack.title;
+    const message =
+      'Creator Economy & Voice Localization:\n\n' +
+      'Why this is important: Local creators, historians, and guides can publish and share their unique stories and heritage walks with road-trippers.\n\n' +
+      'Monetization: Musafir earns revenue through creator listing fees and story subscription revenue share.\n\n' +
+      'Multilingual AI Voice: Musafir translates and narrates the story in the user\'s preferred language, while cloning and maintaining the creator\'s own authentic voice.\n\n' +
+      '(Audio preview is currently locked pending creator voice licensing and publishing permissions.)';
+
+    if (Platform.OS === 'web') {
+      window.alert(`${title}\n\n${message}`);
+    } else {
+      Alert.alert(title, message);
+    }
   };
 
   return (
@@ -43,6 +54,12 @@ export default function ExploreScreen() {
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.text }]}>Explore</Text>
           </View>
+
+          {/* CUSTOM VOICE CLONE SECTION */}
+          <VoiceCloneSection />
+
+          {/* PARTNER TRAILS / BRAND EXPERIENCES (From DB with Map) */}
+          <PartnerExperiencesSection />
 
           {/* CREATOR PACKS SECTION (exact original design from Home) */}
           <View style={styles.creatorSection}>

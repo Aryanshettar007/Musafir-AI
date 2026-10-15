@@ -1,4 +1,5 @@
 import { api } from '@/services/api';
+import { buildApiUrl } from '@/config/api';
 
 export interface CatalogLanguage {
   id: string;
@@ -11,6 +12,8 @@ export interface VoiceModel {
   recommended: boolean;
   demoUrl: string | null;
   avatarUrl?: string | null;
+  isCustom?: boolean;
+  id?: string;
 }
 
 export interface CatalogInterest {
@@ -195,7 +198,10 @@ export async function fetchVoices(
 
     const res = await api.get<{ success: boolean; data: VoiceModel[] }>(url);
     if (Array.isArray(res?.data) && res.data.length > 0) {
-      return res.data;
+      return res.data.map((v) => ({
+        ...v,
+        demoUrl: v.demoUrl && v.demoUrl.startsWith('/') ? buildApiUrl(v.demoUrl) : v.demoUrl,
+      }));
     }
   } catch (err) {
     console.warn('[CatalogService] Failed to fetch voices from backend, using fallback:', err);

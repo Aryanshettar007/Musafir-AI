@@ -59,6 +59,7 @@ const startServer = async () => {
     const app = createApp({
       verifyIdToken: firebaseTokenVerifier(env.FIREBASE_PROJECT_ID),
       storage,
+      gnani,
       corsOrigins: env.CORS_ORIGINS?.split(",").map((o) => o.trim()).filter(Boolean),
       routers: [
         ...tripRouters({

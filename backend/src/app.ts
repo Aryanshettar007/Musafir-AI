@@ -2,6 +2,9 @@ import cors from "cors";
 import express, { type Application, type Request, type Response, type Router } from "express";
 import type { VerifyIdToken } from "./clients/firebase";
 import type { Storage } from "./clients/storage";
+import type { GnaniService } from "./clients/gnaniQueue";
+import { getCustomVoiceDemoHandler } from "./controllers/customVoice.controller";
+import { getSponsorsHandler } from "./controllers/sponsor.controller";
 import { requireAuth } from "./middleware/auth";
 import { errorHandler, notFoundHandler } from "./middleware/error";
 import { catalogRoutes } from "./routes/catalog.routes";
@@ -11,13 +14,14 @@ import { reportsRouter } from "./routes/reports.routes";
 export interface AppOptions {
   verifyIdToken: VerifyIdToken;
   storage: Storage;
+  gnani?: GnaniService;
   corsOrigins?: string[];
   // Feature routers, mounted behind auth after the built-in routes. Multipart parsing (multer) is per route.
   routers?: Array<{ path: string; router: Router }>;
 }
 
 // Builds the Express app without connecting to anything, so tests can pass a fake token verifier.
-export function createApp({ verifyIdToken, storage, corsOrigins, routers }: AppOptions): Application {
+export function createApp({ verifyIdToken, storage, gnani, corsOrigins, routers }: AppOptions): Application {
   const app = express();
 
   app.use(cors(corsOrigins?.length ? { origin: corsOrigins } : undefined));
@@ -45,9 +49,17 @@ export function createApp({ verifyIdToken, storage, corsOrigins, routers }: AppO
     app.use("/files", express.static(storage.localRoot));
   }
 
+  if (gnani) {
+    // Public voice demo clip route for custom voice multilingual previews
+    app.get("/voices/custom/:id/demo", getCustomVoiceDemoHandler({ storage, gnani }));
+  }
+
+  // Active brand partners & sponsors
+  app.get("/sponsors", getSponsorsHandler);
+
   // Everything below needs a Firebase ID token. Sign-up and login happen in the app against Firebase directly.
   app.use(requireAuth(verifyIdToken));
-  app.use(catalogRoutes(storage));
+  app.use(catalogRoutes(storage, gnani));
   app.use("/me", meRoutes);
   app.use("/reports", reportsRouter());
   for (const { path, router } of routers ?? []) app.use(path, router);

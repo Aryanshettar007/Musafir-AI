@@ -19,7 +19,13 @@ import {
   requestRecordingPermissionsAsync,
   getRecordingPermissionsAsync,
   setAudioModeAsync,
+  type RecordingOptions,
 } from 'expo-audio';
+
+const VOICE_RECORDING_PRESET: RecordingOptions = {
+  ...RecordingPresets.HIGH_QUALITY,
+  numberOfChannels: 1, // Mono channel to match phone/hardware mic
+};
 
 import { askMusafir, AskHistoryTurn } from '@/services/trip-service';
 import { PermissionModal } from '@/components/permission-modal';
@@ -77,8 +83,8 @@ export function VoiceRecordButton({
   isExternalPlaying = false,
   disabled = false,
 }: VoiceRecordButtonProps) {
-  // Recorder from expo-audio (high-quality m4a/aac)
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  // Recorder from expo-audio (high-quality mono m4a/aac)
+  const recorder = useAudioRecorder(VOICE_RECORDING_PRESET);
 
   // States: 'idle' | 'recording' | 'loading' | 'playing'
   const [buttonState, setButtonState] = useState<'idle' | 'recording' | 'loading' | 'playing'>('idle');
@@ -468,7 +474,12 @@ export function VoiceRecordButton({
       });
 
       // 5. Prepare and begin recording
-      await recorder.prepareToRecordAsync();
+      try {
+        await recorder.prepareToRecordAsync(VOICE_RECORDING_PRESET);
+      } catch (prepareErr) {
+        console.warn('[VoiceRecordButton] Retrying prepareToRecordAsync with default:', prepareErr);
+        await recorder.prepareToRecordAsync();
+      }
       recorder.record();
       recorderReadyRef.current = true;
 
@@ -493,9 +504,13 @@ export function VoiceRecordButton({
           stopRecordingAndSubmit();
         }
       }, 500);
-    } catch (err) {
+    } catch (err: any) {
       console.warn('[VoiceRecordButton] Error starting recording:', err);
       resetToIdle();
+      Alert.alert(
+        'Recording Error',
+        err?.message || 'Could not start recording. If using the iOS Simulator, enable microphone in Simulator > I/O > Audio Input.'
+      );
     }
   }, [
     micOpacityAnim,
