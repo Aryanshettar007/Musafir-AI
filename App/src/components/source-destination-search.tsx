@@ -104,10 +104,14 @@ export const SourceDestinationSearch = forwardRef<
   };
 
   const [activeField, setActiveField] = useState<'source' | 'destination' | null>(null);
+  const [isSourceFocused, setIsSourceFocused] = useState<boolean>(false);
+  const [isDestinationFocused, setIsDestinationFocused] = useState<boolean>(false);
   const [autocompleteResults, setAutocompleteResults] = useState<PlaceSuggestion[]>([]);
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [cardHeight, setCardHeight] = useState<number>(104);
 
+  const sourceInputRef = useRef<TextInput>(null);
+  const destinationInputRef = useRef<TextInput>(null);
   const autocompleteSessionToken = useRef<string>(Crypto.randomUUID());
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -118,6 +122,8 @@ export const SourceDestinationSearch = forwardRef<
   const dismissSuggestions = useCallback(() => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     setActiveField(null);
+    setIsSourceFocused(false);
+    setIsDestinationFocused(false);
     setAutocompleteResults([]);
     setIsSearching(false);
   }, []);
@@ -180,6 +186,7 @@ export const SourceDestinationSearch = forwardRef<
   );
 
   const handleSourceFocus = useCallback(() => {
+    setIsSourceFocused(true);
     refreshSessionToken();
     setActiveField('source');
     onFocusField?.('source');
@@ -188,7 +195,12 @@ export const SourceDestinationSearch = forwardRef<
     }
   }, [refreshSessionToken, onFocusField, sourcePoint.text, sourcePoint.isGps, triggerSearch]);
 
+  const handleSourceBlur = useCallback(() => {
+    setIsSourceFocused(false);
+  }, []);
+
   const handleDestinationFocus = useCallback(() => {
+    setIsDestinationFocused(true);
     refreshSessionToken();
     setActiveField('destination');
     onFocusField?.('destination');
@@ -196,6 +208,10 @@ export const SourceDestinationSearch = forwardRef<
       triggerSearch(destinationPoint.text, 'destination');
     }
   }, [refreshSessionToken, onFocusField, destinationPoint.text, destinationPoint.isGps, triggerSearch]);
+
+  const handleDestinationBlur = useCallback(() => {
+    setIsDestinationFocused(false);
+  }, []);
 
   const handleSelectSuggestion = useCallback(
     (suggestion: PlaceSuggestion) => {
@@ -206,6 +222,8 @@ export const SourceDestinationSearch = forwardRef<
       } else {
         onSelectDestinationSuggestion(suggestion);
       }
+      setIsSourceFocused(false);
+      setIsDestinationFocused(false);
       dismissSuggestions();
       refreshSessionToken();
     },
@@ -220,16 +238,20 @@ export const SourceDestinationSearch = forwardRef<
 
   const handleClearSourceInternal = useCallback(() => {
     dismissSuggestions();
+    setIsSourceFocused(false);
     onClearSource();
   }, [dismissSuggestions, onClearSource]);
 
   const handleClearDestinationInternal = useCallback(() => {
     dismissSuggestions();
+    setIsDestinationFocused(false);
     onClearDestination();
   }, [dismissSuggestions, onClearDestination]);
 
   const handleSwapInternal = useCallback(() => {
     dismissSuggestions();
+    setIsSourceFocused(false);
+    setIsDestinationFocused(false);
     onSwapLocations();
   }, [dismissSuggestions, onSwapLocations]);
 
@@ -252,16 +274,45 @@ export const SourceDestinationSearch = forwardRef<
         <View style={styles.inputsColumn}>
           {/* SOURCE / STARTING LOCATION ROW */}
           <View style={styles.inputRow}>
-            <TextInput
-              style={[styles.textInput, { color: colors.text }]}
-              value={sourcePoint.text}
-              onChangeText={handleSourceChange}
-              onFocus={handleSourceFocus}
-              placeholder="Choose starting point"
-              placeholderTextColor={colors.placeholder}
-              returnKeyType="next"
-              autoCapitalize="words"
-            />
+            <View style={styles.inputContainer}>
+              <TextInput
+                ref={sourceInputRef}
+                style={[styles.textInput, { color: colors.text }]}
+                value={sourcePoint.text}
+                onChangeText={handleSourceChange}
+                onFocus={handleSourceFocus}
+                onBlur={handleSourceBlur}
+                placeholder="Choose starting point"
+                placeholderTextColor={colors.placeholder}
+                returnKeyType="next"
+                autoCapitalize="words"
+                onSubmitEditing={() => destinationInputRef.current?.focus()}
+                selection={
+                  !isSourceFocused && Platform.OS === 'android'
+                    ? { start: 0, end: 0 }
+                    : undefined
+                }
+              />
+              {!isSourceFocused && sourcePoint.text.length > 0 && (
+                <Pressable
+                  style={[
+                    StyleSheet.absoluteFill,
+                    styles.overlayContainer,
+                    { backgroundColor: colors.surfaceAlt },
+                  ]}
+                  onPress={() => {
+                    setIsSourceFocused(true);
+                    sourceInputRef.current?.focus();
+                  }}>
+                  <Text
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                    style={[styles.textInput, styles.overlayText, { color: colors.text }]}>
+                    {sourcePoint.text}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
             {isSearching && activeField === 'source' && (
               <ActivityIndicator size="small" color={colors.accent} style={{ marginLeft: 6 }} />
             )}
@@ -291,16 +342,49 @@ export const SourceDestinationSearch = forwardRef<
 
           {/* DESTINATION / WHERE TO ROW */}
           <View style={styles.inputRow}>
-            <TextInput
-              style={[styles.textInput, styles.destinationInputText, { color: colors.text }]}
-              value={destinationPoint.text}
-              onChangeText={handleDestinationChange}
-              onFocus={handleDestinationFocus}
-              placeholder="Where to?"
-              placeholderTextColor={colors.placeholder}
-              returnKeyType="search"
-              autoCapitalize="words"
-            />
+            <View style={styles.inputContainer}>
+              <TextInput
+                ref={destinationInputRef}
+                style={[styles.textInput, styles.destinationInputText, { color: colors.text }]}
+                value={destinationPoint.text}
+                onChangeText={handleDestinationChange}
+                onFocus={handleDestinationFocus}
+                onBlur={handleDestinationBlur}
+                placeholder="Where to?"
+                placeholderTextColor={colors.placeholder}
+                returnKeyType="search"
+                autoCapitalize="words"
+                selection={
+                  !isDestinationFocused && Platform.OS === 'android'
+                    ? { start: 0, end: 0 }
+                    : undefined
+                }
+              />
+              {!isDestinationFocused && destinationPoint.text.length > 0 && (
+                <Pressable
+                  style={[
+                    StyleSheet.absoluteFill,
+                    styles.overlayContainer,
+                    { backgroundColor: colors.surfaceAlt },
+                  ]}
+                  onPress={() => {
+                    setIsDestinationFocused(true);
+                    destinationInputRef.current?.focus();
+                  }}>
+                  <Text
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                    style={[
+                      styles.textInput,
+                      styles.destinationInputText,
+                      styles.overlayText,
+                      { color: colors.text },
+                    ]}>
+                    {destinationPoint.text}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
             {isSearching && activeField === 'destination' && (
               <ActivityIndicator size="small" color={colors.accent} style={{ marginLeft: 6 }} />
             )}
@@ -472,11 +556,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     minHeight: 36,
   },
-  textInput: {
+  inputContainer: {
     flex: 1,
+    justifyContent: 'center',
+    position: 'relative',
+    minHeight: 36,
+  },
+  overlayContainer: {
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  overlayText: {
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  },
+  textInput: {
+    width: '100%',
     fontSize: 15,
     fontWeight: '500',
     paddingVertical: 2,
+    paddingHorizontal: 0,
+    margin: 0,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   destinationInputText: {
     fontWeight: '600',
