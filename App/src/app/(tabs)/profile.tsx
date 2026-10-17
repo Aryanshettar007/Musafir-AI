@@ -19,7 +19,6 @@ import { updateProfile } from 'firebase/auth';
 
 import { ThemedView } from '@/components/themed-view';
 import { LegalLinks } from '@/components/legal-links';
-import { DeleteAccountModal } from '@/components/ui/delete-account-modal';
 import { AudioLanguageRow } from '@/components/ui/audio-language-sheet';
 import { MoodSelectRow } from '@/components/ui/mood-select-sheet';
 import {
@@ -76,7 +75,6 @@ export default function ProfileScreen() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isClearingCache, setIsClearingCache] = useState(false);
   const [offlineStorageText, setOfflineStorageText] = useState<string>('0 B');
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   // Re-sync preferences on focus to ensure Profile stays 100% in sync with Home
   useFocusEffect(
@@ -84,55 +82,6 @@ export default function ProfileScreen() {
       refreshPreferences();
     }, [refreshPreferences])
   );
-
-  // Sync /profile/delete-account URL on web when modal opens/closes
-  useEffect(() => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      if (window.location.pathname.endsWith('/delete-account')) {
-        setShowDeleteModal(true);
-      }
-
-      const handlePopState = () => {
-        if (window.location.pathname.endsWith('/delete-account')) {
-          setShowDeleteModal(true);
-        } else {
-          setShowDeleteModal(false);
-        }
-      };
-
-      window.addEventListener('popstate', handlePopState);
-      return () => {
-        window.removeEventListener('popstate', handlePopState);
-      };
-    }
-  }, []);
-
-  const handleOpenDeleteModal = () => {
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch {}
-    setShowDeleteModal(true);
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      window.history.pushState(null, '', '/profile/delete-account');
-    }
-  };
-
-  const handleCloseDeleteModal = () => {
-    setShowDeleteModal(false);
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      if (window.location.pathname.includes('/delete-account')) {
-        window.history.pushState(null, '', '/profile');
-      }
-    }
-  };
-
-  const handleDeleteSuccess = () => {
-    setShowDeleteModal(false);
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      window.history.replaceState(null, '', '/profile');
-    }
-    router.replace('/(auth)/login');
-  };
 
   // Load existing onboarding / profile data
   useEffect(() => {
@@ -542,7 +491,12 @@ export default function ProfileScreen() {
                 <LegalLinks variant="compact">
                   <Text style={[styles.bullet, { color: isDark ? '#48484A' : '#C7C7CC' }]}>•</Text>
                   <Pressable
-                    onPress={handleOpenDeleteModal}
+                    onPress={() => {
+                      try {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      } catch {}
+                      router.push('/profile/delete-account' as any);
+                    }}
                     accessibilityRole="button"
                     accessibilityLabel="Delete Account"
                     hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
@@ -561,13 +515,6 @@ export default function ProfileScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-
-      {/* Delete Account Modal */}
-      <DeleteAccountModal
-        visible={showDeleteModal}
-        onClose={handleCloseDeleteModal}
-        onSuccess={handleDeleteSuccess}
-      />
     </ThemedView>
   );
 }
