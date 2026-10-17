@@ -7,3 +7,23 @@
   --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif;
   --font-serif: Georgia, 'Times New Roman', serif;
 }
+
+/* Remove default browser focus outline on web inputs and textareas */
+input,
+textarea,
+select,
+button,
+[contenteditable] {
+  outline: none !important;
+  -webkit-tap-highlight-color: transparent;
+}
+
+input:focus,
+textarea:focus,
+select:focus,
+button:focus,
+[contenteditable]:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+

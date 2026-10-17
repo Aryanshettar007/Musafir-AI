@@ -4,6 +4,8 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useColorScheme } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import '@/global.css';
+
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { AuthProvider } from '@/context/auth-context';
 import { PreferencesProvider } from '@/context/preferences-context';

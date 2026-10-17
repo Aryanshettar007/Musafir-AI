@@ -15,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 import Markdown, { RenderRules } from 'react-native-markdown-display';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAuth } from '@/context/auth-context';
 import PRIVACY_POLICY_MD from '@/constants/legal/privacy-policy.md';
 
 function extractNodeText(node: any): string {
@@ -28,6 +29,7 @@ function extractNodeText(node: any): string {
 
 export default function PrivacyPolicyScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme();
   const isDark = scheme === 'dark';
@@ -52,7 +54,7 @@ export default function PrivacyPolicyScreen() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace('/(tabs)');
+      router.replace(user ? '/(tabs)' : '/(auth)/login');
     }
   };
 

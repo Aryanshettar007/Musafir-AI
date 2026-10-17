@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Platform,
   StyleSheet,
   TextInput,
   View,
@@ -128,6 +129,7 @@ const styles = StyleSheet.create({
     height: '100%',
     fontSize: 14,
     paddingVertical: 0,
+    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none', outlineWidth: 0 } as any) : {}),
   },
   toggleButton: {
     paddingHorizontal: 6,
