@@ -493,7 +493,12 @@ export default function ProfileScreen() {
                 <LegalLinks variant="compact">
                   <Text style={[styles.bullet, { color: isDark ? '#48484A' : '#C7C7CC' }]}>•</Text>
                   <Pressable
-                    onPress={() => setShowDeleteModal(true)}
+                    onPress={() => {
+                      try {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      } catch {}
+                      router.push('/profile/delete-account' as any);
+                    }}
                     accessibilityRole="button"
                     accessibilityLabel="Delete Account"
                     hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}

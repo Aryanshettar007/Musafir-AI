@@ -38,6 +38,10 @@ export default function RootLayout() {
               name="terms"
               options={{ headerShown: false, presentation: 'modal' }}
             />
+            <Stack.Screen
+              name="profile/delete-account"
+              options={{ headerShown: false, presentation: 'card' }}
+            />
           </Stack>
           </PreferencesProvider>
         </AuthProvider>
