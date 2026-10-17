@@ -9,7 +9,16 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_BACKEND_URL": "https://musafir-ai.onrender.com",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyB0NiplKvhn1Sc01qEt6ox4gA5wjlbPi-g",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "623421286127-84e7pp3ni6h0gorfsqs29j29e5sptdle.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "623421286127-c5m9bv8ba366qm9l5arcml15d2bqrftp.apps.googleusercontent.com"
+      }
     },
     "production": {
       "autoIncrement": true,

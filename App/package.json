@@ -59,7 +59,16 @@
     "ios:physical": "expo run:ios --device",
     "ios:fast": "expo start --dev-client",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "build": "expo export -p web",
+    "build:web": "expo export -p web",
+    "lint": "expo lint",
+    "build:android": "npx eas build --platform android --profile production",
+    "build:android:preview": "npx eas build --platform android --profile preview",
+    "build:ios": "npx eas build --platform ios --profile production",
+    "build:ios:preview": "npx eas build --platform ios --profile preview",
+    "build:all": "npx eas build --platform all --profile production",
+    "submit:android": "npx eas submit --platform android",
+    "submit:ios": "npx eas submit --platform ios"
   },
   "private": true
 }

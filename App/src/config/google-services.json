@@ -7,17 +7,25 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:623421286127:android:d3c49764ab8b840d649d1a",
+        "mobilesdk_app_id": "1:623421286127:android:8c04e8ee776961ac649d1a",
         "android_client_info": {
-          "package_name": "com.musafir.app"
+          "package_name": "com.musafir_ai.app"
         }
       },
       "oauth_client": [
         {
-          "client_id": "623421286127-malqrok1hg6p5stn1h3u99hbhn710o8h.apps.googleusercontent.com",
+          "client_id": "623421286127-83ciaop8nl73qk0o9nckhqqeahnpi69h.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.musafir.app",
+            "package_name": "com.musafir_ai.app",
+            "certificate_hash": "530d8d651bcfc75c4de0a58097c83fbcf8f5eb34"
+          }
+        },
+        {
+          "client_id": "623421286127-ftfgbas172cist0g2dd2u72e1295g4dg.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.musafir_ai.app",
             "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
           }
         },
