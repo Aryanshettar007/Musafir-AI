@@ -6,6 +6,7 @@ import { UpstreamError } from "../../clients/upstream";
 import { AppError, notFound } from "../../errors";
 import type { LatLng } from "../../geo";
 import { checkScript, narrate } from "../../speech";
+import { convertToMp3 } from "../../utils/audioConverter";
 import { getProfile, type Identity } from "../user.service";
 import { inspectAudio } from "./audio";
 import {
@@ -86,8 +87,20 @@ export function createAskService(deps: AskDeps): AskService {
       } else {
         const info = await inspectAudio(req.question.audio);
         const t = now();
+        let audio = req.question.audio;
+        let filename = info.filename;
+        let mimeType = info.mimeType;
+
+        // Gnani STT only supports: aac, ogg, wav, m4a, flac, mp3.
+        // Web browsers record webm (opus), so convert webm to mp3 before calling Gnani STT.
+        if (info.mimeType === "audio/webm" || info.filename.endsWith(".webm")) {
+          audio = await convertToMp3(req.question.audio);
+          filename = "question.mp3";
+          mimeType = "audio/mpeg";
+        }
+
         const stt = await deps.gnani.stt(
-          { audio: req.question.audio, filename: info.filename, mimeType: info.mimeType, languageCode: sttLanguage(language) },
+          { audio, filename, mimeType, languageCode: sttLanguage(language) },
           { priority: "interactive" },
         );
         sttMs = now() - t;

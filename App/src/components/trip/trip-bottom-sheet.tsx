@@ -86,6 +86,7 @@ export function TripBottomSheet({
   onTogglePlayPause,
   onStopPlaying,
   downloads,
+  played = {},
   queue = [],
   onSkipPlaying,
   onExitSession,
@@ -102,7 +103,11 @@ export function TripBottomSheet({
   const [isTranscriptOpen, setIsTranscriptOpen] = useState(false);
   const [isAudioSettingsOpen, setIsAudioSettingsOpen] = useState(false);
 
-  const activeItem = playingItem || lastPlayedItem;
+  const firstAudioItem =
+    trip.items.find((i) => i.status === 'ready' && i.audio?.url) ||
+    trip.items.find((i) => i.audio?.url) ||
+    trip.items[0];
+  const activeItem = playingItem || lastPlayedItem || firstAudioItem;
   const isPlayingActive = playingItem != null && isPlaying && !isPaused;
 
   const downloadedCount = readyItems.reduce(
@@ -209,12 +214,20 @@ export function TripBottomSheet({
                 {itemTypeLabel[activeItem.type] ?? activeItem.type}
                 {activeItem.audio?.durationS ? ` · ${formatAudioDuration(activeItem.audio.durationS)}` : ''}
               </Text>
-              {!isPlayingActive && lastPlayedItem?.id === activeItem.id && (
-                <View style={[styles.recentlyPlayedBadge, { backgroundColor: colors.surface2 }]}>
-                  <Text style={[styles.recentlyPlayedText, { color: colors.textSecondary }]}>
-                    Recently Played
-                  </Text>
-                </View>
+              {!isPlayingActive && activeItem && (
+                played[activeItem.id] ? (
+                  <View style={[styles.recentlyPlayedBadge, { backgroundColor: colors.surface2 }]}>
+                    <Text style={[styles.recentlyPlayedText, { color: colors.textSecondary }]}>
+                      Recently Played
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={[styles.recentlyPlayedBadge, { backgroundColor: colors.surface2 }]}>
+                    <Text style={[styles.recentlyPlayedText, { color: colors.accent }]}>
+                      Ready to Play
+                    </Text>
+                  </View>
+                )
               )}
             </View>
 

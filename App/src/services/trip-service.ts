@@ -344,6 +344,9 @@ export async function askMusafir(params: AskParams): Promise<AskResult> {
       if (Platform.OS === 'web') {
         const res = await fetch(params.audioUri);
         const blob = await res.blob();
+        if (blob.size === 0) {
+          throw new Error("Recorded audio was empty. Please speak again.");
+        }
         audioBase64 = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onloadend = () => {

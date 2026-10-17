@@ -153,12 +153,20 @@ export interface MapViewProps {
   [key: string]: any;
 }
 
+const DEFAULT_FALLBACK_LAT = 12.9716;
+const DEFAULT_FALLBACK_LNG = 77.5946;
+
 export const MapView = forwardRef<any, MapViewProps>((props, ref) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [mapInstance, setMapInstance] = useState<any | null>(null);
   const [mapsApi, setMapsApi] = useState<any | null>(null);
   const [authError, setAuthError] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
+
+  // Synchronous refs for imperative calls that arrive before async Google Maps SDK finishes loading
+  const mapInstanceRef = useRef<any | null>(null);
+  const mapsApiRef = useRef<any | null>(null);
+  const pendingActionRef = useRef<(() => void) | null>(null);
 
   const scheme = useColorScheme();
   const isDark = scheme === 'dark';
@@ -192,9 +200,10 @@ export const MapView = forwardRef<any, MapViewProps>((props, ref) => {
         if (!isMounted || !containerRef.current || !googleMaps) return;
 
         setMapsApi(googleMaps);
+        mapsApiRef.current = googleMaps;
 
-        const initialLat = props.region?.latitude ?? props.initialRegion?.latitude ?? 28.6139;
-        const initialLng = props.region?.longitude ?? props.initialRegion?.longitude ?? 77.209;
+        const initialLat = props.region?.latitude ?? props.initialRegion?.latitude ?? DEFAULT_FALLBACK_LAT;
+        const initialLng = props.region?.longitude ?? props.initialRegion?.longitude ?? DEFAULT_FALLBACK_LNG;
         const initialZoom = deltaToZoom(
           props.region?.latitudeDelta ?? props.initialRegion?.latitudeDelta ?? 0.05,
           props.region?.longitudeDelta ?? props.initialRegion?.longitudeDelta ?? 0.05
@@ -240,8 +249,30 @@ export const MapView = forwardRef<any, MapViewProps>((props, ref) => {
           }
         });
 
+        mapInstanceRef.current = map;
         setMapInstance(map);
         setLoading(false);
+
+        // Execute any pending action that arrived before Google Maps SDK finished loading
+        if (pendingActionRef.current) {
+          try {
+            pendingActionRef.current();
+          } catch (e) {
+            console.warn('[react-native-maps.web] Error executing pending map action:', e);
+          }
+          pendingActionRef.current = null;
+        } else if (!props.region && !props.initialRegion && typeof navigator !== 'undefined' && navigator.geolocation) {
+          // If no initial region was explicitly provided, auto-pan to the user's browser location
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              if (isMounted && mapInstanceRef.current && !pendingActionRef.current) {
+                mapInstanceRef.current.panTo({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+              }
+            },
+            () => {},
+            { timeout: 4000 }
+          );
+        }
       })
       .catch((err) => {
         console.warn('Google Maps script error:', err);
@@ -262,43 +293,82 @@ export const MapView = forwardRef<any, MapViewProps>((props, ref) => {
     }
   }, [mapInstance, effectiveStyles]);
 
+  // Sync controlled region prop changes
+  useEffect(() => {
+    if (!mapInstance || !props.region) return;
+    const zoom = deltaToZoom(props.region.latitudeDelta, props.region.longitudeDelta);
+    mapInstance.panTo({ lat: props.region.latitude, lng: props.region.longitude });
+    mapInstance.setZoom(zoom);
+  }, [mapInstance, props.region?.latitude, props.region?.longitude, props.region?.latitudeDelta, props.region?.longitudeDelta]);
+
   // Imperative Ref API (animateToRegion, fitToCoordinates, etc.)
   useImperativeHandle(
     ref,
     () => ({
       animateToRegion: (region: Region, _duration?: number) => {
-        if (!mapInstance || !region) return;
-        const zoom = deltaToZoom(region.latitudeDelta, region.longitudeDelta);
-        mapInstance.panTo({ lat: region.latitude, lng: region.longitude });
-        mapInstance.setZoom(zoom);
+        if (!region) return;
+        const action = () => {
+          const map = mapInstanceRef.current;
+          if (!map) return;
+          const zoom = deltaToZoom(region.latitudeDelta, region.longitudeDelta);
+          map.panTo({ lat: region.latitude, lng: region.longitude });
+          map.setZoom(zoom);
+        };
+
+        if (!mapInstanceRef.current) {
+          pendingActionRef.current = action;
+        } else {
+          action();
+        }
       },
       fitToCoordinates: (
         coordinates: LatLng[],
         options?: { edgePadding?: { top?: number; right?: number; bottom?: number; left?: number }; animated?: boolean }
       ) => {
-        if (!mapInstance || !mapsApi || !coordinates || coordinates.length === 0) return;
-        const bounds = new mapsApi.LatLngBounds();
-        coordinates.forEach((coord) => {
-          if (coord && typeof coord.latitude === 'number' && typeof coord.longitude === 'number') {
-            bounds.extend({ lat: coord.latitude, lng: coord.longitude });
-          }
-        });
-        const padding = options?.edgePadding
-          ? {
-              top: options.edgePadding.top || 40,
-              right: options.edgePadding.right || 40,
-              bottom: options.edgePadding.bottom || 40,
-              left: options.edgePadding.left || 40,
+        if (!coordinates || coordinates.length === 0) return;
+        const action = () => {
+          const map = mapInstanceRef.current;
+          const api = mapsApiRef.current;
+          if (!map || !api) return;
+          const bounds = new api.LatLngBounds();
+          coordinates.forEach((coord) => {
+            if (coord && typeof coord.latitude === 'number' && typeof coord.longitude === 'number') {
+              bounds.extend({ lat: coord.latitude, lng: coord.longitude });
             }
-          : 40;
-        mapInstance.fitBounds(bounds, padding);
+          });
+          const padding = options?.edgePadding
+            ? {
+                top: options.edgePadding.top || 40,
+                right: options.edgePadding.right || 40,
+                bottom: options.edgePadding.bottom || 40,
+                left: options.edgePadding.left || 40,
+              }
+            : 40;
+          map.fitBounds(bounds, padding);
+        };
+
+        if (!mapInstanceRef.current || !mapsApiRef.current) {
+          pendingActionRef.current = action;
+        } else {
+          action();
+        }
       },
       animateCamera: (camera: any) => {
-        if (!mapInstance || !camera?.center) return;
-        mapInstance.panTo({ lat: camera.center.latitude, lng: camera.center.longitude });
+        if (!camera?.center) return;
+        const action = () => {
+          const map = mapInstanceRef.current;
+          if (!map) return;
+          map.panTo({ lat: camera.center.latitude, lng: camera.center.longitude });
+        };
+
+        if (!mapInstanceRef.current) {
+          pendingActionRef.current = action;
+        } else {
+          action();
+        }
       },
     }),
-    [mapInstance, mapsApi]
+    []
   );
 
   return (

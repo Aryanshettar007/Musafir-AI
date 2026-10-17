@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
+import { createAudioPlayer, setAudioModeAsync, setIsAudioActiveAsync } from 'expo-audio';
 import { Image } from 'expo-image';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -294,6 +294,7 @@ export function AudioLanguageSheetModal({
       }
       activePlayerRef.current = null;
     }
+    setIsAudioActiveAsync(false).catch(() => {});
     setPlayingVoice(null);
     setLoadingVoice(null);
   };
@@ -317,7 +318,10 @@ export function AudioLanguageSheetModal({
       await setAudioModeAsync({
         allowsRecording: false,
         playsInSilentMode: true,
+        shouldPlayInBackground: false,
+        interruptionMode: 'doNotMix',
       });
+      await setIsAudioActiveAsync(true).catch(() => {});
 
       const cacheKey = `${selectedLangId}_${voiceModel.name}`;
       const sourceUri = await getCachedAudioUri(voiceModel.demoUrl, cacheKey);

@@ -26,6 +26,7 @@ import {
   getRecordingPermissionsAsync,
   setAudioModeAsync,
   createAudioPlayer,
+  setIsAudioActiveAsync,
   type RecordingOptions,
 } from 'expo-audio';
 
@@ -363,7 +364,10 @@ export function VoiceCloneSection({ onVoiceCreated }: VoiceCloneSectionProps) {
       await setAudioModeAsync({
         allowsRecording: false,
         playsInSilentMode: true,
+        shouldPlayInBackground: false,
+        interruptionMode: 'doNotMix',
       });
+      await setIsAudioActiveAsync(true).catch(() => {});
 
       const player = createAudioPlayer(uri);
       setPreviewPlayer(player);
@@ -379,6 +383,7 @@ export function VoiceCloneSection({ onVoiceCreated }: VoiceCloneSectionProps) {
             Math.abs(status.currentTime - status.duration) < 0.2)
         ) {
           setIsPlayingPreview(false);
+          setIsAudioActiveAsync(false).catch(() => {});
         }
       });
     } catch (err) {
@@ -416,7 +421,10 @@ export function VoiceCloneSection({ onVoiceCreated }: VoiceCloneSectionProps) {
       await setAudioModeAsync({
         allowsRecording: false,
         playsInSilentMode: true,
+        shouldPlayInBackground: false,
+        interruptionMode: 'doNotMix',
       });
+      await setIsAudioActiveAsync(true).catch(() => {});
 
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setPlayingVoiceId(voice.name);
@@ -434,6 +442,7 @@ export function VoiceCloneSection({ onVoiceCreated }: VoiceCloneSectionProps) {
             Math.abs(status.currentTime - status.duration) < 0.2)
         ) {
           setPlayingVoiceId(null);
+          setIsAudioActiveAsync(false).catch(() => {});
         }
       });
     } catch (err) {

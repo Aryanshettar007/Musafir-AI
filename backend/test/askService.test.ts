@@ -5,7 +5,7 @@ import { Place } from "../src/models/place.model";
 import { createAskService, type AskRequest } from "../src/services/ask/ask.service";
 import { AnswerSchema } from "../src/services/ask/prompt";
 import { clearCollections, startMongo, stopMongo } from "./helpers/mongo";
-import { fakeGemini, fakeGnani, fakeMaps, SHORT_MP3 } from "./helpers/fakes";
+import { fakeGemini, fakeGnani, fakeMaps, SHORT_MP3, SHORT_WEBM } from "./helpers/fakes";
 import { answer, makePlace, makeProfile, makeTrip, MID } from "./askFixtures";
 
 beforeAll(async () => {
@@ -120,6 +120,23 @@ describe("ask service: audio path", () => {
     const long = Buffer.concat(Array.from({ length: 8 }, () => SHORT_MP3));
     await expect(service.ask(base({ question: { kind: "audio", audio: long } }))).rejects.toMatchObject({ status: 422, code: "AUDIO_TOO_LONG" });
     expect(gnani.calls).toHaveLength(0);
+  });
+
+  it("converts webm audio to mp3 before calling Gnani STT", async () => {
+    const gnani = fakeGnani();
+    let sentMime: string | undefined;
+    let sentFile: string | undefined;
+    const original = gnani.stt;
+    gnani.stt = async (req, o) => {
+      sentMime = req.mimeType;
+      sentFile = req.filename;
+      return original(req, o);
+    };
+    const service = createAskService({ gemini: fakeGemini([answer(KN)]), gnani, maps: fakeMaps() });
+    const r = await service.ask(base({ question: { kind: "audio", audio: SHORT_WEBM } }));
+    expect(r.answerText).toBe(KN);
+    expect(sentMime).toBe("audio/mpeg");
+    expect(sentFile).toBe("question.mp3");
   });
 
   it("rejects bytes that are not audio", async () => {

@@ -119,9 +119,13 @@ export default function TripScreen() {
   const [currentPosition, setCurrentPosition] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
 
-  // Audio system music interruption preference (false = duckOthers, true = doNotMix)
-  const [pauseSystemMusic, setPauseSystemMusic] = useState(false);
-  const pauseSystemMusicRef = useRef(false);
+  // Auto-end session when destination reached
+  const hasDepartedForDestRef = useRef(false);
+  const hasEndedSessionRef = useRef(false);
+
+  // Audio system music interruption preference (false = duckOthers, true = doNotMix, defaults to true)
+  const [pauseSystemMusic, setPauseSystemMusic] = useState(true);
+  const pauseSystemMusicRef = useRef(true);
 
   // ─── Live Mode State & Player Synchronization ─────────────────────────────
   const [liveTranscript, setLiveTranscript] = useState<{ question?: string; answerText: string; audioUri?: string } | null>(null);
@@ -136,7 +140,11 @@ export default function TripScreen() {
 
   const handleOpenStoryReport = useCallback(
     (item?: TripItem | null) => {
-      const targetItem = item || playingItem || lastPlayedItem;
+      const firstAudioItem =
+        trip?.items?.find((i) => i.status === 'ready' && i.audio?.url) ||
+        trip?.items?.find((i) => i.audio?.url) ||
+        trip?.items?.[0];
+      const targetItem = item || playingItem || lastPlayedItem || firstAudioItem;
       setReportTarget({
         tripId: typeof tripId === 'string' ? tripId : undefined,
         itemId: targetItem?.id,
@@ -146,7 +154,7 @@ export default function TripScreen() {
         contentType: 'story',
       });
     },
-    [tripId, playingItem, lastPlayedItem]
+    [tripId, trip?.items, playingItem, lastPlayedItem]
   );
 
   const handleOpenLiveTranscriptReport = useCallback(
@@ -200,7 +208,7 @@ export default function TripScreen() {
     if (wasPlayingStoryRef.current) {
       audioQueueRef.current.resume();
       wasPlayingStoryRef.current = false;
-    } else if (pauseSystemMusicRef.current) {
+    } else {
       setIsAudioActiveAsync(false).catch(() => {});
     }
 
@@ -230,7 +238,7 @@ export default function TripScreen() {
   }, [isPlaying, isPaused]);
 
   const handleLiveResponse = useCallback(
-    (data: { transcript: string; answerText: string; audioUri: string; durationS: number }) => {
+    async (data: { transcript: string; answerText: string; audioUri: string; durationS: number }) => {
       // Ensure story is paused while Musafir answers
       if (isPlaying && !isPaused) {
         wasPlayingStoryRef.current = true;
@@ -251,9 +259,13 @@ export default function TripScreen() {
 
       // Play spoken answer
       try {
-        if (pauseSystemMusicRef.current) {
-          setIsAudioActiveAsync(true).catch(() => {});
-        }
+        await setAudioModeAsync({
+          allowsRecording: false,
+          playsInSilentMode: true,
+          shouldPlayInBackground: true,
+          interruptionMode: pauseSystemMusicRef.current ? 'doNotMix' : 'duckOthers',
+        }).catch(() => {});
+        await setIsAudioActiveAsync(true).catch(() => {});
         livePlayer.replace({ uri: data.audioUri });
         livePlayer.play();
       } catch (err) {
@@ -424,7 +436,7 @@ export default function TripScreen() {
     (async () => {
       try {
         const stored = await AsyncStorage.getItem('@musafir_pause_system_music');
-        const shouldPause = stored === 'true';
+        const shouldPause = stored === null ? true : stored === 'true';
         setPauseSystemMusic(shouldPause);
         pauseSystemMusicRef.current = shouldPause;
         await setAudioModeAsync({
@@ -444,13 +456,15 @@ export default function TripScreen() {
       pauseSystemMusicRef.current = value;
       try {
         await AsyncStorage.setItem('@musafir_pause_system_music', value ? 'true' : 'false');
+        // Deactivate first so iOS AVFoundation flushes previous category options
+        await setIsAudioActiveAsync(false).catch(() => {});
         await setAudioModeAsync({
           playsInSilentMode: true,
           shouldPlayInBackground: true,
           interruptionMode: value ? 'doNotMix' : 'duckOthers',
         });
-        if (!value && !isPlaying) {
-          await setIsAudioActiveAsync(false).catch(() => {});
+        if (isPlaying) {
+          await setIsAudioActiveAsync(true).catch(() => {});
         }
       } catch (err) {
         console.warn('Error updating audio interruption preference:', err);
@@ -533,9 +547,12 @@ export default function TripScreen() {
           if (!playUri) {
             throw new Error('Audio file not ready');
           }
-          if (pauseSystemMusicRef.current) {
-            await setIsAudioActiveAsync(true).catch(() => {});
-          }
+          await setAudioModeAsync({
+            playsInSilentMode: true,
+            shouldPlayInBackground: true,
+            interruptionMode: pauseSystemMusicRef.current ? 'doNotMix' : 'duckOthers',
+          }).catch(() => {});
+          await setIsAudioActiveAsync(true).catch(() => {});
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           player.replace({ uri: playUri });
           try {
@@ -558,15 +575,16 @@ export default function TripScreen() {
         } catch (err) {
           console.warn('[TripAudioQueue] Error pausing item:', err);
         }
-        if (pauseSystemMusicRef.current) {
-          setIsAudioActiveAsync(false).catch(() => {});
-        }
+        setIsAudioActiveAsync(false).catch(() => {});
       },
-      onResumeItem: () => {
-        if (pauseSystemMusicRef.current) {
-          setIsAudioActiveAsync(true).catch(() => {});
-        }
+      onResumeItem: async () => {
         try {
+          await setAudioModeAsync({
+            playsInSilentMode: true,
+            shouldPlayInBackground: true,
+            interruptionMode: pauseSystemMusicRef.current ? 'doNotMix' : 'duckOthers',
+          }).catch(() => {});
+          await setIsAudioActiveAsync(true).catch(() => {});
           if (player) {
             player.play();
           }
@@ -582,9 +600,7 @@ export default function TripScreen() {
         } catch (err) {
           // Native shared object may not be initialized or already released
         }
-        if (pauseSystemMusicRef.current) {
-          setIsAudioActiveAsync(false).catch(() => {});
-        }
+        setIsAudioActiveAsync(false).catch(() => {});
       },
       onListenEvent: (itemId, event) => {
         queueListen(itemId, event);
@@ -604,10 +620,17 @@ export default function TripScreen() {
     return unsub;
   }, []);
 
-  // Update items in audio queue and start background geofencing when trip updates
+  // Update items in audio queue, seed initial first audio item, and start background geofencing when trip updates
   useEffect(() => {
     if (trip?.items && trip.items.length > 0) {
       audioQueueRef.current.setItems(trip.items);
+      const firstAudioItem =
+        trip.items.find((i) => i.status === 'ready' && i.audio?.url) ||
+        trip.items.find((i) => i.audio?.url) ||
+        trip.items[0];
+      if (firstAudioItem) {
+        audioQueueRef.current.setInitialItem(firstAudioItem);
+      }
       (async () => {
         try {
           const fg = await Location.getForegroundPermissionsAsync();
@@ -813,12 +836,82 @@ export default function TripScreen() {
     };
   }, [fetchTrip]);
 
+  // ─── Exit session action ───
+  const exitTrip = useCallback(() => {
+    if (hasEndedSessionRef.current) return;
+    hasEndedSessionRef.current = true;
+    try {
+      player.pause();
+    } catch {}
+    audioQueueRef.current.stop();
+    stopBackgroundGeofencing();
+    locationSubscription.current?.remove();
+    locationSubscription.current = null;
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    flushListens().catch(() => {});
+    try {
+      setIsAudioActiveAsync(false);
+    } catch {}
+    router.replace('/(tabs)');
+  }, [player, router, flushListens]);
+
   // ─── Location & Geofencing handler (used by both real GPS and Simulator) ─
   const handleLocationUpdate = useCallback(
     (coords: { latitude: number; longitude: number }) => {
       setUserLocation(coords);
 
-      if (!trip || !trip.items) return;
+      if (!trip) return;
+
+      // ─── Auto-end session when destination is reached ───
+      const destLat =
+        trip.destination.lat ??
+        (polylineCoords.length > 0 ? polylineCoords[polylineCoords.length - 1].latitude : null);
+      const destLng =
+        trip.destination.lng ??
+        (polylineCoords.length > 0 ? polylineCoords[polylineCoords.length - 1].longitude : null);
+
+      if (destLat != null && destLng != null && !hasEndedSessionRef.current) {
+        const distToDest = haversineDistanceM(coords.latitude, coords.longitude, destLat, destLng);
+
+        // Determine span of route to calibrate departure threshold
+        const originLat =
+          trip.origin.lat ?? (polylineCoords.length > 0 ? polylineCoords[0].latitude : null);
+        const originLng =
+          trip.origin.lng ?? (polylineCoords.length > 0 ? polylineCoords[0].longitude : null);
+        const totalTripSpan =
+          originLat != null && originLng != null
+            ? haversineDistanceM(originLat, originLng, destLat, destLng)
+            : 1000;
+
+        const departureThreshold = Math.min(200, Math.max(80, totalTripSpan * 0.4));
+        const arrivalThreshold = 100; // 100 meters to destination
+
+        if (distToDest > departureThreshold) {
+          hasDepartedForDestRef.current = true;
+        } else if (distToDest <= arrivalThreshold && hasDepartedForDestRef.current) {
+          hasEndedSessionRef.current = true;
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          if (Platform.OS === 'web') {
+            if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+              window.alert('Destination Reached! You have arrived at your destination.');
+            }
+            exitTrip();
+          } else {
+            Alert.alert(
+              'Destination Reached',
+              'You have arrived at your destination! Your trip session has ended.',
+              [{ text: 'OK' }]
+            );
+            exitTrip();
+          }
+          return;
+        }
+      }
+
+      if (!trip.items) return;
       for (const item of trip.items) {
         if (!item.trigger || item.status !== 'ready') continue;
         if (Platform.OS !== 'web') {
@@ -831,7 +924,7 @@ export default function TripScreen() {
         }
       }
     },
-    [trip]
+    [trip, polylineCoords, exitTrip]
   );
   handleLocationUpdateRef.current = handleLocationUpdate;
 
@@ -945,22 +1038,56 @@ export default function TripScreen() {
     }
   }, [polylineCoords]);
 
-  // ─── Exit session action (Defined before early returns to preserve hook order) ───
-  const exitTrip = useCallback(() => {
-    try {
-      player.pause();
-    } catch {}
-    audioQueueRef.current.stop();
-    stopBackgroundGeofencing();
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
+
+  // ─── Toggle Play / Pause Handler ──────────────────────────────────────────
+  const handleTogglePlayPause = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (isLivePlaying) {
+      if (livePlayer.playing) {
+        livePlayer.pause();
+      } else {
+        livePlayer.play();
+      }
+      return;
     }
-    try {
-      setIsAudioActiveAsync(false);
-    } catch {}
-    router.replace('/(tabs)');
-  }, [player, router]);
+
+    if (!trip) return;
+    const firstAudio =
+      trip.items.find((i) => i.status === 'ready' && i.audio?.url) ||
+      trip.items.find((i) => i.audio?.url) ||
+      trip.items[0];
+    const targetId = playingItem?.id || lastPlayedItem?.id || firstAudio?.id;
+    if (targetId) {
+      audioQueueRef.current.togglePlayPause(targetId);
+    }
+  }, [isLivePlaying, livePlayer, trip, playingItem?.id, lastPlayedItem?.id]);
+
+  // ─── Web Keyboard Shortcut: Space bar to toggle Play / Pause ──────────────
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' || e.key === ' ' || e.keyCode === 32) {
+        // Do not intercept if user is typing in an input, textarea or contentEditable element
+        const activeTag = document.activeElement?.tagName?.toLowerCase();
+        const isEditable =
+          activeTag === 'input' ||
+          activeTag === 'textarea' ||
+          (document.activeElement as HTMLElement)?.isContentEditable;
+
+        if (isEditable) return;
+
+        // Prevent default browser scrolling when Space bar is pressed
+        e.preventDefault();
+        handleTogglePlayPause();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleTogglePlayPause]);
 
   // Ensure audio focus is cleanly released if screen unmounts
   useEffect(() => {
@@ -1100,12 +1227,16 @@ export default function TripScreen() {
         isPlaying={isPlaying}
         isPaused={isPaused}
         currentTime={currentPosition}
-        duration={audioDuration > 0 ? audioDuration : (playingItem?.audio?.durationS ?? lastPlayedItem?.audio?.durationS ?? 0)}
+        duration={
+          audioDuration > 0
+            ? audioDuration
+            : (playingItem?.audio?.durationS ??
+               lastPlayedItem?.audio?.durationS ??
+               trip.items.find((i) => i.audio?.durationS)?.audio?.durationS ??
+               0)
+        }
         onSeek={handleSeek}
-        onTogglePlayPause={() => {
-          const targetId = playingItem?.id || lastPlayedItem?.id;
-          audioQueueRef.current.togglePlayPause(targetId);
-        }}
+        onTogglePlayPause={handleTogglePlayPause}
         onStopPlaying={() => {
           audioQueueRef.current.stop();
         }}

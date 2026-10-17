@@ -2,6 +2,7 @@ import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { Platform, useColorScheme } from 'react-native';
 
 import { Colors } from '@/constants/theme';
+import AndroidTabs from './app-tabs.android';
 
 const ACCENT_BLUE = '#007AFF';
 
@@ -9,12 +10,13 @@ export default function AppTabs() {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
 
+  if (Platform.OS === 'android') {
+    return <AndroidTabs />;
+  }
+
   return (
     <NativeTabs
-      backgroundColor={Platform.OS === 'ios' ? undefined : colors.background}
       tintColor={ACCENT_BLUE}
-      indicatorColor={Platform.OS === 'android' ? 'transparent' : undefined}
-      disableIndicator={Platform.OS === 'android'}
       iconColor={{
         default: colors.textSecondary,
         selected: ACCENT_BLUE,

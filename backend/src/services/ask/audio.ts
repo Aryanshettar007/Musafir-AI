@@ -16,11 +16,12 @@ const FORMATS: Array<{ container: RegExp; mimeType: string; ext: string }> = [
   { container: /^wav/i, mimeType: "audio/wav", ext: "wav" },
   { container: /^(m4a|mp4|isom)/i, mimeType: "audio/mp4", ext: "m4a" },
   { container: /^adts/i, mimeType: "audio/aac", ext: "aac" },
+  { container: /^ogg/i, mimeType: "audio/ogg", ext: "ogg" },
   { container: /^(ebml|webm|matroska)/i, mimeType: "audio/webm", ext: "webm" },
 ];
 
-// Sniffs the bytes: UNSUPPORTED_AUDIO (415) when it isn't m4a/aac, mp3, wav or webm, AUDIO_TOO_LONG (422) over 25 s.
-// A file whose duration still can't be read (MediaRecorder webm) passes here and Gnani enforces its own 30 s limit.
+// Sniffs the bytes: UNSUPPORTED_AUDIO (415) when it isn't m4a/aac, mp3, wav, ogg or webm, AUDIO_TOO_LONG (422) over 25 s.
+// Web browsers record in webm (opus), which is accepted here and automatically transcoded to mp3 for Gnani STT.
 export async function inspectAudio(audio: Buffer): Promise<QuestionAudio> {
   let container: string | undefined;
   let durationS: number | undefined;
@@ -41,4 +42,4 @@ export async function inspectAudio(audio: Buffer): Promise<QuestionAudio> {
   return { mimeType: format.mimeType, filename: `question.${format.ext}`, durationS };
 }
 
-const unsupported = () => new AppError(415, "UNSUPPORTED_AUDIO", "Send the question as m4a/aac, mp3, wav or webm audio.");
+const unsupported = () => new AppError(415, "UNSUPPORTED_AUDIO", "Send the question as m4a/aac, mp3, wav, ogg or webm audio.");

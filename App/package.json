@@ -53,6 +53,7 @@
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
+    "android:physical": "expo run:android --device",
     "android:fast": "expo start --dev-client",
     "ios": "expo run:ios",
     "ios:physical": "expo run:ios --device",

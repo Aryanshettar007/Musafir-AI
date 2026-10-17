@@ -67,6 +67,16 @@ export class TripAudioQueue {
     }
   }
 
+  /**
+   * Set an initial item for playback (e.g. first story) when entering a trip.
+   */
+  public setInitialItem(item: TripItem) {
+    if (!this.playingItem && (!this.lastPlayedItem || this.lastPlayedItem.id === item.id)) {
+      this.lastPlayedItem = item;
+      this.notify();
+    }
+  }
+
   public setAudioMultiplier(mult: number) {
     this.audioMultiplier = Math.max(1, mult);
   }

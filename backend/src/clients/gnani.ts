@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { LanguageId } from "../catalog/languages";
+import { convertToMp3 } from "../utils/audioConverter";
 import { asUpstreamError, fetchWithTimeout, isRetryableStatus, parseRetryAfter, UpstreamError } from "./upstream";
 
 const BASE_URL = "https://api.vachana.ai";
@@ -105,8 +106,16 @@ export function gnaniClient(cfg: { apiKey: string }): GnaniClient {
     },
 
     async stt({ audio, filename, mimeType, languageCode }) {
+      let sendAudio = audio;
+      let sendFilename = filename;
+      let sendMimeType = mimeType;
+      if (mimeType === "audio/webm" || filename.endsWith(".webm")) {
+        sendAudio = await convertToMp3(audio);
+        sendFilename = "question.mp3";
+        sendMimeType = "audio/mpeg";
+      }
       const form = new FormData();
-      form.append("audio_file", new Blob([new Uint8Array(audio)], { type: mimeType }), filename);
+      form.append("audio_file", new Blob([new Uint8Array(sendAudio)], { type: sendMimeType }), sendFilename);
       form.append("language_code", languageCode);
       form.append("format", "transcribe");
       const res = await send("/stt/v3", { method: "POST", headers, body: form, timeoutMs: STT_TIMEOUT_MS });

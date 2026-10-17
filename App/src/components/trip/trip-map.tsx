@@ -90,12 +90,33 @@ export function TripMap({
 }: TripMapProps) {
   const [selectedPlace, setSelectedPlace] = React.useState<TripItem | null>(null);
 
+  // Compute a smart initial region (User GPS -> Trip Origin -> First Polyline Coord -> Default Bangalore)
+  const initialRegion = React.useMemo(() => {
+    const lat =
+      userLocation?.latitude ??
+      trip?.origin?.lat ??
+      polylineCoords?.[0]?.latitude ??
+      12.9716;
+    const lng =
+      userLocation?.longitude ??
+      trip?.origin?.lng ??
+      polylineCoords?.[0]?.longitude ??
+      77.5946;
+    return {
+      latitude: lat,
+      longitude: lng,
+      latitudeDelta: 0.04,
+      longitudeDelta: 0.04,
+    };
+  }, [userLocation?.latitude, userLocation?.longitude, trip?.origin?.lat, trip?.origin?.lng, polylineCoords]);
+
   return (
     <View style={StyleSheet.absoluteFill}>
       <MapView
         provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
         ref={mapRef}
         style={StyleSheet.absoluteFill}
+        initialRegion={initialRegion}
         customMapStyle={isDark ? darkMapStyle : []}
         zoomControlEnabled={true}
         zoomEnabled={true}

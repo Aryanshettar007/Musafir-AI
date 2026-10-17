@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as FileSystem from 'expo-file-system/legacy';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   useAudioRecorder,
   RecordingPresets,
@@ -345,11 +346,13 @@ export function VoiceRecordButton({
       const recordedUri = recorder.uri;
 
       // Reset audio session mode to normal playback
+      const storedPause = await AsyncStorage.getItem('@musafir_pause_system_music').catch(() => null);
+      const shouldPause = storedPause === null ? true : storedPause === 'true';
       await setAudioModeAsync({
         allowsRecording: false,
         playsInSilentMode: true,
         shouldPlayInBackground: true,
-        interruptionMode: 'duckOthers',
+        interruptionMode: shouldPause ? 'doNotMix' : 'duckOthers',
       });
 
       const recordDurationMs = recordStartTimeRef.current ? Date.now() - recordStartTimeRef.current : 0;
@@ -390,7 +393,7 @@ export function VoiceRecordButton({
       // Save audio response base64 to local cache (.mp3) on native, or use data URI on web
       let responseFileUri: string;
       if (Platform.OS === 'web') {
-        responseFileUri = `data:audio/mp3;base64,${result.audio.base64}`;
+        responseFileUri = `data:${result.audio?.mimeType || 'audio/mpeg'};base64,${result.audio.base64}`;
       } else {
         const cacheDir = FileSystem.cacheDirectory?.endsWith('/')
           ? FileSystem.cacheDirectory

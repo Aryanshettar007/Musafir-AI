@@ -40,6 +40,7 @@ export function memoryStorage(): MemoryStorage {
 
 // A real ~4 second mp3 (a Gnani voice demo), so durations parse in tests.
 export const SHORT_MP3 = readFileSync(path.join(__dirname, "../fixtures/short.mp3"));
+export const SHORT_WEBM = readFileSync(path.join(__dirname, "../fixtures/short.webm"));
 
 type Scripted<T> = T | Error | ((req: GenerateJsonRequest<T>) => T | Error);
 
