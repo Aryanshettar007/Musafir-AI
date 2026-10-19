@@ -3,7 +3,7 @@
     "name": "Musafir AI",
     "slug": "musafir-ai",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/ios-icon-default.png",
     "scheme": "musafir",
     "userInterfaceStyle": "automatic",
@@ -66,6 +66,10 @@
       [
         "expo-build-properties",
         {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          },
           "ios": {
             "enableSceneSupport": true
           }
@@ -86,7 +90,8 @@
         {
           "photosPermission": "Musafir AI needs access to your photo library to let you select a profile picture for your custom voice."
         }
-      ]
+      ],
+      "./plugins/withAndroidPlayConsoleFixes.js"
     ],
     "experiments": {
       "typedRoutes": true,
