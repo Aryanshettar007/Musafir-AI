@@ -1,12 +1,12 @@
-**Last updated October 15, 2026**
+**Last updated October 19, 2026**
 
-This Privacy Notice for Musafir AI ("**we**," "**us**," or "**our**"), describes how and why we might access, collect, store, use, and/or share ("**process**") your personal information when you use our services ("**Services**"), including when you:
+This Privacy Notice for Musafir AI ("**we**," "**us**," or "**our**"), describes how and why we might access, collect, store, use, and/or share ("**process**") your personal information when you use our services ("**Services**") worldwide, including when you:
 
 * Visit our website at musafir-ai.tech or any website of ours that links to this Privacy Notice
-* Download and use our mobile application (Musafir AI), or any other application of ours that links to this Privacy Notice
-* Engage with us in other related ways, including any marketing or events
+* Download and use our mobile application (Musafir AI) available globally on app distribution platforms, or any other application of ours that links to this Privacy Notice
+* Engage with us in other related ways, including any customer support, marketing, or events
 
-**Questions or concerns?** Reading this Privacy Notice will help you understand your privacy rights and choices. We are responsible for making decisions about how your personal information is processed. If you do not agree with our policies and practices, please do not use our Services. If you still have any questions or concerns, please contact us at rishitpadagatti@gmail.com.
+**Questions or concerns?** Reading this Privacy Notice will help you understand your privacy rights and choices. Musafir AI is the data controller responsible for making decisions about how your personal information is processed. If you do not agree with our policies and practices, please do not use our Services. If you have any questions or concerns, please contact our Data Protection and Grievance contact at rishitpadagatti@gmail.com.
 
 ---
 
@@ -14,14 +14,16 @@ This Privacy Notice for Musafir AI ("**we**," "**us**," or "**our**"), describes
 
 *This summary provides key points from our Privacy Notice, but you can find out more details about any of these topics by clicking the link following each key point or by using our table of contents below to find the section you are looking for.*
 
-* **What personal information do we process?** When you visit, use, or navigate our Services, we may process personal information depending on how you interact with us and the Services, the choices you make, and the products and features you use. [Learn more about personal information you disclose to us.](#sec1)
-* **Do we process any sensitive personal information?** Some of the information may be considered "special" or "sensitive" in certain jurisdictions, for example your racial or ethnic origins, sexual orientation, and religious beliefs. We do not process sensitive personal information.
-* **Do we collect any information from third parties?** We do not collect any information from third parties.
-* **How do we process your information?** We process your information to provide, improve, and administer our Services, communicate with you, for security and fraud prevention, and to comply with law. We may also process your information for other purposes with your consent. We process your information only when we have a valid legal reason to do so. [Learn more about how we process your information.](#sec2)
-* **In what situations and with which parties do we share personal information?** We may share information in specific situations and with specific third parties. [Learn more about when and with whom we share your personal information.](#sec3)
-* **How do we keep your information safe?** We have adequate organizational and technical processes and procedures in place to protect your personal information. However, no electronic transmission over the internet or information storage technology can be guaranteed to be 100% secure, so we cannot promise or guarantee that hackers, cybercriminals, or other unauthorized third parties will not be able to defeat our security and improperly collect, access, steal, or modify your information. [Learn more about how we keep your information safe.](#sec8)
-* **What are your rights?** Depending on where you are located geographically, the applicable privacy law may mean you have certain rights regarding your personal information. [Learn more about your privacy rights.](#sec10)
-* **How do you exercise your rights?** The easiest way to exercise your rights is by contacting us. We will consider and act upon any request in accordance with applicable data protection laws.
+* **What personal information do we process?** When you visit, use, or navigate our Services, we may process personal information depending on how you interact with us and the Services, the choices you make, and the features you use (such as voluntary audio samples for voice cloning, avatar pictures, and travel location data). [Learn more about personal information you disclose to us.](#sec1)
+* **Do we process any sensitive personal information?** We do not process special category or sensitive personal data (such as racial or ethnic origins, sexual orientation, political opinions, or religious beliefs).
+* **Do we collect any information from third parties?** Aside from profile authentication details provided with your authorization by Apple or Google when using social sign-in, we do not collect information about you from third parties.
+* **How do we process your information?** We process your information to provide, personalize, and administer our Services, deliver AI-guided travel audio stories, process custom voice models, communicate with you, ensure security and fraud prevention, and comply with applicable laws worldwide. [Learn more about how we process your information.](#sec2)
+* **What legal bases do we rely on?** For users in jurisdictions such as the European Economic Area (EEA) and United Kingdom (UK), we process personal information under valid legal grounds under the GDPR and UK GDPR, including consent, performance of our contract with you, legitimate interests, and compliance with legal obligations. [Learn more about our legal bases.](#sec3)
+* **In what situations and with which parties do we share personal information?** We share information only with trusted service providers necessary to operate the Services (such as Google Cloud Platform for cloud hosting, Google Cloud AI for generative audio and translation, and Google Maps for navigation and points of interest). We do not sell your personal data. [Learn more about when and with whom we share your personal information.](#sec4)
+* **Do we transfer your information internationally?** Yes. We serve users globally. Your personal information may be transferred to, stored, and processed in cloud data centers located in India, the United States, and other global regions. We implement robust safeguards, including Standard Contractual Clauses (SCCs), to protect your data. [Learn more about international transfers.](#sec5)
+* **How do we keep your information safe?** We employ industry-standard organizational and technical security measures (such as TLS encryption in transit and secure cloud storage) to safeguard your personal information. [Learn more about how we keep your information safe.](#sec10)
+* **What are your privacy rights?** Depending on where you reside (including the European Economic Area, the United Kingdom, Switzerland, the United States, India, Canada, Brazil, and Australia), you have specific statutory privacy rights, including rights of access, correction, deletion, restriction, and data portability. [Learn more about your privacy rights by region.](#sec12)
+* **How do you exercise your rights?** The easiest way to exercise your rights is by emailing us at rishitpadagatti@gmail.com. We respond to verified requests within thirty (30) days or within the statutory timelines required by your local data protection authority.
 
 Want to learn more about what we do with any information we collect? [Review the Privacy Notice in full.](#toc)
 
@@ -31,18 +33,20 @@ Want to learn more about what we do with any information we collect? [Review the
 
 1. [WHAT INFORMATION DO WE COLLECT?](#sec1)
 2. [HOW DO WE PROCESS YOUR INFORMATION?](#sec2)
-3. [WHEN AND WITH WHOM DO WE SHARE YOUR PERSONAL INFORMATION?](#sec3)
-4. [DO WE USE COOKIES AND OTHER TRACKING TECHNOLOGIES?](#sec4)
-5. [DO WE OFFER ARTIFICIAL INTELLIGENCE-BASED PRODUCTS?](#sec5)
-6. [HOW DO WE HANDLE YOUR SOCIAL LOGINS?](#sec6)
-7. [HOW LONG DO WE KEEP YOUR INFORMATION?](#sec7)
-8. [HOW DO WE KEEP YOUR INFORMATION SAFE?](#sec8)
-9. [DO WE COLLECT INFORMATION FROM MINORS?](#sec9)
-10. [WHAT ARE YOUR PRIVACY RIGHTS?](#sec10)
-11. [CONTROLS FOR DO-NOT-TRACK FEATURES](#sec11)
-12. [DO WE MAKE UPDATES TO THIS NOTICE?](#sec12)
-13. [HOW CAN YOU CONTACT US ABOUT THIS NOTICE?](#sec13)
-14. [HOW CAN YOU REVIEW, UPDATE, OR DELETE THE DATA WE COLLECT FROM YOU?](#sec14)
+3. [WHAT LEGAL BASES DO WE RELY ON TO PROCESS YOUR INFORMATION?](#sec3)
+4. [WHEN AND WITH WHOM DO WE SHARE YOUR PERSONAL INFORMATION?](#sec4)
+5. [IS YOUR INFORMATION TRANSFERRED INTERNATIONALLY?](#sec5)
+6. [DO WE USE COOKIES AND OTHER TRACKING TECHNOLOGIES?](#sec6)
+7. [DO WE OFFER ARTIFICIAL INTELLIGENCE-BASED PRODUCTS?](#sec7)
+8. [HOW DO WE HANDLE YOUR SOCIAL LOGINS?](#sec8)
+9. [HOW LONG DO WE KEEP YOUR INFORMATION?](#sec9)
+10. [HOW DO WE KEEP YOUR INFORMATION SAFE?](#sec10)
+11. [DO WE COLLECT INFORMATION FROM MINORS?](#sec11)
+12. [WHAT ARE YOUR PRIVACY RIGHTS BY REGION?](#sec12)
+13. [CONTROLS FOR DO-NOT-TRACK FEATURES](#sec13)
+14. [DO WE MAKE UPDATES TO THIS NOTICE?](#sec14)
+15. [HOW CAN YOU CONTACT US ABOUT THIS NOTICE?](#sec15)
+16. [HOW CAN YOU REVIEW, UPDATE, OR DELETE THE DATA WE COLLECT FROM YOU?](#sec16)
 
 ---
 
@@ -50,184 +54,256 @@ Want to learn more about what we do with any information we collect? [Review the
 
 ### Personal information you disclose to us
 
-*In Short: We collect personal information that you provide to us.*
+*In Short: We collect personal information that you voluntarily provide to us when you register on our Services or use our personalized travel features.*
 
-We collect personal information that you voluntarily provide to us when you register on the Services, express an interest in obtaining information about us or our products and Services, when you participate in activities on the Services, or otherwise when you contact us.
+We collect personal information that you voluntarily provide to us when you create an account on the Services, express an interest in obtaining information about us or our products and Services, participate in activities on the Services, or otherwise contact us.
 
-**Personal Information Provided by You.** The personal information that we collect depends on the context of your interactions with us and the Services, the choices you make, and the products and features you use. The personal information we collect may include the following:
+**Personal Information Provided by You.** The personal information that we collect depends on the context of your interactions with us and the Services, the choices you make, and the features you use. The personal information we collect may include:
 
-* names
-* email addresses
-* passwords
-* location
-* photos and profile avatars (voluntarily selected and uploaded by you for custom voice avatars and profile personalization)
-* audio recordings and voice samples (voluntarily recorded or uploaded by you when using voice cloning features)
-* device local cache
-* travel profile
-* age range
+* **Account details:** names, email addresses, usernames, and hashed passwords.
+* **Location and navigation data:** real-time GPS coordinates, route points, and travel destinations (used solely to trigger localized travel stories and navigation recommendations).
+* **Profile media:** photos and profile avatars that you explicitly pick and upload to customize your voice profile or user avatar.
+* **Audio samples:** voice recordings voluntarily recorded or uploaded by you when utilizing our custom voice cloning features.
+* **Travel preferences:** travel mode, destination interests, language preferences, and age range to tailor narration content.
+* **Device local cache:** localized cached story content and app state stored directly on your device.
 
-**Sensitive Information.** We do not process sensitive information.
+**Sensitive Information.** We do not process sensitive personal data (e.g., racial or ethnic origin, political opinions, religious or philosophical beliefs, trade union membership, genetic data, biometric identification data for public surveillance, or health data). Audio samples uploaded for voice cloning are processed solely to compute voice feature vectors for custom narration playback and are never used for biometric identity verification or shared with law enforcement or commercial brokers.
 
-**Social Login Data.** We may provide you with the option to register and sign in with us using your existing Apple or Google account details. If you choose to register in this way, we will collect certain profile information about you from the identity provider (Apple or Google), as described in the section called [HOW DO WE HANDLE YOUR SOCIAL LOGINS?](#sec6) below.
+**Social Login Data.** We provide the option to register and sign in with us using your existing Apple or Google account. If you choose to register this way, we collect the basic profile information you authorize (typically your name and email address), as described in [HOW DO WE HANDLE YOUR SOCIAL LOGINS?](#sec8).
 
-**Application Data.** If you use our application(s), we also may collect the following information if you choose to provide us with access or permission:
+**Application Permissions.** If you use our mobile application, we request the following permissions on your device:
+* *Geolocation Information:* We request permission to access location data while using the app (or in the background during active trip navigation) to detect nearby landmarks and play timely contextual travel stories. You can adjust or revoke location permissions at any time in your mobile device's settings.
+* *Photos and Media:* When selecting an avatar image, our application utilizes the native system photo picker. We access only the specific photo that you explicitly pick and authorize; our application never requests or obtains full access to your photo library.
+* *Microphone and Audio:* When recording voice samples for custom narration, we request microphone permission to record your reference audio. You can disable microphone access at any time in your device settings.
 
-* *Geolocation Information.* We may request access or permission to track location-based information from your mobile device, either continuously or while you are using our mobile application(s), to provide certain location-based services. If you wish to change our access or permissions, you may do so in your device's settings.
-* *Photos and Media.* If you choose to personalize a custom voice model with a custom avatar image, our application allows you to select a photo from your photo library. We only receive and access the specific photo that you explicitly pick and authorize; our application does not request or obtain access to your full photo library.
-
-This information is primarily needed to maintain the security and operation of our application(s), for troubleshooting, and for our internal analytics and reporting purposes.
-
-All personal information that you provide to us must be true, complete, and accurate, and you must notify us of any changes to such personal information.
-
-### Google API
-Our use of information received from Google APIs will adhere to Google API Services User Data Policy, including the Limited Use requirements.
+### Google API Services Compliance
+Our use and transfer to any other app of information received from Google APIs adheres to the **Google API Services User Data Policy**, including the Limited Use requirements.
 
 ---
 
 ## 2. HOW DO WE PROCESS YOUR INFORMATION?
 
-*In Short: We process your information to provide, improve, and administer our Services, communicate with you, for security and fraud prevention, and to comply with law. We may also process your information for other purposes with your consent.*
+*In Short: We process your information to provide, improve, and administer our Services, deliver personalized AI travel narrations, communicate with you, protect against fraud, and comply with applicable laws.*
 
-We process your personal information for a variety of reasons, depending on how you interact with our Services, including:
+We process your personal information for various purposes depending on how you interact with our Services:
 
-* **To facilitate account creation and authentication and otherwise manage user accounts.** We may process your information so you can create and log in to your account, as well as keep your account in working order.
-* **To deliver and facilitate delivery of services to the user.** We may process your information to provide you with the requested service.
-* **To personalize custom voices and avatar displays.** We process your voluntarily uploaded photos and audio samples solely to generate custom voice embeddings, display your selected avatar, and personalize travel audio narrations for your account.
-
----
-
-## 3. WHEN AND WITH WHOM DO WE SHARE YOUR PERSONAL INFORMATION?
-
-*In Short: We may share information in specific situations described in this section and/or with the following third parties.*
-
-**Vendors, Consultants, and Other Third-Party Service Providers.** We may share your data with third-party vendors, service providers, contractors, or agents ("**third parties**") who perform services for us or on our behalf and require access to such information to do that work. We have contracts in place with our third parties, which are designed to help safeguard your personal information. This means that they cannot do anything with your personal information unless we have instructed them to do it. They will also not share your personal information with any organization apart from us. They also commit to protect the data they hold on our behalf and to retain it for the period we instruct.
-
-The third parties we may share personal information with are as follows:
-
-* **AI Service Providers**  
-  Google Cloud AI
-* **Allow Users to Connect to Their Third-Party Accounts**  
-  Google account and Apple account
-* **Cloud Computing Services**  
-  Google Cloud Platform
-
-We also may need to share your personal information in the following situations:
-
-* **Business Transfers.** We may share or transfer your information in connection with, or during negotiations of, any merger, sale of company assets, financing, or acquisition of all or a portion of our business to another company.
-* **When we use Google Maps Platform APIs.** We may share your information with certain Google Maps Platform APIs (e.g., Google Maps API, Places API). Google Maps uses GPS, Wi-Fi, and cell towers to estimate your location. GPS is accurate to about 20 meters, while Wi-Fi and cell towers help improve accuracy when GPS signals are weak, like indoors. This data helps Google Maps provide directions, but it is not always perfectly precise. We obtain and store on your device ("cache") your location. You may revoke your consent anytime by contacting us at the contact details provided at the end of this document.
+* **Account Creation and Authentication:** To facilitate account registration, authenticate sign-ins, and maintain your account profile.
+* **Service Delivery and Narration:** To deliver location-aware travel stories, route directions, audio transcripts, and interactive Q&A.
+* **Custom Voice Personalization:** To process your voluntarily uploaded audio samples and avatar photos to generate voice models and personalized narration for your trips.
+* **Service Maintenance and Troubleshooting:** To monitor app performance, fix crashes, diagnose technical bugs, and ensure server stability.
+* **Safety and Fraud Prevention:** To protect our users and infrastructure against unauthorized access, abusive prompt submissions, spam, or security threats.
+* **Legal Compliance:** To fulfill our obligations under tax, corporate, accounting, and consumer protection laws worldwide, and to cooperate with lawful requests from authorities.
 
 ---
 
-## 4. DO WE USE COOKIES AND OTHER TRACKING TECHNOLOGIES?
+## 3. WHAT LEGAL BASES DO WE RELY ON TO PROCESS YOUR INFORMATION?
 
-*In Short: We may use cookies and other tracking technologies to collect and store your information.*
+*In Short: If you are in the European Economic Area (EEA), the United Kingdom (UK), or Switzerland, we process your personal data only under valid legal bases set out in Article 6 of the General Data Protection Regulation (GDPR) and UK GDPR.*
 
-We may use cookies and similar tracking technologies (like web beacons and pixels) to gather information when you interact with our Services. Some online tracking technologies help us maintain the security of our Services and your account, prevent crashes, fix bugs, save your preferences, and assist with basic site functions.
+Under European data protection laws, we rely on the following lawful bases to process your personal data:
 
-We also permit third parties and service providers to use online tracking technologies on our Services for analytics and advertising, including to help manage and display advertisements or to tailor advertisements to your interests. The third parties and service providers use their technology to provide advertising about products and services tailored to your interests which may appear either on our Services or on other websites.
+* **Consent (GDPR Art. 6(1)(a)):** We process your information if you have given us clear and affirmative consent for a specific purpose—for example, granting device location permissions, accessing your microphone for audio recording, or selecting photos for avatar customization. You have the right to withdraw your consent at any time without affecting the lawfulness of processing based on consent before its withdrawal.
+* **Performance of a Contract (GDPR Art. 6(1)(b)):** We process your personal data when it is necessary to fulfill our contractual obligations to you under our Terms of Service—such as providing your account, generating requested travel narrations, and delivering customer support.
+* **Legitimate Interests (GDPR Art. 6(1)(f)):** We process your information when it is reasonably necessary to achieve our legitimate business interests, provided those interests do not override your fundamental rights and freedoms. These interests include detecting security incidents, preventing fraud, debugging technical crashes, and improving our AI narration quality.
+* **Legal Obligation (GDPR Art. 6(1)(c)):** We may process your information where necessary to comply with legal and regulatory obligations, such as maintaining accounting records or complying with court orders.
 
-Specific information about how we use such technologies and how you can refuse certain cookies is set out in our Cookie Notice.
-
----
-
-## 5. DO WE OFFER ARTIFICIAL INTELLIGENCE-BASED PRODUCTS?
-
-*In Short: We offer products, features, or tools powered by artificial intelligence, machine learning, or similar technologies.*
-
-As part of our Services, we offer products, features, or tools powered by artificial intelligence, machine learning, or similar technologies (collectively, "AI Products"). These tools are designed to enhance your experience and provide you with innovative solutions. The terms in this Privacy Notice govern your use of the AI Products within our Services.
-
-### Use of AI Technologies
-We provide the AI Products through third-party service providers ("AI Service Providers"), including Google Cloud AI. As outlined in this Privacy Notice, your input, output, and personal information will be shared with and processed by these AI Service Providers to enable your use of our AI Products for purposes outlined in [WHEN AND WITH WHOM DO WE SHARE YOUR PERSONAL INFORMATION?](#sec3) You must not use the AI Products in any way that violates the terms or policies of any AI Service Provider.
-
-### Our AI Products
-Our AI Products are designed for the following functions:
-* AI translation
-
-### How We Process Your Data Using AI
-All personal information processed using our AI Products is handled in line with our Privacy Notice and our agreement with third parties. This ensures high security and safeguards your personal information throughout the process, giving you peace of mind about your data's safety.
+For users residing in other global jurisdictions, we process your personal information based on your consent, contractual necessity, or our legitimate business operations in accordance with applicable local data protection statutes.
 
 ---
 
-## 6. HOW DO WE HANDLE YOUR SOCIAL LOGINS?
+## 4. WHEN AND WITH WHOM DO WE SHARE YOUR PERSONAL INFORMATION?
 
-*In Short: If you choose to register or log in to our Services using an Apple or Google account, we may have access to certain information about you.*
+*In Short: We do not sell your personal data. We share information only with trusted service providers necessary to operate the Services and deliver our features.*
 
-Our Services offer you the ability to register and log in using your third-party account details with Apple or Google. Where you choose to do this, we will receive certain profile information about you from Apple or Google. The profile information we receive typically includes your name and email address, as well as any other basic information you choose to authorize on such service.
+We may share your personal data with third-party vendors, service providers, contractors, or agents ("**third parties**") who perform services on our behalf:
 
-We will use the information we receive only for the purposes that are described in this Privacy Notice or that are otherwise made clear to you on the relevant Services. Please note that we do not control, and are not responsible for, other uses of your personal information by Apple or Google. We recommend that you review their privacy notices to understand how they collect, use, and share your personal information, and how you can set your privacy preferences on their platforms.
+* **Cloud Infrastructure Providers:**
+  * *Google Cloud Platform (GCP):* Secure backend database, server hosting, and API infrastructure.
+* **Artificial Intelligence and Speech Providers:**
+  * *Google Cloud AI / Vertex AI:* Generative story creation, text-to-speech narration, speech-to-text transcription, and multilingual AI translation.
+* **Mapping and Navigation Providers:**
+  * *Google Maps Platform APIs:* Geocoding, landmark lookup, and route mapping. Google Maps processes location data in accordance with the Google Privacy Policy.
+* **Identity and Authentication Providers:**
+  * *Apple and Google:* Authenticating user logins and social sign-in.
 
----
+We have contractual data processing agreements in place with these third parties requiring them to protect your personal data, process it solely on our instructions, and maintain strict confidentiality and security standards.
 
-## 7. HOW LONG DO WE KEEP YOUR INFORMATION?
-
-*In Short: We keep your information for as long as necessary to fulfill the purposes outlined in this Privacy Notice unless otherwise required by law.*
-
-We will only keep your personal information for as long as it is necessary for the purposes set out in this Privacy Notice, unless a longer retention period is required or permitted by law (such as tax, accounting, or other legal requirements). No purpose in this notice will require us keeping your personal information for longer than the period of time in which users have an account with us.
-
-When we have no ongoing legitimate business need to process your personal information, we will either delete or anonymize such information, or, if this is not possible (for example, because your personal information has been stored in backup archives), then we will securely store your personal information and isolate it from any further processing until deletion is possible.
-
----
-
-## 8. HOW DO WE KEEP YOUR INFORMATION SAFE?
-
-*In Short: We aim to protect your personal information through a system of organizational and technical security measures.*
-
-We have implemented appropriate and reasonable technical and organizational security measures designed to protect the security of any personal information we process. However, despite our safeguards and efforts to secure your information, no electronic transmission over the Internet or information storage technology can be guaranteed to be 100% secure, so we cannot promise or guarantee that hackers, cybercriminals, or other unauthorized third parties will not be able to defeat our security and improperly collect, access, steal, or modify your information. Although we will do our best to protect your personal information, transmission of personal information to and from our Services is at your own risk. You should only access the Services within a secure environment.
+We may also disclose your information in the following situations:
+* **Business Transfers:** In connection with any merger, sale of company assets, financing, or acquisition of all or a portion of our business.
+* **Legal Obligations:** If required to do so by applicable law, regulation, subpoena, search warrant, or regulatory proceeding.
 
 ---
 
-## 9. DO WE COLLECT INFORMATION FROM MINORS?
+## 5. IS YOUR INFORMATION TRANSFERRED INTERNATIONALLY?
 
-*In Short: We do not knowingly collect data from or market to children under 18 years of age.*
+*In Short: Yes. Because Musafir AI operates globally, your personal information may be transferred to, stored, and processed in countries outside your country of residence.*
 
-We do not knowingly collect, solicit data from, or market to children under 18 years of age, nor do we knowingly sell such personal information. By using the Services, you represent that you are at least 18 or that you are the parent or guardian of such a minor and consent to such minor dependent's use of the Services. If we learn that personal information from users less than 18 years of age has been collected, we will deactivate the account and take reasonable measures to promptly delete such data from our records. If you become aware of any data we may have collected from children under age 18, please contact us at rishitpadagatti@gmail.com.
+Our cloud infrastructure and third-party AI service providers (including Google Cloud Platform and Google Cloud AI) operate data centers located in India, the United States, and other global regions.
 
----
+If you are accessing the Services from the **European Economic Area (EEA), United Kingdom (UK), Switzerland, Canada, Latin America, the Asia-Pacific region, or the Middle East**, please be aware that your personal information will be transferred to and processed in countries that may have different data protection laws than your country of residence.
 
-## 10. WHAT ARE YOUR PRIVACY RIGHTS?
+**Safeguards for International Transfers:**  
+Whenever we transfer personal data originating in the EEA, UK, or Switzerland to countries that have not received an adequacy decision from the European Commission or UK Information Commissioner's Office, we ensure appropriate safeguards are implemented in accordance with Chapter V of the GDPR. These safeguards include:
+* Entering into European Commission-approved **Standard Contractual Clauses (SCCs)** and the **UK International Data Transfer Addendum** with our cloud service providers.
+* Implementing robust technical safeguards, including data encryption in transit (TLS 1.2+) and encryption at rest (AES-256).
+* Enforcing strict contractual limitations on access and processing.
 
-*In Short: You may review, change, or terminate your account at any time, depending on your country, province, or state of residence.*
-
-**Withdrawing your consent:** If we are relying on your consent to process your personal information, which may be express and/or implied consent depending on the applicable law, you have the right to withdraw your consent at any time. You can withdraw your consent at any time by contacting us by using the contact details provided in the section [HOW CAN YOU CONTACT US ABOUT THIS NOTICE?](#sec13) below.
-
-However, please note that this will not affect the lawfulness of the processing before its withdrawal nor, when applicable law allows, will it affect the processing of your personal information conducted in reliance on lawful processing grounds other than consent.
-
-### Account Information
-
-If you would at any time like to review or change the information in your account or terminate your account, you can:
-* Log in to your account settings and update your user account.
-
-Upon your request to terminate your account, we will deactivate or delete your account and information from our active databases. However, we may retain some information in our files to prevent fraud, troubleshoot problems, assist with any investigations, enforce our legal terms and/or comply with applicable legal requirements.
-
-If you have questions or comments about your privacy rights, you may email us at rishitpadagatti@gmail.com.
+You may request a copy of the safeguards we employ for international data transfers by contacting us at rishitpadagatti@gmail.com.
 
 ---
 
-## 11. CONTROLS FOR DO-NOT-TRACK FEATURES
+## 6. DO WE USE COOKIES AND OTHER TRACKING TECHNOLOGIES?
 
-Most web browsers and some mobile operating systems and mobile applications include a Do-Not-Track ("DNT") feature or setting you can activate to signal your privacy preference not to have data about your online browsing activities monitored and collected. At this stage, no uniform technology standard for recognizing and implementing DNT signals has been finalized. As such, we do not currently respond to DNT browser signals or any other mechanism that automatically communicates your choice not to be tracked online. If a standard for online tracking is adopted that we must follow in the future, we will inform you about that practice in a revised version of this Privacy Notice.
+*In Short: We may use cookies and similar technologies to remember user preferences and maintain secure sessions.*
 
----
+We may use cookies, local storage, and similar technologies (such as device tokens) to secure your account, prevent crashes, save your app preferences, and maintain session continuity.
 
-## 12. DO WE MAKE UPDATES TO THIS NOTICE?
-
-*In Short: Yes, we will update this notice as necessary to stay compliant with relevant laws.*
-
-We may update this Privacy Notice from time to time. The updated version will be indicated by an updated "Revised" date at the top of this Privacy Notice. If we make material changes to this Privacy Notice, we may notify you either by prominently posting a notice of such changes or by directly sending you a notification. We encourage you to review this Privacy Notice frequently to be informed of how we are protecting your information.
+We do not use third-party tracking cookies for cross-context behavioral advertising or sell user profiles to data brokers. You can manage or disable cookies via your browser settings; however, disabling certain technologies may affect the functionality of our web services.
 
 ---
 
-## 13. HOW CAN YOU CONTACT US ABOUT THIS NOTICE?
+## 7. DO WE OFFER ARTIFICIAL INTELLIGENCE-BASED PRODUCTS?
 
-If you have questions or comments about this notice, you may email us at rishitpadagatti@gmail.com or contact us by post at:
+*In Short: We offer features powered by artificial intelligence and machine learning to generate travel stories, voice synthesis, and translations.*
 
-141  
-BDA 2nd Stage 12th Block, Nagarabhavi  
-Bangalore, Karnataka 560072  
-India  
+As a core part of our Services, Musafir AI utilizes generative artificial intelligence, machine learning, and neural speech synthesis technologies:
+
+* **AI Narration and Storytelling:** Dynamic generation of cultural and historical travel stories tailored to your current route and destination.
+* **AI Voice Cloning:** Processing voluntary user voice recordings to produce a personalized speaker model for reading stories.
+* **AI Multilingual Translation:** Translating travel content and transcripts into your preferred language.
+
+### Data Protection in AI Processing
+* Your prompts, uploaded photos, and audio recordings are transmitted securely via encrypted enterprise APIs to our AI service providers (Google Cloud AI).
+* **No Public Foundation Model Training:** Your private voice samples and personal travel logs are not used to train or refine publicly accessible foundation models without your explicit, separate consent.
+* All processing complies with strict enterprise confidentiality agreements and privacy guidelines.
 
 ---
 
-## 14. HOW CAN YOU REVIEW, UPDATE, OR DELETE THE DATA WE COLLECT FROM YOU?
+## 8. HOW DO WE HANDLE YOUR SOCIAL LOGINS?
 
-You have the right to request access to the personal information we collect from you, details about how we have processed it, correct inaccuracies, or delete your personal information. You may also have the right to withdraw your consent to our processing of your personal information. These rights may be limited in some circumstances by applicable law. To request to review, update, or delete your personal information, please contact us at rishitpadagatti@gmail.com.
+*In Short: If you choose to log in using Apple or Google, we receive basic identity information that you authorize.*
+
+Our Services offer you the ability to sign in using your existing Apple or Google account. When you do so, we receive basic profile information authorized by the identity provider—typically your name, verified email address, and a unique user identifier.
+
+We use this information solely to create and manage your Musafir AI account. We do not obtain your third-party account password. We recommend reviewing the privacy notices of Apple and Google to understand how they process and safeguard your data.
+
+---
+
+## 9. HOW LONG DO WE KEEP YOUR INFORMATION?
+
+*In Short: We keep your information only as long as necessary to provide the Services and fulfill legal obligations.*
+
+We retain your personal information only for as long as you maintain an active account with us or as necessary to fulfill the purposes set out in this Privacy Notice, unless a longer retention period is mandated or permitted by applicable law (such as tax, accounting, or fraud prevention requirements).
+
+When you delete your account or when we no longer have an ongoing legitimate business need to process your personal information, we will securely delete or anonymize your data from our active systems. If immediate deletion is not technically possible (for instance, if data has been archived in secure backups), we will isolate and safeguard your data until deletion is complete.
+
+---
+
+## 10. HOW DO WE KEEP YOUR INFORMATION SAFE?
+
+*In Short: We protect your personal data through industry-standard organizational and technical security measures.*
+
+We have implemented robust administrative, technical, and physical security measures designed to protect your personal information against unauthorized access, destruction, loss, alteration, or disclosure:
+
+* **Encryption in Transit:** All network communication between the mobile app, backend servers, and AI APIs is encrypted using Transport Layer Security (TLS 1.2 or higher).
+* **Encryption at Rest:** User data, audio files, and avatar images stored in cloud databases are encrypted using modern cryptographic standards (AES-256).
+* **Access Control:** Strict role-based access control and least-privilege principles are enforced for any server infrastructure.
+
+While we take rigorous measures to secure your data, no electronic transmission over the internet or storage system can be guaranteed 100% impenetrable. We encourage you to access our Services using secure networks and keep your credentials confidential.
+
+---
+
+## 11. DO WE COLLECT INFORMATION FROM MINORS?
+
+*In Short: We do not knowingly collect personal data from children under the age of digital consent required in their jurisdiction.*
+
+Musafir AI is not directed to children under the age of digital consent under applicable law:
+* **In the United States:** Children under 13 years of age (in compliance with the Children's Online Privacy Protection Act - COPPA).
+* **In the European Economic Area & United Kingdom:** Children under 13 to 16 years of age (in accordance with Article 8 of the GDPR and national member state regulations).
+* **In India:** Minors under 18 years of age without verifiable parental consent (in accordance with the Digital Personal Data Protection Act, 2023).
+
+By using the Services, you represent that you are at least the age of majority in your jurisdiction, or that you are the parent or legal guardian of such a minor and consent to their use of the Services. If we learn that personal data from a child under the required age has been collected without verifiable parental consent, we will promptly deactivate the account and delete the data from our records. If you believe we have inadvertently collected data from a child, please contact us at rishitpadagatti@gmail.com.
+
+---
+
+## 12. WHAT ARE YOUR PRIVACY RIGHTS BY REGION?
+
+*In Short: Depending on your country, state, or region of residence, you have specific legal rights regarding your personal data.*
+
+### A. European Economic Area (EEA), United Kingdom (UK), and Switzerland
+If you are located in the EEA, UK, or Switzerland, you have the following rights under the GDPR and UK GDPR:
+* **Right of Access (Art. 15):** The right to request copies of your personal data and information on how we process it.
+* **Right to Rectification (Art. 16):** The right to have inaccurate or incomplete personal data corrected without undue delay.
+* **Right to Erasure ("Right to be Forgotten") (Art. 17):** The right to request the deletion of your personal data where it is no longer needed or where you withdraw consent.
+* **Right to Restriction of Processing (Art. 18):** The right to restrict the processing of your personal data under certain conditions.
+* **Right to Data Portability (Art. 20):** The right to receive your personal data in a structured, commonly used, and machine-readable format and transmit it to another controller.
+* **Right to Object (Art. 21):** The right to object at any time to the processing of your personal data based on legitimate interests or for direct marketing.
+* **Right to Withdraw Consent:** The right to withdraw consent at any time where processing is based on consent.
+* **Right to Lodge a Complaint:** The right to lodge a complaint with your local supervisory authority (such as the UK Information Commissioner's Office (ICO) or your national Data Protection Authority in the EU).
+
+### B. United States Residents (California CCPA/CPRA and Other US State Laws)
+If you reside in California or other US states with consumer data privacy statutes (e.g., Virginia, Colorado, Connecticut, Utah, Texas), you have specific statutory rights:
+* **Right to Know and Access:** The right to request what categories and specific pieces of personal information we have collected, used, and disclosed about you.
+* **Right to Delete:** The right to request deletion of personal information collected from you, subject to statutory exceptions.
+* **Right to Correct:** The right to request correction of inaccurate personal information.
+* **No Sale or Sharing of Personal Data:** Musafir AI **does not sell** your personal information to third parties, nor do we "share" personal information for cross-context behavioral advertising as defined under the California Consumer Privacy Act (CCPA) and California Privacy Rights Act (CPRA).
+* **Right to Non-Discrimination:** We will not discriminate against you (by denying goods or services or charging different prices) for exercising any of your privacy rights.
+* **California "Shine the Light":** Under California Civil Code Section 1798.83, California residents may request information once a year regarding our disclosure (if any) of personal information to third parties for direct marketing purposes. We do not disclose personal information to third parties for direct marketing.
+
+### C. India Residents (Digital Personal Data Protection Act, 2023 - DPDP Act)
+If you reside in India, you are entitled to the following rights under the Digital Personal Data Protection Act, 2023:
+* **Right to Access Information:** The right to obtain a summary of personal data being processed by us and the processing activities undertaken.
+* **Right to Correction and Erasure:** The right to correct, complete, update, and request erasure of your personal data.
+* **Right to Grievance Redressal:** The right to readily available grievance redressal mechanisms regarding our obligations under the DPDP Act.
+* **Right to Nominate:** The right to nominate another individual who shall exercise your rights in the event of death or incapacity.
+
+### D. Other Jurisdictions (Canada, Brazil, Australia)
+* **Canada (PIPEDA):** You have the right to access and challenge the accuracy and completeness of your personal data, and to withdraw consent. You may also contact the Office of the Privacy Commissioner of Canada (OPC).
+* **Brazil (LGPD):** Brazilian residents enjoy rights to confirm processing, access data, correct incomplete or inaccurate data, anonymize or block unnecessary data, and revoke consent.
+* **Australia (Privacy Act 1988):** Australian residents have the right to request access to and correction of personal information held by us, and to file inquiries with the Office of the Australian Information Commissioner (OAIC).
+
+### How to Exercise Your Rights
+To exercise any of your privacy rights, please submit a request to us by emailing:  
+**rishitpadagatti@gmail.com** with the subject line *"Privacy Rights Request"*.
+
+We will verify your identity before processing your request. In accordance with applicable laws, we will respond to your request within thirty (30) days (or within any shorter or longer period permitted under your local statutory framework).
+
+---
+
+## 13. CONTROLS FOR DO-NOT-TRACK FEATURES
+
+Most web browsers and some mobile operating systems include a Do-Not-Track ("DNT") setting. Because no uniform technology standard for recognizing DNT signals has been finalized, our Services do not currently respond to automated DNT browser signals. If a universal standard is established in the future, we will update this notice accordingly.
+
+---
+
+## 14. DO WE MAKE UPDATES TO THIS NOTICE?
+
+*In Short: Yes. We will update this notice as necessary to stay compliant with global privacy laws and reflect changes in our Services.*
+
+We may update this Privacy Notice from time to time. The updated version will be indicated by a revised "Last updated" date at the top of this document. If we make material changes, we will notify you by prominently posting a notice within our application, on our website, or by sending you an electronic communication. We encourage you to review this Privacy Notice periodically.
+
+---
+
+## 15. HOW CAN YOU CONTACT US ABOUT THIS NOTICE?
+
+If you have questions, comments, or complaints about this Privacy Notice, or wish to contact our designated Data Protection and Grievance Officer, you may reach us at:
+
+* **Email:** [rishitpadagatti@gmail.com](mailto:rishitpadagatti@gmail.com)
+* **Designated Grievance & Data Protection Contact:** Rishit Padagatti
+* **Mailing Address:**  
+  Musafir AI  
+  141, BDA 2nd Stage 12th Block, Nagarabhavi  
+  Bangalore, Karnataka 560072  
+  India  
+
+If you are an EU or UK resident and feel we have not satisfactorily resolved your inquiry, you also have the right to contact your local data protection supervisory authority.
+
+---
+
+## 16. HOW CAN YOU REVIEW, UPDATE, OR DELETE THE DATA WE COLLECT FROM YOU?
+
+You have full control over your personal data:
+* **In-App Account Settings:** You can review, update, or edit your profile information directly within the account settings in the Musafir AI mobile app.
+* **Account and Data Deletion:** You can request the permanent deletion of your account and all associated personal data directly within the app settings or by emailing **rishitpadagatti@gmail.com**.
+
+Upon receipt of your deletion request, we will deactivate your account and permanently remove your personal data from our active databases, subject to any retention necessary to comply with applicable tax, accounting, or legal requirements.
