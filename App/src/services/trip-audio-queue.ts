@@ -161,6 +161,18 @@ export class TripAudioQueue {
   }
 
   /**
+   * Play a story right away, ahead of anything queued (stories unlocked before their geofence, for testing and demos).
+   * The current story stops; queued stories keep waiting behind it.
+   */
+  public playNow(itemId: string) {
+    const waiting = this.queue.filter((id) => id !== itemId);
+    this.queue = [];
+    this.enqueue(itemId, true);
+    this.queue.push(...waiting);
+    this.notify();
+  }
+
+  /**
    * Pause the currently playing audio.
    */
   public pause() {

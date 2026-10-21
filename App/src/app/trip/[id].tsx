@@ -61,6 +61,8 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const MIN_SHEET_HEIGHT = 160;
 const COLLAPSED_SHEET_HEIGHT = Math.min(SCREEN_HEIGHT * 0.40, 320);
 const EXPANDED_SHEET_HEIGHT = Math.min(SCREEN_HEIGHT * 0.82, 680);
+// Testing and demos: any ready story can be played from its map pin, before the car reaches its geofence.
+const UNLOCK_ALL_STORIES = process.env.EXPO_PUBLIC_UNLOCK_ALL_STORIES === 'true';
 
 export default function TripScreen() {
   const { id: tripId } = useLocalSearchParams<{ id: string }>();
@@ -1209,6 +1211,7 @@ export default function TripScreen() {
         isLivePlaying={isLivePlaying}
         onDismissLiveTranscript={() => setLiveTranscript(null)}
         onReportLiveTranscript={handleOpenLiveTranscriptReport}
+        onPlayItem={UNLOCK_ALL_STORIES ? (item) => audioQueueRef.current.playNow(item.id) : undefined}
       />
 
       {/* ── DRAGGABLE BOTTOM SHEET ── */}

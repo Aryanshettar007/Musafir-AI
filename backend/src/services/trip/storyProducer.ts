@@ -8,9 +8,9 @@ import { Place } from "../../models/place.model";
 import { Story, type StoryDoc } from "../../models/story.model";
 import type { ItemType } from "../../models/trip.model";
 import { cacheKey } from "../../pipeline/cacheKey";
-import { PROMPT_VERSION } from "../../pipeline/rules";
+import { KNOWN_MIN_RATINGS, PROMPT_VERSION } from "../../pipeline/rules";
 import type { Focus, Side } from "../../pipeline/types";
-import { writeStory, type PlaceFacts } from "../../pipeline/write";
+import { placeCard, writeStory, type PlaceFacts } from "../../pipeline/write";
 import { narrate } from "../../speech";
 
 export type StoryRow = StoryDoc & { _id: Types.ObjectId };
@@ -56,9 +56,11 @@ export function createStoryProducer(deps: StoryProducerDeps) {
     const rows = await Place.find({ _id: { $in: req.placeIds } }).lean();
     const places: PlaceFacts[] = req.placeIds.flatMap((id) => {
       const row = rows.find((r) => r._id.equals(id));
-      return row ? [{ name: row.name, kind: row.kind, facts: row.facts?.text }] : [];
+      if (!row) return [];
+      const known = !row.facts && (row.google?.userRatingCount ?? 0) >= KNOWN_MIN_RATINGS;
+      return [{ name: row.name, kind: row.kind, facts: row.facts?.text, card: placeCard(row.google?.primaryType, row.google?.userRatingCount), known }];
     });
-    if (req.type !== "trip-intro" && !places.some((p) => p.facts)) throw new Error("No facts for this item: refusing to write without them");
+    if (req.type !== "trip-intro" && !places.some((p) => p.facts || p.known)) throw new Error("No facts for this item: refusing to write without them");
 
     const written = await writeStory(deps.gemini, {
       type: req.type, language: req.language, voice: req.voice, focus: req.focus, side: req.side, targetSeconds: req.targetSeconds,

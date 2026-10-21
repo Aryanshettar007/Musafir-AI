@@ -65,6 +65,12 @@ describe("wikipediaClient", () => {
     expect(sent[0].url.searchParams.get("gsrlimit")).toBe("3");
   });
 
+  it("searchByName keeps articles without coordinates", async () => {
+    stubFetch([{ json: { query: { pages: [{ pageid: 3, index: 1, title: "Bengaluru Palace", description: "Royal palace in India" }] } } }]);
+    const hits = await client().searchByName({ query: "Bengaluru Palace" });
+    expect(hits).toEqual([{ pageId: 3, title: "Bengaluru Palace", description: "Royal palace in India", length: undefined, wikidataId: undefined }]);
+  });
+
   it("extract returns the plain text cut at a sentence, with the page url", async () => {
     stubFetch([{ json: { query: { pages: [{ pageid: 5, title: "Mysore Palace", extract: "First sentence. Second sentence is longer. Third sentence here." }] } } }]);
     const ex = await client().extract({ pageId: 5, maxChars: 50 });

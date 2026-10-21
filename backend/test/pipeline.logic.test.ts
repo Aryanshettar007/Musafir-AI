@@ -411,13 +411,13 @@ describe("curator answer checks (D3)", () => {
 describe("cache key and triggers", () => {
   const base = { type: "story", placeIds: ["b", "a"], language: "kn-IN", voice: "Girish", focus: "history", side: "left" } as const;
   it("sorts place ids and includes everything that changes the audio", () => {
-    expect(cacheKey(base)).toBe("v2|story|a,b|kn-IN|Girish|history|left");
+    expect(cacheKey(base)).toBe("v4|story|a,b|kn-IN|Girish|history|left");
     expect(cacheKey({ ...base, voice: "Nalini" })).not.toBe(cacheKey(base));
     expect(cacheKey({ ...base, side: "right" })).not.toBe(cacheKey(base));
     expect(cacheKey({ ...base, focus: "general" })).not.toBe(cacheKey(base));
   });
   it("keys the trip intro per trip", () => {
-    expect(cacheKey({ ...base, type: "trip-intro", placeIds: [], tripId: "T1", focus: "general", side: "none" })).toBe("v2|trip-intro|T1|kn-IN|Girish");
+    expect(cacheKey({ ...base, type: "trip-intro", placeIds: [], tripId: "T1", focus: "general", side: "none" })).toBe("v4|trip-intro|T1|kn-IN|Girish");
   });
 
   it("starts 30 % of the audio before the anchor, never before the route start", () => {

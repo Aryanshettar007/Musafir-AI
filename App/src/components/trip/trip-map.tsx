@@ -58,6 +58,8 @@ export interface TripMapProps {
   isLivePlaying?: boolean;
   onDismissLiveTranscript?: () => void;
   onReportLiveTranscript?: (transcript: LiveTranscriptData) => void;
+  // Set only when stories are unlocked (EXPO_PUBLIC_UNLOCK_ALL_STORIES): the spot card gets a play button.
+  onPlayItem?: (item: TripItem) => void;
 }
 
 export function TripMap({
@@ -87,6 +89,7 @@ export function TripMap({
   isLivePlaying,
   onDismissLiveTranscript,
   onReportLiveTranscript,
+  onPlayItem,
 }: TripMapProps) {
   const [selectedPlace, setSelectedPlace] = React.useState<TripItem | null>(null);
 
@@ -362,6 +365,19 @@ export function TripMap({
             <Text style={[styles.floatingPlaceTitle, { color: colors.text }]} numberOfLines={1}>
               {selectedPlace.title}
             </Text>
+
+            {/* Play now (unlocked stories only) */}
+            {onPlayItem && selectedPlace.status === 'ready' && (
+              <Pressable
+                style={({ pressed }) => [styles.floatingPlayBtn, { backgroundColor: colors.accent }, pressed && { opacity: 0.8 }]}
+                onPress={() => {
+                  onPlayItem(selectedPlace);
+                  setSelectedPlace(null);
+                }}
+                hitSlop={10}>
+                <Ionicons name="play" size={14} color="#FFFFFF" style={{ marginLeft: 2 }} />
+              </Pressable>
+            )}
 
             {/* Dismiss X */}
             <Pressable
@@ -701,6 +717,14 @@ const styles = StyleSheet.create({
   floatingCloseBtn: {
     padding: 4,
     marginLeft: 2,
+  },
+  floatingPlayBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 6,
   },
 
   // Live Mode Transcript Overlay Card
