@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPrompt, placeCard, writeStory, type WriteRequest } from "../src/pipeline/write";
+import { buildPrompt, openingProblems, placeCard, writeStory, type WriteRequest } from "../src/pipeline/write";
 import { introFactsCheck } from "./pipeline.write.helpers";
 import { fakeGemini } from "./helpers/fakes";
 
@@ -66,6 +66,16 @@ describe("story prompt", () => {
 
   it("brings interests in only where the place fits them", () => {
     expect(buildPrompt(base)).toContain("no food tips in a story that is not about food");
+  });
+
+  it("lets only the trip intro open with a greeting", () => {
+    expect(openingProblems("ನಮಸ್ಕಾರ ಸ್ನೇಹಿತರೇ, ಲಾಲ್‌ಬಾಗ್ ನೋಡಿ", "story")).toHaveLength(1);
+    expect(openingProblems("Hey folks, look out on your left", "story")).toHaveLength(1);
+    expect(openingProblems("Welcome back, this is Lalbagh", "food")).toHaveLength(1);
+    expect(openingProblems("Hey folks, welcome to our drive", "trip-intro")).toEqual([]);
+    expect(openingProblems("Welcome to Channapatna, the toy town", "town-welcome")).toEqual([]);
+    expect(openingProblems("Look left: that teak palace is Tipu's summer home", "story")).toEqual([]);
+    expect(openingProblems("Hidden history: this fort once guarded the city", "story")).toEqual([]); // "hi" only as a word
   });
 
   it("describes popularity in words", () => {

@@ -23,7 +23,26 @@ You speak to people in a moving car, so:
 - Never mention distances or how far away something is ("ahead", "coming up" is fine). The story plays just before the place.
 - The FACTS are in English. Write the title and the script in the LANGUAGE given below, translating the facts. Never answer in English unless that is the LANGUAGE.
 - Use ONLY facts from the FACTS section, except for a KNOWN PLACE (see the prompt). Never invent dates, names, numbers or claims. If unsure, leave it out.
+- This is one segment of a show that is already running. Only the trip intro greets the listener: every other story starts straight with the place, never with a greeting ("hello", "hey folks", "namaskara", "welcome"). Make the first line different every time: a question, a surprising fact, or something to spot out of the window.
 - End with one practical tip or a hook that makes them want to look out the window.`;
+
+// Greetings a story other than the trip intro must not open with. Each story is written on its own, so without the rule
+// and this check every one began "Namaskara snehitare" / "Hey folks" as if the show were starting again.
+const GREETINGS = [
+  "hey", "hello", "hi", "hiya", "namaste", "namaskar", "namaskara", "namaskaram", "vanakkam", "dear friends", "my friends", "folks",
+  "ನಮಸ್ಕಾರ", "ಸ್ನೇಹಿತರೇ", "ಸ್ನೇಹಿತರೆ", "ಹಲೋ", "ಹಾಯ್", "नमस्ते", "नमस्कार", "दोस्तों", "हेलो", "வணக்கம்", "నమస్కారం", "నమస్తే",
+  "നമസ്കാരം", "নমস্কার", "নমস্তে", "નમસ્તે", "નમસ્કાર", "ਨਮਸਤੇ", "ਸਤ ਸ੍ਰੀ ਅਕਾਲ",
+];
+const WELCOMES = ["welcome", "ಸ್ವಾಗತ", "स्वागत", "வரவேற்", "స్వాగతం", "സ്വാഗതം", "স্বাগত", "સ્વાગત", "ਸਵਾਗਤ"];
+
+// The first few words of a script that should start mid-show. A town-welcome may welcome the listener to the town.
+export function openingProblems(script: string, type: WriteRequest["type"]): string[] {
+  if (type === "trip-intro") return [];
+  const opening = script.split(/\s+/).slice(0, 4).join(" ").toLowerCase().replace(/[.,!?;:'"“”‘’-]/g, " ");
+  const words = type === "town-welcome" ? GREETINGS : [...GREETINGS, ...WELCOMES];
+  const hit = words.find((w) => (/^[a-z ]+$/.test(w) ? new RegExp(`(^|\\s)${w}(\\s|$)`).test(opening) : opening.includes(w)));
+  return hit ? [`The script opens with a greeting ("${hit}"). Only the trip intro greets; start straight with the place.`] : [];
+}
 
 export interface PlaceFacts {
   name: string;
@@ -138,7 +157,11 @@ export async function writeStory(gemini: GeminiClient, req: WriteRequest): Promi
     schema: StorySchema,
     language: req.language,
     // The title is shown and stored too: unchecked, Kannada trips got "श्री कांतिरवा स्टेडियम" and "ವಿದyarthi Bhavan".
-    validate: (v) => [...checkScript(v.script, req.language, { wordBudget: budget }), ...checkScript(v.title, req.language).map((p) => `Title: ${p}`)],
+    validate: (v) => [
+      ...checkScript(v.script, req.language, { wordBudget: budget }),
+      ...checkScript(v.title, req.language).map((p) => `Title: ${p}`),
+      ...openingProblems(v.script, req.type),
+    ],
   });
   return { ...res.value, model: res.model, words: countWords(res.value.script), budget };
 }

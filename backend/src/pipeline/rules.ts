@@ -5,7 +5,8 @@ import type { ItemType } from "../models/trip.model";
 // v2 (2026-10-11): explicit target-script instruction and per-voice word budgets; v1 stories are not reused.
 // v3 (2026-10-21): a food stop without an article is the subject of its own story (place card), not the area.
 // v4 (2026-10-22): famous places without an article are written from Gemini's knowledge; interests only where they fit.
-export const PROMPT_VERSION = 4;
+// v5 (2026-10-22): only the trip intro greets; every other story starts straight with the place.
+export const PROMPT_VERSION = 5;
 
 // Discovery (5.2).
 export const NEARBY_STEP_M = 15_000;
