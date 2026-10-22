@@ -9,6 +9,7 @@ import { decodePolyline, indexRoute } from "../src/geo";
 import { prepare } from "../src/pipeline/candidates";
 import { DiscoveryFileSchema } from "../src/pipeline/discoveryFile";
 import { fallbackPicks, finalizeItems, introItem, limitFood } from "../src/pipeline/plan";
+import { rulesFor } from "../src/pipeline/rules";
 import { avgSpeedMps } from "../src/pipeline/select";
 import { buildPool, buildSlots } from "../src/pipeline/slots";
 
@@ -26,13 +27,14 @@ async function main() {
 
   const route = indexRoute(decodePolyline(d.route.polyline));
   const v = avgSpeedMps(d.route);
-  const prepared = prepare({ route, google: d.google, wiki: d.wiki, originLabel: d.origin.label, destinationLabel: d.destination.label });
-  const pool = buildPool(prepared);
-  const slots = buildSlots(pool, route, d.route.durationS);
-  const picks = limitFood(fallbackPicks(slots, interests, route.totalM), v);
-  const items = finalizeItems(picks, { intro: introItem(`${d.origin.label} to ${d.destination.label}`), avgSpeedMps: v, totalM: route.totalM });
+  const rules = rulesFor(d.route.distanceM);
+  const prepared = prepare({ route, google: d.google, wiki: d.wiki, originLabel: d.origin.label, destinationLabel: d.destination.label, rules });
+  const pool = buildPool(prepared, rules);
+  const slots = buildSlots(pool, route, d.route.durationS, rules);
+  const picks = limitFood(fallbackPicks(slots, interests, route.totalM, rules), v, rules);
+  const items = finalizeItems(picks, { intro: introItem(`${d.origin.label} to ${d.destination.label}`, rules), avgSpeedMps: v, totalM: route.totalM, rules });
 
-  console.log(`${d.origin.label} -> ${d.destination.label}: ${(d.route.distanceM / 1000).toFixed(1)} km, ${Math.round(d.route.durationS / 60)} min, ${slots.length} slots`);
+  console.log(`${d.origin.label} -> ${d.destination.label}: ${(d.route.distanceM / 1000).toFixed(1)} km, ${Math.round(d.route.durationS / 60)} min, ${rules.mode} mode, ${slots.length} slots`);
   console.log(`discovery: ${d.google.length} Google places, ${d.wiki.length} Wikipedia articles; classes ${JSON.stringify(prepared.counts)}`);
   const matched = prepared.pois.filter((p) => p.article).length;
   console.log(`POIs ${prepared.pois.length} (${matched} matched to articles) -> strict ${pool.strict.length} (episodes ${pool.strict.filter((c) => c.kind === "episode").length}), relaxed extra ${pool.relaxed.length}, towns ${pool.towns.length}, regions ${pool.regions.length}`);

@@ -896,6 +896,17 @@ export default function HomeScreen() {
     }
   };
 
+  // What the route preview depends on, as a value: the source place, its coordinates, or the GPS fix rounded to about
+  // 100 m. Depending on the coordinate objects themselves looped: this effect sets sourcePoint.coords (a new object every
+  // time), which re-ran it, re-fetched /trips/preview and refit the map, over and over (the flicker).
+  const originKey = selectedSourceSuggestion
+    ? `place:${selectedSourceSuggestion.placeId}`
+    : sourcePoint.coords
+    ? `ll:${sourcePoint.coords.latitude.toFixed(5)},${sourcePoint.coords.longitude.toFixed(5)}`
+    : sourcePoint.isGps && deviceGpsCoords
+    ? `gps:${deviceGpsCoords.latitude.toFixed(3)},${deviceGpsCoords.longitude.toFixed(3)}`
+    : null;
+
   // Automatically fetch route alternatives when both source and destination are set
   useEffect(() => {
     let isCancelled = false;
@@ -930,7 +941,7 @@ export default function HomeScreen() {
           const points = decodePolyline(routes[0].polyline);
           if (points.length > 0) {
             setDestinationPoint((prev) => ({ ...prev, coords: points[points.length - 1] }));
-            setSourcePoint((prev) => (prev.isGps ? prev : { ...prev, coords: points[0] }));
+            setSourcePoint((prev) => (prev.isGps || prev.coords ? prev : { ...prev, coords: points[0] }));
 
             // Ensure sheet is brought down so the user can clearly see the routes on the map
             if (currentHeightRef.current > COLLAPSED_SHEET_HEIGHT + 20) {
@@ -970,13 +981,8 @@ export default function HomeScreen() {
     return () => {
       isCancelled = true;
     };
-  }, [
-    selectedSuggestion,
-    selectedSourceSuggestion,
-    sourcePoint.coords,
-    sourcePoint.isGps,
-    deviceGpsCoords,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- originKey stands for the origin values read above
+  }, [selectedSuggestion, originKey]);
 
   const currentRegion = {
     latitude: getVisibleCenterLatitude(

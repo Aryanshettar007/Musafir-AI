@@ -1,8 +1,6 @@
 import type { InterestId } from "../catalog/interests";
 import type { SponsoredItemSpec } from "../services/sponsor/types";
-import {
-  FOOD_MIN_GAP_S, INTRO_TRIGGER_RADIUS_M, MAJOR_TOWN_LENGTH, SIDE_NONE_END_M, SPACING_PADDING_S, TARGET_SECONDS, TOWN_WELCOME_LEAD_M,
-} from "./rules";
+import { INTERCITY_RULES, INTRO_TRIGGER_RADIUS_M, MAJOR_TOWN_LENGTH, SIDE_NONE_END_M, TOWN_WELCOME_LEAD_M, type TripRules } from "./rules";
 import { rank } from "./candidates";
 import { slotIndex, type Slot } from "./slots";
 import { placeKeysOf, type Candidate, type Focus, type PlannedItem, type RealItemType, type Side } from "./types";
@@ -10,20 +8,22 @@ import { placeKeysOf, type Candidate, type Focus, type PlannedItem, type RealIte
 // Where an item is "about", per type (trip spec 5.4.5): closest approach (story, food), anchor member (episode),
 // 1 km before the town's closest approach (town-welcome), start of the slot (long-form). Side is none for towns and
 // long-form, near the route ends and for episodes with members on both sides.
-export function plan(type: RealItemType, c: Candidate, focus: Focus, slot: Pick<Slot, "fromM">, totalM: number): PlannedItem {
+export function plan(
+  type: RealItemType, c: Candidate, focus: Focus, slot: Pick<Slot, "fromM">, totalM: number, rules: TripRules = INTERCITY_RULES,
+): PlannedItem {
   const anchor = type === "town-welcome" ? Math.max(0, c.routeDistanceM - TOWN_WELCOME_LEAD_M) : type === "long-form" ? slot.fromM : c.routeDistanceM;
   let side: Side = c.side;
   if (type === "town-welcome" || type === "long-form") side = "none";
   else if (type === "episode") side = new Set((c.members ?? [c]).map((m) => m.side)).size > 1 ? "none" : c.side;
   if (nearEnds(c.routeDistanceM, totalM)) side = "none";
-  return { type, candidate: c, focus, side, targetSeconds: TARGET_SECONDS[type], anchorRouteDistanceM: anchor, score: rank(c), title: c.name };
+  return { type, candidate: c, focus, side, targetSeconds: rules.targetSeconds[type], anchorRouteDistanceM: anchor, score: rank(c), title: c.name };
 }
 
 const nearEnds = (m: number, totalM: number) => m < SIDE_NONE_END_M || m > totalM - SIDE_NONE_END_M;
 
-export function introItem(title: string): PlannedItem {
+export function introItem(title: string, rules: TripRules = INTERCITY_RULES): PlannedItem {
   return {
-    type: "trip-intro", focus: "general", side: "none", targetSeconds: TARGET_SECONDS["trip-intro"], anchorRouteDistanceM: 0, score: Infinity,
+    type: "trip-intro", focus: "general", side: "none", targetSeconds: rules.targetSeconds["trip-intro"], anchorRouteDistanceM: 0, score: Infinity,
     title, locked: true, triggerRadiusM: INTRO_TRIGGER_RADIUS_M,
   };
 }
@@ -55,20 +55,22 @@ export const defaultType = (c: Candidate): RealItemType => allowedTypes(c)[0];
 
 // No curator needed: the top shortlist entry of every slot, a town for slots with nothing else (or a major town), and
 // the long-form region the slot builder already put in an otherwise empty slot.
-export function fallbackPicks(slots: readonly Slot[], interests: readonly InterestId[], totalM: number): PlannedItem[] {
+export function fallbackPicks(
+  slots: readonly Slot[], interests: readonly InterestId[], totalM: number, rules: TripRules = INTERCITY_RULES,
+): PlannedItem[] {
   const out: PlannedItem[] = [];
   for (const slot of slots) {
     const top = slot.candidates[0];
-    if (top) out.push(plan(defaultType(top), top, focusFor(top, interests), slot, totalM));
+    if (top) out.push(plan(defaultType(top), top, focusFor(top, interests), slot, totalM, rules));
     const town = slot.towns[0];
-    if (town && (!top || (town.article?.length ?? 0) >= MAJOR_TOWN_LENGTH)) out.push(plan("town-welcome", town, "general", slot, totalM));
+    if (town && (!top || (town.article?.length ?? 0) >= MAJOR_TOWN_LENGTH)) out.push(plan("town-welcome", town, "general", slot, totalM, rules));
   }
   return out;
 }
 
-// At most one food item per 45 minutes of driving; the lower-scoring of two close ones is dropped.
-export function limitFood(items: readonly PlannedItem[], avgSpeedMps: number): PlannedItem[] {
-  const gapM = FOOD_MIN_GAP_S * avgSpeedMps;
+// At most one food item per 45 minutes of driving (15 in a city); the lower-scoring of two close ones is dropped.
+export function limitFood(items: readonly PlannedItem[], avgSpeedMps: number, rules: TripRules = INTERCITY_RULES): PlannedItem[] {
+  const gapM = rules.foodMinGapS * avgSpeedMps;
   const out: PlannedItem[] = [];
   for (const it of [...items].sort((a, b) => a.anchorRouteDistanceM - b.anchorRouteDistanceM)) {
     if (it.type !== "food") {
@@ -82,18 +84,20 @@ export function limitFood(items: readonly PlannedItem[], avgSpeedMps: number): P
   return out;
 }
 
-function shortened(it: PlannedItem, totalM: number): PlannedItem | undefined {
+function shortened(it: PlannedItem, totalM: number, rules: TripRules): PlannedItem | undefined {
   if (it.locked || !it.candidate || (it.type !== "episode" && it.type !== "long-form")) return undefined;
   const candidate = it.type === "episode" ? (it.candidate.anchor ?? it.candidate) : it.candidate;
   const side: Side = it.type === "episode" && !nearEnds(candidate.routeDistanceM, totalM) ? candidate.side : "none";
-  return { ...it, type: "story", candidate, side, targetSeconds: TARGET_SECONDS.story };
+  return { ...it, type: "story", candidate, side, targetSeconds: rules.targetSeconds.story };
 }
 
-// The next anchor must be at least targetSeconds(prev) + 60 s of driving after the previous one. A violation first
+// The next anchor must be at least targetSeconds(prev) + 60 s (20 s in a city) of driving after the previous one. A violation first
 // shortens an episode or long-form to a story, then drops the lower-scoring item. Locked items (trip-intro,
 // sponsored) are never dropped or shortened, so their neighbours give way.
-export function enforceSpacing(items: readonly PlannedItem[], avgSpeedMps: number, totalM: number): PlannedItem[] {
-  const needM = (p: PlannedItem) => (p.targetSeconds + SPACING_PADDING_S) * avgSpeedMps;
+export function enforceSpacing(
+  items: readonly PlannedItem[], avgSpeedMps: number, totalM: number, rules: TripRules = INTERCITY_RULES,
+): PlannedItem[] {
+  const needM = (p: PlannedItem) => (p.targetSeconds + rules.spacingPaddingS) * avgSpeedMps;
   const out: PlannedItem[] = [];
   for (let cur of [...items].sort((a, b) => a.anchorRouteDistanceM - b.anchorRouteDistanceM)) {
     for (;;) {
@@ -106,15 +110,21 @@ export function enforceSpacing(items: readonly PlannedItem[], avgSpeedMps: numbe
         out.push(cur); // two fixed items that collide: nothing to give way
         break;
       }
+      // Behind a locked item, move a little later before shortening or dropping (local trips only).
+      const earliestM = prev.anchorRouteDistanceM + needM(prev);
+      if (prev.locked && !cur.locked && earliestM - cur.anchorRouteDistanceM <= rules.maxShiftM && earliestM <= totalM) {
+        cur = { ...cur, anchorRouteDistanceM: earliestM };
+        continue;
+      }
       // Shorten the longer of the two that can be shortened.
-      const options = [prev, cur].filter((x) => shortened(x, totalM)).sort((a, b) => b.targetSeconds - a.targetSeconds);
+      const options = [prev, cur].filter((x) => shortened(x, totalM, rules)).sort((a, b) => b.targetSeconds - a.targetSeconds);
       const target = options[0];
       if (target === prev) {
-        out[out.length - 1] = shortened(prev, totalM)!;
+        out[out.length - 1] = shortened(prev, totalM, rules)!;
         continue;
       }
       if (target === cur) {
-        cur = shortened(cur, totalM)!;
+        cur = shortened(cur, totalM, rules)!;
         continue;
       }
       // Nothing to shorten: drop the lower-scoring item (a locked one always stays).
@@ -126,33 +136,37 @@ export function enforceSpacing(items: readonly PlannedItem[], avgSpeedMps: numbe
 }
 
 // Trip-intro first, the sponsored item if any, then everything in route order with spacing enforced.
-export function finalizeItems(picks: readonly PlannedItem[], opts: { intro: PlannedItem; sponsor?: PlannedItem; avgSpeedMps: number; totalM: number }): PlannedItem[] {
+export function finalizeItems(
+  picks: readonly PlannedItem[],
+  opts: { intro: PlannedItem; sponsor?: PlannedItem; avgSpeedMps: number; totalM: number; rules?: TripRules },
+): PlannedItem[] {
   const all = [opts.intro, ...(opts.sponsor ? [opts.sponsor] : []), ...picks.filter((p) => !p.locked)];
-  return enforceSpacing(all, opts.avgSpeedMps, opts.totalM);
+  return enforceSpacing(all, opts.avgSpeedMps, opts.totalM, opts.rules);
 }
 
 // Same-slot replacements for an item dropped for lack of facts (spacing ran before facts were known): the slot's other
 // shortlist entries, then its towns as town-welcomes, best first, skipping places already in the trip.
 export function alternativesFor(
   dropped: PlannedItem, slots: readonly Slot[], usedKeys: ReadonlySet<string>, interests: readonly InterestId[], totalM: number,
+  rules: TripRules = INTERCITY_RULES,
 ): PlannedItem[] {
   if (!dropped.candidate || slots.length === 0) return [];
   const slot = slots[slotIndex(dropped.candidate.routeDistanceM, totalM, slots.length)];
   const fresh = (p: PlannedItem) => placeKeysOf(p).every((k) => !usedKeys.has(k));
   return [
-    ...slot.candidates.map((c) => plan(defaultType(c), c, focusFor(c, interests), slot, totalM)),
-    ...slot.towns.map((t) => plan("town-welcome", t, "general", slot, totalM)),
+    ...slot.candidates.map((c) => plan(defaultType(c), c, focusFor(c, interests), slot, totalM, rules)),
+    ...slot.towns.map((t) => plan("town-welcome", t, "general", slot, totalM, rules)),
   ].filter(fresh);
 }
 
 // Whether `item` can join the already spaced `items` without breaking the spacing rule or the food limit.
-export function fitsSpacing(item: PlannedItem, items: readonly PlannedItem[], avgSpeedMps: number): boolean {
-  const needM = (p: PlannedItem) => (p.targetSeconds + SPACING_PADDING_S) * avgSpeedMps;
+export function fitsSpacing(item: PlannedItem, items: readonly PlannedItem[], avgSpeedMps: number, rules: TripRules = INTERCITY_RULES): boolean {
+  const needM = (p: PlannedItem) => (p.targetSeconds + rules.spacingPaddingS) * avgSpeedMps;
   const sorted = [...items].sort((a, b) => a.anchorRouteDistanceM - b.anchorRouteDistanceM);
   const prev = sorted.filter((x) => x.anchorRouteDistanceM <= item.anchorRouteDistanceM).at(-1);
   const next = sorted.find((x) => x.anchorRouteDistanceM > item.anchorRouteDistanceM);
   if (prev && item.anchorRouteDistanceM - prev.anchorRouteDistanceM < needM(prev)) return false;
   if (next && next.anchorRouteDistanceM - item.anchorRouteDistanceM < needM(item)) return false;
-  const foodGapM = FOOD_MIN_GAP_S * avgSpeedMps;
+  const foodGapM = rules.foodMinGapS * avgSpeedMps;
   return item.type !== "food" || !items.some((x) => x.type === "food" && Math.abs(x.anchorRouteDistanceM - item.anchorRouteDistanceM) < foodGapM);
 }

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { INTEREST_IDS, type InterestId } from "../catalog/interests";
 import type { GeminiClient } from "../clients/gemini";
 import { rank } from "./candidates";
-import { CURATOR_NULL_MAX_RANK, MIN_CURATOR_PICKS } from "./rules";
+import { CURATOR_MAX_RANK_GAP, CURATOR_NULL_MAX_RANK, INTERCITY_RULES, MIN_CURATOR_PICKS, type TripRules } from "./rules";
 import { allowedTypes, defaultType, fallbackPicks, focusFor, plan } from "./plan";
 import type { Slot } from "./slots";
 import type { Candidate, Focus, PlannedItem } from "./types";
@@ -35,6 +35,19 @@ export function idMap(slots: readonly Slot[]): Map<string, Entry> {
   return m;
 }
 
+// The curator's pick, unless the best place of the same kind (food or not) in its slot is ten times more popular: then
+// that one. Towns are left alone. Not a "problem" for a retry: the answer is fine, the model just undervalues fame.
+function famousEnough(pickedId: string, entry: Entry, seen: ReadonlySet<string>): { id: string; candidate: Candidate } {
+  const c = entry.candidate;
+  if (c.kind === "town" || c.kind === "region") return { id: pickedId, candidate: c };
+  const isFood = c.kind === "food";
+  const best = entry.slot.candidates
+    .map((x, i) => ({ id: `s${entry.slot.index}c${i}`, candidate: x }))
+    .filter((x) => (x.candidate.kind === "food") === isFood && !seen.has(x.id))
+    .sort((a, b) => rank(b.candidate) - rank(a.candidate))[0];
+  return best && rank(best.candidate) - rank(c) > CURATOR_MAX_RANK_GAP ? best : { id: pickedId, candidate: c };
+}
+
 export interface Checked {
   items: PlannedItem[];
   itemSlots: number[]; // slot of each item, same order
@@ -45,7 +58,9 @@ export interface Checked {
 // Code checks every curator answer (design decision D3): each pick belongs to its slot's shortlist, the type fits
 // the place (town-welcome -> town, long-form -> town or region, episode -> cluster) and the focus is one of the
 // user's interests or "general". Repeats (same place twice, two picks of one kind in a slot) are dropped silently.
-export function checkCuratorAnswer(answer: CuratorAnswer, slots: readonly Slot[], interests: readonly InterestId[], totalM: number): Checked {
+export function checkCuratorAnswer(
+  answer: CuratorAnswer, slots: readonly Slot[], interests: readonly InterestId[], totalM: number, rules: TripRules = INTERCITY_RULES,
+): Checked {
   const ids = idMap(slots);
   const problems: string[] = [];
   const items: PlannedItem[] = [];
@@ -72,28 +87,46 @@ export function checkCuratorAnswer(answer: CuratorAnswer, slots: readonly Slot[]
       continue;
     }
     const slotKind = `${pick.slot}:${pick.type === "town-welcome" ? "town" : "other"}`;
-    if (seen.has(pick.candidateId) || taken.has(slotKind)) continue;
-    seen.add(pick.candidateId);
+    const chosen = famousEnough(pick.candidateId, entry, seen);
+    if (seen.has(chosen.id) || taken.has(slotKind)) continue;
+    seen.add(chosen.id);
     taken.add(slotKind);
-    items.push(plan(pick.type, entry.candidate, pick.focus as Focus, entry.slot, totalM));
+    const c = chosen.candidate;
+    const type = c === entry.candidate ? pick.type : defaultType(c);
+    // A focus the place has nothing to say about ("food" for an art gallery) becomes general instead of a forced angle.
+    const focus: Focus = pick.focus !== "general" && c.interests.includes(pick.focus) ? pick.focus : "general";
+    items.push(plan(type, c, focus, entry.slot, totalM, rules));
     itemSlots.push(pick.slot);
   }
   return { items, itemSlots, problems };
 }
 
-const SYSTEM = `You are the curator of an audio road trip. The route is cut into equal stretches ("slots"). For every slot you get a
+const system = (rules: TripRules) => `You are the curator of an audio road trip. The route is cut into equal stretches ("slots"). For every slot you get a
 short list of places the car passes. Choose at most one place per slot to tell a story about, plus optionally one town
 to welcome travellers to (towns have ids starting with t, places with c). The trip should have something to listen to
-every ten minutes or so, so use null only when every place in a slot is a poor fit, and never leave a slot empty just
-because a place is outside the listener's interests. Pick for the listener: lean towards their interests, prefer places
-they have not heard (heard=true means they already did), and vary the kinds of places so the trip stays interesting.
+every ${rules.slotMinutes} minutes or so, so use null only when every place in a slot is a poor fit, and never leave a slot empty just
+because a place is outside the listener's interests. Pick the places a traveller would most want to hear about: a
+famous landmark of the city or region beats a minor place, even when the minor place matches an interest. Judge fame from
+the review counts and from what you know about each place. Among places of similar fame, lean towards the listener's
+interests, prefer places they have not heard (heard=true means they already did), and vary the kinds of places.
+Pick a food place at most once every ${Math.round(rules.foodMinGapS / 60)} minutes of driving; extra food picks are thrown away.
 Use only the ids you are given. Types: story (a single place), food (a food place), episode (a cluster of places, longer), town-welcome
 (a town), long-form (a longer story about a town or a region). Answer with JSON only.`;
+
+// Review counts only order places within one trip; a Wikipedia-only landmark (Vidhana Soudha) has none, so the
+// model's own knowledge has to judge it.
+function fame(c: Candidate): string {
+  const best = c.anchor ?? c;
+  if (c.kind === "town" || c.kind === "region") return "town or area";
+  if (best.ratings === 0) return best.article ? "no Google reviews, has a Wikipedia article" : "no reviews";
+  const k = best.ratings >= 1000 ? `${Math.round(best.ratings / 1000)}k` : String(best.ratings);
+  return `${k} Google reviews${best.article ? ", has a Wikipedia article" : ""}`;
+}
 
 function prompt(slots: readonly Slot[], interests: readonly InterestId[], durationS: number): string {
   const line = (id: string, c: Candidate) =>
     `  ${id}: ${c.name} | ${c.kind}${c.kind === "episode" ? ` of ${c.members?.length ?? 0} places` : ""}` +
-    ` | ${c.side} side | interests: ${c.interests.join(", ") || "-"}${c.heard ? " | heard=true" : ""}`;
+    ` | ${fame(c)} | ${c.side} side | interests: ${c.interests.join(", ") || "-"}${c.heard ? " | heard=true" : ""}`;
   const body = slots
     .map((s) => {
       const rows = [
@@ -112,7 +145,10 @@ function prompt(slots: readonly Slot[], interests: readonly InterestId[], durati
 // entry. An explicit null is honoured only when the slot's best place is weak and the slot or a neighbour has an item
 // anyway (CURATOR_NULL_MAX_RANK); otherwise the top entry is used with focus "general" (the model judged it off-interest).
 // A slot with only towns that ends up empty between two empty neighbours gets a town-welcome.
-export function fillSlots(checked: Checked, answer: CuratorAnswer, slots: readonly Slot[], interests: readonly InterestId[], totalM: number): PlannedItem[] {
+export function fillSlots(
+  checked: Checked, answer: CuratorAnswer, slots: readonly Slot[], interests: readonly InterestId[], totalM: number,
+  rules: TripRules = INTERCITY_RULES,
+): PlannedItem[] {
   const items = [...checked.items];
   const covered = new Set(checked.itemSlots); // slots with any item, town-welcomes included
   const picked = new Set(checked.itemSlots.filter((_, k) => checked.items[k].type !== "town-welcome"));
@@ -125,16 +161,16 @@ export function fillSlots(checked: Checked, answer: CuratorAnswer, slots: readon
   for (const slot of slots) {
     const top = slot.candidates[0];
     if (!top || picked.has(slot.index)) continue;
-    if (!nulled.has(slot.index)) add(plan(defaultType(top), top, focusFor(top, interests), slot, totalM), slot);
-    else if (rank(top) >= CURATOR_NULL_MAX_RANK) add(plan(defaultType(top), top, "general", slot, totalM), slot);
+    if (!nulled.has(slot.index)) add(plan(defaultType(top), top, focusFor(top, interests), slot, totalM, rules), slot);
+    else if (rank(top) >= CURATOR_NULL_MAX_RANK) add(plan(defaultType(top), top, "general", slot, totalM, rules), slot);
   }
   // Weak nulls and town-only slots, in route order: fill only where the slot and both neighbours would stay empty.
   for (const slot of slots) {
     const i = slot.index;
     if (covered.has(i) || covered.has(i - 1) || covered.has(i + 1)) continue;
     const top = slot.candidates[0];
-    if (top) add(plan(defaultType(top), top, "general", slot, totalM), slot);
-    else if (slot.towns[0]) add(plan("town-welcome", slot.towns[0], "general", slot, totalM), slot);
+    if (top) add(plan(defaultType(top), top, "general", slot, totalM, rules), slot);
+    else if (slot.towns[0]) add(plan("town-welcome", slot.towns[0], "general", slot, totalM, rules), slot);
   }
   return items;
 }
@@ -150,21 +186,22 @@ export interface Curated {
 // falls back to the top shortlist entry of every slot, so a trip is always built (trip spec 5.4.6).
 export async function curate(
   gemini: GeminiClient,
-  input: { slots: readonly Slot[]; interests: readonly InterestId[]; durationS: number; totalM: number },
+  input: { slots: readonly Slot[]; interests: readonly InterestId[]; durationS: number; totalM: number; rules?: TripRules },
 ): Promise<Curated> {
   const { slots, interests, durationS, totalM } = input;
-  const fallback = () => fallbackPicks(slots, interests, totalM);
+  const rules = input.rules ?? INTERCITY_RULES;
+  const fallback = () => fallbackPicks(slots, interests, totalM, rules);
   if (!slots.some((s) => s.candidates.length > 0 || s.towns.length > 0)) return { items: [], source: "fallback", note: "no candidates" };
   try {
     const res = await gemini.generateJson({
       purpose: "curate",
-      system: SYSTEM,
+      system: system(rules),
       prompt: prompt(slots, interests, durationS),
       schema: CuratorSchema,
-      validate: (answer) => checkCuratorAnswer(answer, slots, interests, totalM).problems,
+      validate: (answer) => checkCuratorAnswer(answer, slots, interests, totalM, rules).problems,
     });
-    const checked = checkCuratorAnswer(res.value, slots, interests, totalM);
-    const items = fillSlots(checked, res.value, slots, interests, totalM);
+    const checked = checkCuratorAnswer(res.value, slots, interests, totalM, rules);
+    const items = fillSlots(checked, res.value, slots, interests, totalM, rules);
     const backup = fallback();
     if (items.length >= Math.min(MIN_CURATOR_PICKS, backup.length)) return { items, source: "gemini", model: res.model };
     return { items: backup, source: "fallback", note: `curator returned ${items.length} valid picks` };

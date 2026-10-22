@@ -23,6 +23,7 @@ import { Trip } from "../src/models/trip.model";
 import { poiKind } from "../src/pipeline/classify";
 import { discover } from "../src/pipeline/discover";
 import { DiscoveryFileSchema, toDiscoveryFile } from "../src/pipeline/discoveryFile";
+import { rulesFor } from "../src/pipeline/rules";
 import { createTripBuilder, createTripService, type BuildEvent } from "../src/services/trip";
 import { createSponsorAds } from "../src/services/sponsor/sponsorAds";
 import { createSponsorProvider } from "../src/services/sponsor/sponsorProvider";
@@ -139,7 +140,9 @@ async function main() {
     const route = await maps.computeRoute({ origin: { placeId: o[0].placeId }, destination: { placeId: d[0].placeId } });
     if (!route) throw new Error("No route");
     console.log(`route ${km(route.distanceM)} km, ${Math.round(route.durationS / 60)} min`);
-    const discovery = await discover({ maps, wikipedia, warn: (m) => console.warn(`  warn: ${m}`) }, indexRoute(decodePolyline(route.polyline)));
+    const rules = rulesFor(route.distanceM);
+    console.log(`mode ${rules.mode}`);
+    const discovery = await discover({ maps, wikipedia, warn: (m) => console.warn(`  warn: ${m}`) }, indexRoute(decodePolyline(route.polyline)), rules);
     const file = toDiscoveryFile({ originLabel: from, destinationLabel: to, route, discovery });
     const out = path.resolve(saveDiscovery);
     await writeFile(out, JSON.stringify(file));

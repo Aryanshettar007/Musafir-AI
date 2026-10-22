@@ -21,10 +21,15 @@ export interface WikiExtract {
   text: string;
 }
 
+// A name-search result. Some articles have no coordinates ("Bengaluru Palace"), so the location is optional here.
+export interface NameHit extends Omit<WikiHit, "location"> {
+  location?: LatLng;
+}
+
 export interface WikipediaClient {
   geosearch(req: { center: LatLng; radiusM: number; limit: number }): Promise<WikiHit[]>;
-  // Top `limit` articles for a name, with coordinates (articles without coordinates are dropped).
-  searchByName(req: { query: string; limit?: number }): Promise<WikiHit[]>;
+  // Top `limit` articles for a name, with coordinates when the article has them.
+  searchByName(req: { query: string; limit?: number }): Promise<NameHit[]>;
   // Plain-text article extract, cut at a sentence boundary to at most `maxChars`. null = no such page or empty.
   extract(req: { pageId: number; maxChars: number }): Promise<WikiExtract | null>;
 }
@@ -47,6 +52,18 @@ const RawPage = z.object({
 type RawPage = z.infer<typeof RawPage>;
 
 const QueryResponse = z.object({ query: z.object({ pages: z.array(RawPage) }).optional() });
+
+const toNameHit = (p: RawPage): NameHit => {
+  const c = p.coordinates?.[0];
+  return {
+    pageId: p.pageid,
+    title: p.title,
+    ...(c ? { location: { lat: c.lat, lng: c.lon } } : {}),
+    description: p.description,
+    length: p.length,
+    wikidataId: p.pageprops?.wikibase_item,
+  };
+};
 
 const toHit = (p: RawPage): WikiHit | null => {
   const c = p.coordinates?.[0];
@@ -139,7 +156,7 @@ export function wikipediaClient(cfg: { userAgent: string }): WikipediaClient {
         },
         QueryResponse,
       );
-      return (r.query?.pages ?? []).sort(byIndex).flatMap((p) => toHit(p) ?? []);
+      return (r.query?.pages ?? []).sort(byIndex).map(toNameHit);
     },
 
     async extract({ pageId, maxChars }) {

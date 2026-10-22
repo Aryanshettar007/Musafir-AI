@@ -94,6 +94,22 @@ describe("trip builder", () => {
     expect(fort?.google?.fetchedAt).toBeInstanceOf(Date);
   });
 
+  it("writes a famous place without an article from Gemini's knowledge instead of dropping it", async () => {
+    const places = [
+      gplace("g-fort", "Alpha Fort", 20, { primaryType: "historical_landmark", types: ["historical_landmark"] }),
+      gplace("g-temple", "Beta Temple", 32, { primaryType: "hindu_temple", types: ["hindu_temple"], userRatingCount: 100_000 }),
+    ];
+    const wiki = fakeWikipedia({ hits: [{ pageId: 101, title: "Alpha Fort", location: at(20, 300), description: "Fort in Karnataka, India", length: 20000 }] });
+    const { builder, gemini } = setup({ wiki, maps: fakeMaps({ searchNearby: async () => places, searchText: async () => ({ places: [] }) }) });
+    const trip = await newTrip("u1");
+    await builder.start(String(trip._id));
+    const t = await load(trip._id);
+    expect(t.items.find((i) => i.title === "Beta Temple")?.status).toBe("ready");
+    const prompt = gemini.calls.filter((c) => c.purpose === "story").map((c) => c.prompt).find((p) => p.includes("PLACES: Beta Temple"))!;
+    expect(prompt).toContain("KNOWN PLACE: Beta Temple (from Google: Hindu temple; hugely popular, with tens of thousands of reviews)");
+    expect(prompt).not.toContain("FACTS about Beta Temple");
+  });
+
   it("removes an item that has neither an article nor a town nearby", async () => {
     const { builder, events } = setup({ wiki: fakeWikipedia({ hits: [{ pageId: 101, title: "Alpha Fort", location: at(20, 300), description: "Fort in Karnataka, India", length: 20000 }] }) });
     const trip = await newTrip("u1");
@@ -105,11 +121,12 @@ describe("trip builder", () => {
   });
 
   it("replaces an item dropped for lack of facts with a same-slot alternative that has them", async () => {
-    // Slot 3 (30-40 km): Beta Temple ranks first but has no article and no town nearby; Delta Museum has an article.
+    // Slot 3 (30-40 km): Beta Temple ranks first but has no article, no town nearby and too few reviews to be written
+    // from Gemini's knowledge; Delta Museum has an article.
     const places = [
       gplace("g-fort", "Alpha Fort", 20, { primaryType: "historical_landmark", types: ["historical_landmark"] }),
-      gplace("g-temple", "Beta Temple", 32, { primaryType: "hindu_temple", types: ["hindu_temple"], userRatingCount: 100_000 }),
-      gplace("g-museum", "Delta Museum", 36, { primaryType: "museum", types: ["museum"], userRatingCount: 300 }),
+      gplace("g-temple", "Beta Temple", 32, { primaryType: "hindu_temple", types: ["hindu_temple"], userRatingCount: 9_000 }),
+      gplace("g-museum", "Delta Museum", 36, { primaryType: "museum", types: ["museum"], userRatingCount: 1 }),
     ];
     const wiki = fakeWikipedia({
       hits: [

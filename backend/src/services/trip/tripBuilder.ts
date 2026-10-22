@@ -15,7 +15,7 @@ import { discover, type Discovery } from "../../pipeline/discover";
 import { tripIntroFacts } from "../../pipeline/introFacts";
 import { labelTokens } from "../../pipeline/match";
 import { alternativesFor, finalizeItems, fitsSpacing, introItem, sponsoredItem } from "../../pipeline/plan";
-import { INTRO_TRIGGER_RADIUS_M, ITEMS_IN_FLIGHT, TRIGGER_RADIUS_M } from "../../pipeline/rules";
+import { INTRO_TRIGGER_RADIUS_M, ITEMS_IN_FLIGHT, rulesFor, TRIGGER_RADIUS_M, type TripRules } from "../../pipeline/rules";
 import { avgSpeedMps, selectPicks, type Selection } from "../../pipeline/select";
 import { triggerFor } from "../../pipeline/triggers";
 import { countWords } from "../../pipeline/write";
@@ -120,11 +120,13 @@ export function createTripBuilder(deps: TripBuilderDeps): TripBuilder {
     const warn = (message: string) => emit({ kind: "warn", tripId, message });
     const route = indexRoute(decodePolyline(trip.route.polyline));
     const v = avgSpeedMps(trip.route);
+    const rules = rulesFor(trip.route.distanceM);
+    emit({ kind: "stage", tripId, stage: "mode", detail: `${rules.mode} (${(trip.route.distanceM / 1000).toFixed(1)} km)` });
 
     let t = performance.now();
     let discovery: Discovery;
     try {
-      discovery = await discover({ maps: deps.maps, wikipedia: deps.wikipedia, warn }, route);
+      discovery = await discover({ maps: deps.maps, wikipedia: deps.wikipedia, warn }, route, rules);
     } catch (e) {
       throw new BuildFailure("DISCOVERY_FAILED", `Could not find places along the route: ${describe(e)}`);
     }
@@ -136,9 +138,9 @@ export function createTripBuilder(deps: TripBuilderDeps): TripBuilder {
     const prepared = prepare({
       route, google: discovery.google, wiki: discovery.wiki,
       originLabel: trip.origin.label, destinationLabel: trip.destination.label,
-      heardKeys: await heardKeys(trip.userId),
+      heardKeys: await heardKeys(trip.userId), rules,
     });
-    const selection = await selectPicks(deps.gemini, { route, durationS: trip.route.durationS, prepared, interests: trip.prefs.interests });
+    const selection = await selectPicks(deps.gemini, { route, durationS: trip.route.durationS, prepared, interests: trip.prefs.interests, rules });
     emit({ kind: "selection", tripId, selection });
     if (selection.picks.length === 0) throw new BuildFailure("NOTHING_BUILT", "Found nothing worth narrating along this route.");
 
@@ -152,13 +154,15 @@ export function createTripBuilder(deps: TripBuilderDeps): TripBuilder {
       }
     }
     const items = finalizeItems(selection.picks, {
-      intro: introItem(`${trip.origin.label} to ${trip.destination.label}`), sponsor, avgSpeedMps: v, totalM: route.totalM,
+      intro: introItem(`${trip.origin.label} to ${trip.destination.label}`, rules), sponsor, avgSpeedMps: v, totalM: route.totalM, rules,
     });
 
     // Facts, now that the final items are known; an item that can't get facts is replaced from its slot or removed.
-    const store = createPlaceStore({ wikipedia: deps.wikipedia, exclude: labelTokens(trip.origin.label, trip.destination.label), warn });
+    const store = createPlaceStore({
+      wikipedia: deps.wikipedia, exclude: labelTokens(trip.origin.label, trip.destination.label), borrowFor: rules.borrowTownFacts, warn,
+    });
     const first = await store.resolveItems(items, prepared.towns);
-    const resolved = await refill(first, { store, selection, items, interests: trip.prefs.interests, towns: prepared.towns, totalM: route.totalM, v, warn });
+    const resolved = await refill(first, { store, selection, items, interests: trip.prefs.interests, towns: prepared.towns, totalM: route.totalM, v, rules, warn });
     if (!resolved.some((r) => !r.planned.locked)) throw new BuildFailure("NOTHING_BUILT", "No place along the route had facts to write from.");
 
     const docs = resolved.map(({ planned, keys }) => itemDoc(planned, keys.flatMap((k) => store.idOf(k) ?? []), route, v));
@@ -173,15 +177,15 @@ export function createTripBuilder(deps: TripBuilderDeps): TripBuilder {
     first: { resolved: ResolvedItem[]; dropped: PlannedItem[] },
     ctx: {
       store: PlaceStore; selection: Selection; items: readonly PlannedItem[]; interests: TripRow["prefs"]["interests"];
-      towns: Prepared["towns"]; totalM: number; v: number; warn: (m: string) => void;
+      towns: Prepared["towns"]; totalM: number; v: number; rules: TripRules; warn: (m: string) => void;
     },
   ): Promise<ResolvedItem[]> {
     const out = [...first.resolved];
     const used = new Set(ctx.items.flatMap(placeKeysOf));
     for (const d of first.dropped) {
       let replacement: ResolvedItem | undefined;
-      for (const alt of alternativesFor(d, ctx.selection.slots, used, ctx.interests, ctx.totalM)) {
-        if (!fitsSpacing(alt, out.map((r) => r.planned), ctx.v)) continue;
+      for (const alt of alternativesFor(d, ctx.selection.slots, used, ctx.interests, ctx.totalM, ctx.rules)) {
+        if (!fitsSpacing(alt, out.map((r) => r.planned), ctx.v, ctx.rules)) continue;
         placeKeysOf(alt).forEach((k) => used.add(k));
         replacement = (await ctx.store.resolveItems([alt], ctx.towns)).resolved[0];
         if (replacement) break;

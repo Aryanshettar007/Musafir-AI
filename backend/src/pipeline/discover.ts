@@ -3,8 +3,8 @@ import { createLimiter } from "../clients/limiter";
 import type { WikiHit, WikipediaClient } from "../clients/wikipedia";
 import { encodePolyline, sampleRoute, sliceRoute, type LatLng, type RouteIndex } from "../geo";
 import {
-  FOOD_MAX_PAGES, FOOD_QUERY, FOOD_SEGMENT_M, MAPS_CONCURRENCY, NEARBY_MAX_RESULTS, NEARBY_RADIUS_M, NEARBY_SPLIT_OFFSET_FACTOR,
-  NEARBY_SPLIT_RADIUS_FACTOR, NEARBY_STEP_M, SIGHT_TYPES, WIKI_LIMIT, WIKI_RADIUS_M, WIKI_STEP_M,
+  FOOD_MAX_PAGES, FOOD_QUERY, FOOD_SEGMENT_M, INTERCITY_RULES, MAPS_CONCURRENCY, NEARBY_MAX_RESULTS, NEARBY_SPLIT_OFFSET_FACTOR,
+  NEARBY_SPLIT_RADIUS_FACTOR, WIKI_LIMIT, type TripRules,
 } from "./rules";
 
 export interface DiscoveryStats {
@@ -45,7 +45,7 @@ export function foodSegments(totalM: number): Array<[number, number]> {
   return Array.from({ length: count }, (_, i): [number, number] => [i * len, (i + 1) * len]);
 }
 
-export async function discover(deps: DiscoverDeps, route: RouteIndex): Promise<Discovery> {
+export async function discover(deps: DiscoverDeps, route: RouteIndex, rules: TripRules = INTERCITY_RULES): Promise<Discovery> {
   const { maps, wikipedia } = deps;
   const warn = deps.warn ?? (() => {});
   const stats: DiscoveryStats = { nearby: 0, nearbySplits: 0, textSearch: 0, wikipedia: 0, failedCalls: 0 };
@@ -66,24 +66,25 @@ export async function discover(deps: DiscoverDeps, route: RouteIndex): Promise<D
     }
   }
 
-  // Sights: Nearby Search every 15 km. Nearby returns at most 20 places, so a full call is repeated once as four
-  // overlapping circles (0.75 r, centres r/2 away along the diagonals): highways stay cheap, dense cities get more.
-  const nearbyTasks = sampleRoute(route, NEARBY_STEP_M).map(async (center) => {
+  // Sights: Nearby Search every rules.nearbyStepM (15 km between cities). Nearby returns at most 20 places, so a full
+  // call is repeated once as four overlapping circles (0.75 r, centres r/2 away along the diagonals): highways stay
+  // cheap, dense cities get more.
+  const nearbyTasks = sampleRoute(route, rules.nearbyStepM).map(async (center) => {
     stats.nearby++;
     const places = await guarded("nearby", () =>
-      maps.searchNearby({ center, radiusM: NEARBY_RADIUS_M, includedTypes: SIGHT_TYPES, maxResults: NEARBY_MAX_RESULTS }),
+      maps.searchNearby({ center, radiusM: rules.nearbyRadiusM, includedTypes: [...rules.sightTypes], maxResults: NEARBY_MAX_RESULTS }),
     );
     if (!places) return;
     add(places);
     if (places.length < NEARBY_MAX_RESULTS) return;
-    const d = (NEARBY_RADIUS_M * NEARBY_SPLIT_OFFSET_FACTOR) / Math.SQRT2;
+    const d = (rules.nearbyRadiusM * NEARBY_SPLIT_OFFSET_FACTOR) / Math.SQRT2;
     for (const [dx, dy] of [[d, d], [-d, d], [d, -d], [-d, -d]] as const) {
       stats.nearbySplits++;
       const more = await guarded("nearby-split", () =>
         maps.searchNearby({
           center: offsetPoint(center, dx, dy),
-          radiusM: NEARBY_RADIUS_M * NEARBY_SPLIT_RADIUS_FACTOR,
-          includedTypes: SIGHT_TYPES,
+          radiusM: rules.nearbyRadiusM * NEARBY_SPLIT_RADIUS_FACTOR,
+          includedTypes: [...rules.sightTypes],
           maxResults: NEARBY_MAX_RESULTS,
         }),
       );
@@ -108,10 +109,10 @@ export async function discover(deps: DiscoverDeps, route: RouteIndex): Promise<D
   // Wikipedia: one at a time (the client serialises). Runs alongside the Google calls.
   const wiki = new Map<number, WikiHit>();
   const wikiTask = (async () => {
-    for (const center of sampleRoute(route, WIKI_STEP_M)) {
+    for (const center of sampleRoute(route, rules.wikiStepM)) {
       stats.wikipedia++;
       try {
-        for (const hit of await wikipedia.geosearch({ center, radiusM: WIKI_RADIUS_M, limit: WIKI_LIMIT })) wiki.set(hit.pageId, hit);
+        for (const hit of await wikipedia.geosearch({ center, radiusM: rules.wikiRadiusM, limit: WIKI_LIMIT })) wiki.set(hit.pageId, hit);
       } catch (e) {
         stats.failedCalls++;
         warn(`wikipedia geosearch failed: ${e instanceof Error ? e.message : e}`);
