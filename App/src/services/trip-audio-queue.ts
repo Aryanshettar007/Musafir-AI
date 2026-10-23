@@ -71,7 +71,10 @@ export class TripAudioQueue {
    * Set an initial item for playback (e.g. first story) when entering a trip.
    */
   public setInitialItem(item: TripItem) {
-    if (!this.playingItem && (!this.lastPlayedItem || this.lastPlayedItem.id === item.id)) {
+    if (this.playingItem || this.played[item.id]) return;
+    // A placeholder seeded while nothing was ready yet (still building) must not stick once a playable item exists.
+    const current = this.lastPlayedItem && this.itemsMap.get(this.lastPlayedItem.id);
+    if (!this.lastPlayedItem || this.lastPlayedItem.id === item.id || (current && current.status !== 'ready' && item.status === 'ready')) {
       this.lastPlayedItem = item;
       this.notify();
     }
@@ -223,7 +226,12 @@ export class TripAudioQueue {
     } else if (this.playingItem) {
       this.pause();
     } else {
-      const idToPlay = targetItemId || this.lastPlayedItem?.id;
+      let idToPlay = targetItemId || this.lastPlayedItem?.id;
+      // The wanted story may still be building: play the first one that is ready rather than doing nothing.
+      if (!idToPlay || this.itemsMap.get(idToPlay)?.status !== 'ready') {
+        const ready = [...this.itemsMap.values()].filter((i) => i.status === 'ready');
+        idToPlay = (ready.find((i) => !this.played[i.id]) ?? ready[0])?.id ?? idToPlay;
+      }
       if (idToPlay) {
         this.enqueue(idToPlay, true);
       }

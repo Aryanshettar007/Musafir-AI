@@ -27,13 +27,13 @@ async function timed<T>(label: string, fn: () => Promise<T>): Promise<T> {
 async function main() {
   const maps = mapsClient({ apiKey: env.GOOGLE_MAPS_API_KEY });
   const gemini = geminiClient({
-    apiKey: env.GEMINI_API_KEY,
+    apiKeys: env.GEMINI_API_KEYS,
     liteRpm: env.GEMINI_LITE_RPM,
     flashRpm: env.GEMINI_FLASH_RPM,
     concurrency: env.GEMINI_CONCURRENCY,
     flashLanguages: env.GEMINI_FLASH_LANGUAGES,
   });
-  const gnani = createGnaniQueue(gnaniClient({ apiKey: env.GNANI_API_KEY }));
+  const gnani = createGnaniQueue(gnaniClient({ apiKeys: env.GNANI_API_KEYS }));
 
   // 1. Routes: Bengaluru -> Mysore Palace. Place ids come from autocomplete, so run that first.
   const suggestions = await timed("Places autocomplete \"Mysore pal\"", () =>

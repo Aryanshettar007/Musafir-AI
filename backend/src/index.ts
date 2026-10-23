@@ -36,14 +36,14 @@ const startServer = async () => {
     const storage = createStorage(env);
     const maps = mapsClient({ apiKey: env.GOOGLE_MAPS_API_KEY });
     const gemini = geminiClient({
-      apiKey: env.GEMINI_API_KEY,
+      apiKeys: env.GEMINI_API_KEYS,
       liteRpm: env.GEMINI_LITE_RPM,
       flashRpm: env.GEMINI_FLASH_RPM,
       concurrency: env.GEMINI_CONCURRENCY,
       flashLanguages: env.GEMINI_FLASH_LANGUAGES,
     });
     // Gnani allows one in-flight request per key: this is the only queue in the process, shared by every feature.
-    const gnani = createGnaniQueue(gnaniClient({ apiKey: env.GNANI_API_KEY }));
+    const gnani = createGnaniQueue(gnaniClient({ apiKeys: env.GNANI_API_KEYS }));
 
     const sponsor = createSponsorProvider({ ads: createSponsorAds({ gemini, gnani, storage }) });
     const builder = createTripBuilder({

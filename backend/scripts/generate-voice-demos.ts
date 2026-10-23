@@ -10,8 +10,8 @@ import { LANGUAGE_IDS, type LanguageId } from "../src/catalog/languages";
 // Voices and recommended defaults come from the product catalog so the picker and the clips never drift apart.
 import { RECOMMENDED_VOICES, VOICES, type VoiceGender } from "../src/catalog/voices";
 
-const API_KEY = process.env.GNANI_API_KEY;
-if (!API_KEY) throw new Error("GNANI_API_KEY missing from backend/.env");
+const API_KEY = process.env.GNANI_API_KEY1 ?? process.env.GNANI_API_KEY;
+if (!API_KEY) throw new Error("GNANI_API_KEY1 missing from backend/.env");
 
 const OUT_DIR = path.resolve(__dirname, "../generated/voice-demos");
 // Gnani allows only ONE in-flight request per API key (429 RATE_LIMITED otherwise).

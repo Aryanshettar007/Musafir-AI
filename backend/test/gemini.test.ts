@@ -14,7 +14,7 @@ import { UpstreamError } from "../src/clients/upstream";
 const Schema = z.object({ title: z.string(), script: z.string() });
 const good = JSON.stringify({ title: "Fort", script: "hello" });
 
-const cfg: GeminiConfig = { apiKey: "test", liteRpm: 100, flashRpm: 100, concurrency: 2, flashLanguages: [] };
+const cfg: GeminiConfig = { apiKeys: ["test"], liteRpm: 100, flashRpm: 100, concurrency: 2, flashLanguages: [] };
 
 // A transport that answers from a script (a string, or an Error to throw) and records the calls.
 function scripted(answers: Array<string | Error>): { transport: GeminiTransport; calls: GeminiCall[] } {

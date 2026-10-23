@@ -400,7 +400,7 @@ export async function askMusafir(params: AskParams): Promise<AskResult> {
   }
 
   try {
-    const res = await api.post<any>('/ask', payload);
+    const res = await api.post<any>('/ask', payload, { timeout: 40000 }); // the LLM step alone can take 13 s+ on the free tier
     const data = res?.data ?? res;
     if (!data || !data.audio?.base64) {
       throw new Error('Invalid response from Musafir voice assistant');

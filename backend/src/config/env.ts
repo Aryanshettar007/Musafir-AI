@@ -28,8 +28,7 @@ const EnvSchema = z.object({
   AUDIO_URL_TTL_SECONDS: z.coerce.number().int().min(60).max(604_800).default(604_800),
   // Third-party API keys. They stay on the server.
   GOOGLE_MAPS_API_KEY: z.string().min(1),
-  GEMINI_API_KEY: z.string().min(1),
-  GNANI_API_KEY: z.string().min(1),
+  // GEMINI_API_KEY1, GEMINI_API_KEY2, ... and GNANI_API_KEY1, ... are collected by loadEnv (see apiKeysFrom).
   // Gemini free tier: limits are per model, so each model gets its own requests-per-minute limiter.
   GEMINI_CONCURRENCY: z.coerce.number().int().min(1).default(2),
   GEMINI_LITE_RPM: z.coerce.number().int().min(1).default(10),
@@ -57,7 +56,21 @@ const EnvSchema = z.object({
   }
 });
 
-export type Env = z.infer<typeof EnvSchema>;
+export type Env = z.infer<typeof EnvSchema> & {
+  // In order; the next key is used when one hits its limit.
+  GEMINI_API_KEYS: string[];
+  GNANI_API_KEYS: string[];
+};
+
+// NAME1, NAME2, ... in numeric order. A plain NAME (the old single-key form) counts as the first key.
+export function apiKeysFrom(source: Record<string, string | undefined>, name: string): string[] {
+  const numbered = Object.keys(source)
+    .map((k) => ({ k, n: new RegExp(`^${name}(\\d+)$`).exec(k)?.[1] }))
+    .filter((x): x is { k: string; n: string } => x.n !== undefined)
+    .sort((a, b) => Number(a.n) - Number(b.n))
+    .map((x) => source[x.k]?.trim() ?? "");
+  return [source[name]?.trim() ?? "", ...numbered].filter((v) => v !== "");
+}
 
 function loadEnv(): Env {
   // `KEY=` lines copied from .env.example mean "not set", not an empty value.
@@ -67,7 +80,14 @@ function loadEnv(): Env {
     const problems = parsed.error.issues.map((i) => `  ${i.path.join(".")}: ${i.message}`).join("\n");
     throw new Error(`Invalid environment configuration (see backend/.env.example):\n${problems}`);
   }
-  return parsed.data;
+  const GEMINI_API_KEYS = apiKeysFrom(set, "GEMINI_API_KEY");
+  const GNANI_API_KEYS = apiKeysFrom(set, "GNANI_API_KEY");
+  const missing = [
+    ...(GEMINI_API_KEYS.length === 0 ? ["  GEMINI_API_KEY1: at least one Gemini key is required"] : []),
+    ...(GNANI_API_KEYS.length === 0 ? ["  GNANI_API_KEY1: at least one Gnani key is required"] : []),
+  ];
+  if (missing.length > 0) throw new Error(`Invalid environment configuration (see backend/.env.example):\n${missing.join("\n")}`);
+  return { ...parsed.data, GEMINI_API_KEYS, GNANI_API_KEYS };
 }
 
 export const env = loadEnv();

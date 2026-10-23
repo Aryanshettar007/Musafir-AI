@@ -58,8 +58,11 @@ export interface TripMapProps {
   isLivePlaying?: boolean;
   onDismissLiveTranscript?: () => void;
   onReportLiveTranscript?: (transcript: LiveTranscriptData) => void;
-  // Set only when stories are unlocked (EXPO_PUBLIC_UNLOCK_ALL_STORIES): the spot card gets a play button.
-  onPlayItem?: (item: TripItem) => void;
+  // Preview of the selected place: separate from the main playback, so it never touches the story queue.
+  onTogglePreview?: (item: TripItem) => void;
+  onStopPreview?: () => void;
+  previewItemId?: string | null;
+  isPreviewPlaying?: boolean;
 }
 
 export function TripMap({
@@ -89,9 +92,17 @@ export function TripMap({
   isLivePlaying,
   onDismissLiveTranscript,
   onReportLiveTranscript,
-  onPlayItem,
+  onTogglePreview,
+  onStopPreview,
+  previewItemId,
+  isPreviewPlaying,
 }: TripMapProps) {
   const [selectedPlace, setSelectedPlace] = React.useState<TripItem | null>(null);
+  const canPlaySelected = !!onTogglePreview && selectedPlace?.status === 'ready';
+  const isPreviewingSelected = !!selectedPlace && previewItemId === selectedPlace.id && !!isPreviewPlaying;
+  React.useEffect(() => {
+    if (previewItemId && previewItemId !== selectedPlace?.id) onStopPreview?.();
+  }, [selectedPlace?.id, previewItemId, onStopPreview]);
 
   // Compute a smart initial region (User GPS -> Trip Origin -> First Polyline Coord -> Default Bangalore)
   const initialRegion = React.useMemo(() => {
@@ -340,6 +351,7 @@ export function TripMap({
           style={[
             styles.floatingPlaceBanner,
             {
+              right: canPlaySelected ? 128 : 74, // room for the play button
               bottom: Animated.add(sheetHeight, 14),
               backgroundColor: colors.surface,
               borderColor: colors.border,
@@ -366,19 +378,6 @@ export function TripMap({
               {selectedPlace.title}
             </Text>
 
-            {/* Play now (unlocked stories only) */}
-            {onPlayItem && selectedPlace.status === 'ready' && (
-              <Pressable
-                style={({ pressed }) => [styles.floatingPlayBtn, { backgroundColor: colors.accent }, pressed && { opacity: 0.8 }]}
-                onPress={() => {
-                  onPlayItem(selectedPlace);
-                  setSelectedPlace(null);
-                }}
-                hitSlop={10}>
-                <Ionicons name="play" size={14} color="#FFFFFF" style={{ marginLeft: 2 }} />
-              </Pressable>
-            )}
-
             {/* Dismiss X */}
             <Pressable
               style={styles.floatingCloseBtn}
@@ -387,6 +386,24 @@ export function TripMap({
               <Ionicons name="close" size={16} color={colors.textSecondary} />
             </Pressable>
           </View>
+        </Animated.View>
+      )}
+
+      {/* PREVIEW play/pause for the selected place, left of the re-center button */}
+      {selectedPlace && canPlaySelected && (
+        <Animated.View style={[styles.playSelectedWrapper, { bottom: Animated.add(sheetHeight, 14) }]}>
+          <Pressable
+            style={({ pressed }) => [styles.recenterButton, { backgroundColor: colors.accent }, pressed && { opacity: 0.8 }]}
+            accessibilityRole="button"
+            accessibilityLabel={`${isPreviewingSelected ? 'Pause' : 'Preview'} ${selectedPlace.title}`}
+            onPress={() => onTogglePreview?.(selectedPlace)}>
+            <Ionicons
+              name={isPreviewingSelected ? 'pause' : 'play'}
+              size={20}
+              color="#FFFFFF"
+              style={isPreviewingSelected ? undefined : { marginLeft: 2 }}
+            />
+          </Pressable>
         </Animated.View>
       )}
 
@@ -718,13 +735,10 @@ const styles = StyleSheet.create({
     padding: 4,
     marginLeft: 2,
   },
-  floatingPlayBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 6,
+  playSelectedWrapper: {
+    position: 'absolute',
+    right: 70, // recenter button is 46 wide at right: 16
+    zIndex: 27,
   },
 
   // Live Mode Transcript Overlay Card

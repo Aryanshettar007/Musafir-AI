@@ -1,4 +1,4 @@
-**Last updated October 19, 2026**
+**Last updated October 23, 2026**
 
 ## AGREEMENT TO OUR LEGAL TERMS
 

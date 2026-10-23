@@ -61,8 +61,6 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const MIN_SHEET_HEIGHT = 160;
 const COLLAPSED_SHEET_HEIGHT = Math.min(SCREEN_HEIGHT * 0.40, 320);
 const EXPANDED_SHEET_HEIGHT = Math.min(SCREEN_HEIGHT * 0.82, 680);
-// Testing and demos: any ready story can be played from its map pin, before the car reaches its geofence.
-const UNLOCK_ALL_STORIES = process.env.EXPO_PUBLIC_UNLOCK_ALL_STORIES === 'true';
 
 export default function TripScreen() {
   const { id: tripId } = useLocalSearchParams<{ id: string }>();
@@ -90,6 +88,9 @@ export default function TripScreen() {
   const player = useAudioPlayer('');
   const livePlayer = useAudioPlayer('');
   const livePlayerStatus = useAudioPlayerStatus(livePlayer);
+  const previewPlayer = useAudioPlayer('');
+  const previewStatus = useAudioPlayerStatus(previewPlayer);
+  const [previewItemId, setPreviewItemId] = useState<string | null>(null);
   const listenQueueRef = useRef<ListenEvent[]>([]);
   const listenFlushTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
@@ -930,6 +931,22 @@ export default function TripScreen() {
   );
   handleLocationUpdateRef.current = handleLocationUpdate;
 
+  // Geofences are otherwise checked only when GPS moves 15 m. Re-check when a story becomes playable (built and
+  // downloaded), so the intro starts as soon as it is ready even if the car hasn't moved while the trip builds.
+  const playableKey = (trip?.items ?? [])
+    .filter((i) => i.status === 'ready' && downloads[i.id] === 'ready')
+    .map((i) => i.id)
+    .join(',');
+  useEffect(() => {
+    // Opening the trip is its start: the intro plays as soon as it is ready, wherever the phone is (queue skips it once played).
+    const intro = trip?.items.find((i) => i.type === 'trip-intro');
+    if (intro && playableKey.split(',').includes(intro.id) && !hasEndedSessionRef.current) {
+      audioQueueRef.current.enqueue(intro.id);
+    }
+    if (playableKey && userLocation) handleLocationUpdateRef.current?.(userLocation);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playableKey]);
+
   const startLocationWatcher = useCallback(async () => {
     try {
       const current = await Location.getCurrentPositionAsync({
@@ -1040,6 +1057,42 @@ export default function TripScreen() {
     }
   }, [polylineCoords]);
 
+
+  // ─── Preview a place's audio (separate player: never enters the main story queue) ───
+  const stopPreview = useCallback(() => {
+    try {
+      previewPlayer.pause();
+    } catch {}
+    setPreviewItemId(null);
+  }, [previewPlayer]);
+
+  const togglePreview = useCallback(
+    (item: TripItem) => {
+      if (previewItemId === item.id) {
+        if (previewStatus.playing) previewPlayer.pause();
+        else previewPlayer.play();
+        return;
+      }
+      const file = Platform.OS === 'web' ? null : localFile(item.id);
+      const uri = file && file.exists ? file.uri : item.audio?.url;
+      if (!uri) return;
+      audioQueueRef.current.pause(); // a preview takes over the speaker; the current story resumes from the main controls
+      setPreviewItemId(item.id);
+      previewPlayer.replace({ uri });
+      previewPlayer.play();
+    },
+    [previewItemId, previewStatus.playing, previewPlayer]
+  );
+
+  // A story starting on its own (geolocation) ends any preview.
+  useEffect(() => {
+    if (playingItem && isPlaying && previewItemId) stopPreview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playingItem?.id, isPlaying]);
+
+  useEffect(() => {
+    if (previewStatus.didJustFinish) setPreviewItemId(null);
+  }, [previewStatus.didJustFinish]);
 
   // ─── Toggle Play / Pause Handler ──────────────────────────────────────────
   const handleTogglePlayPause = useCallback(() => {
@@ -1211,7 +1264,10 @@ export default function TripScreen() {
         isLivePlaying={isLivePlaying}
         onDismissLiveTranscript={() => setLiveTranscript(null)}
         onReportLiveTranscript={handleOpenLiveTranscriptReport}
-        onPlayItem={UNLOCK_ALL_STORIES ? (item) => audioQueueRef.current.playNow(item.id) : undefined}
+        onTogglePreview={togglePreview}
+        onStopPreview={stopPreview}
+        previewItemId={previewItemId}
+        isPreviewPlaying={previewStatus.playing}
       />
 
       {/* ── DRAGGABLE BOTTOM SHEET ── */}

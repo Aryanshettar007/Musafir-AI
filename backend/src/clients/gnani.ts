@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { LanguageId } from "../catalog/languages";
 import { convertToMp3 } from "../utils/audioConverter";
+import { createKeyRing } from "./keyRing";
 import { asUpstreamError, fetchWithTimeout, isRetryableStatus, parseRetryAfter, UpstreamError } from "./upstream";
 
 const BASE_URL = "https://api.vachana.ai";
@@ -41,10 +42,17 @@ const VoiceCloneResponse = z.object({
 // Errors are JSON, either { error: { type, message } } or a flat { message }.
 const ErrorBody = z.object({ message: z.string().optional(), error: z.object({ message: z.string().optional() }).optional() });
 
-export function gnaniClient(cfg: { apiKey: string }): GnaniClient {
-  const headers = { "X-API-Key-ID": cfg.apiKey };
+export function gnaniClient(cfg: { apiKeys: string[] }): GnaniClient {
+  // Gnani's status for an exhausted key isn't documented (only 429 is known), so a refused or out-of-credit key
+  // (401/402/403) also moves on to the next one.
+  const ring = createKeyRing("gnani", cfg.apiKeys, [401, 402, 403, 429]);
 
-  async function send(path: string, init: RequestInit & { timeoutMs: number }): Promise<Response> {
+  // The key header is added per try, so a rate-limited key can be swapped for the next one.
+  function send(path: string, init: RequestInit & { timeoutMs: number }): Promise<Response> {
+    return ring.withKey((key) => sendWithKey(path, { ...init, headers: { ...init.headers, "X-API-Key-ID": key } }));
+  }
+
+  async function sendWithKey(path: string, init: RequestInit & { timeoutMs: number }): Promise<Response> {
     let res: Response;
     try {
       res = await fetchWithTimeout(`${BASE_URL}${path}`, init);
@@ -89,7 +97,7 @@ export function gnaniClient(cfg: { apiKey: string }): GnaniClient {
 
       const res = await send("/api/v1/tts/inference", {
         method: "POST",
-        headers: { ...headers, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
         timeoutMs: TTS_TIMEOUT_MS,
       });
@@ -118,7 +126,7 @@ export function gnaniClient(cfg: { apiKey: string }): GnaniClient {
       form.append("audio_file", new Blob([new Uint8Array(sendAudio)], { type: sendMimeType }), sendFilename);
       form.append("language_code", languageCode);
       form.append("format", "transcribe");
-      const res = await send("/stt/v3", { method: "POST", headers, body: form, timeoutMs: STT_TIMEOUT_MS });
+      const res = await send("/stt/v3", { method: "POST", body: form, timeoutMs: STT_TIMEOUT_MS });
       let body: string;
       try {
         body = await res.text();
@@ -139,7 +147,6 @@ export function gnaniClient(cfg: { apiKey: string }): GnaniClient {
       form.append("audio_file", new Blob([new Uint8Array(audio)], { type: mimeType }), filename);
       const res = await send("/api/v1/tts/voice-clone/embeddings", {
         method: "POST",
-        headers,
         body: form,
         timeoutMs: TTS_TIMEOUT_MS,
       });

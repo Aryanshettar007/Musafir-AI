@@ -155,11 +155,11 @@ async function main() {
   await connectDB();
   const gemini = countGemini(
     geminiClient({
-      apiKey: env.GEMINI_API_KEY, liteRpm: env.GEMINI_LITE_RPM, flashRpm: env.GEMINI_FLASH_RPM,
+      apiKeys: env.GEMINI_API_KEYS, liteRpm: env.GEMINI_LITE_RPM, flashRpm: env.GEMINI_FLASH_RPM,
       concurrency: env.GEMINI_CONCURRENCY, flashLanguages: env.GEMINI_FLASH_LANGUAGES,
     }),
   );
-  const gnani = countGnani(createGnaniQueue(gnaniClient({ apiKey: env.GNANI_API_KEY })));
+  const gnani = countGnani(createGnaniQueue(gnaniClient({ apiKeys: env.GNANI_API_KEYS })));
   const storage = createStorage(env);
 
   const rows: Array<Extract<BuildEvent, { kind: "item" }>> = [];

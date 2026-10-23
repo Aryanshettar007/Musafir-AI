@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -486,7 +487,20 @@ export default function ProfileScreen() {
               {/* App Info & Legal Links */}
               <View style={[styles.appInfoRow, { borderTopColor: colors.divider }]}>
                 <Text style={[styles.appInfoText, { color: colors.textSecondary }]}>
-                  Musafir AI • v1.0.0
+                  Built by{' '}
+                  <Text
+                    accessibilityRole="link"
+                    style={{ color: colors.textPrimary }}
+                    onPress={() => Linking.openURL('https://aryanshettar.tech/').catch(() => {})}>
+                    Aryan Shettar
+                  </Text>{' '}
+                  and{' '}
+                  <Text
+                    accessibilityRole="link"
+                    style={{ color: colors.textPrimary }}
+                    onPress={() => Linking.openURL('https://www.rishitpadagatti.dev/').catch(() => {})}>
+                    Rishit Padagatti
+                  </Text>
                 </Text>
                 <LegalLinks variant="compact">
                   <Text style={[styles.bullet, { color: isDark ? '#48484A' : '#C7C7CC' }]}>•</Text>

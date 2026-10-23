@@ -27,13 +27,13 @@ async function main() {
   await connectDB();
   const ads = createSponsorAds({
     gemini: geminiClient({
-      apiKey: env.GEMINI_API_KEY,
+      apiKeys: env.GEMINI_API_KEYS,
       liteRpm: env.GEMINI_LITE_RPM,
       flashRpm: env.GEMINI_FLASH_RPM,
       concurrency: env.GEMINI_CONCURRENCY,
       flashLanguages: env.GEMINI_FLASH_LANGUAGES,
     }),
-    gnani: createGnaniQueue(gnaniClient({ apiKey: env.GNANI_API_KEY })),
+    gnani: createGnaniQueue(gnaniClient({ apiKeys: env.GNANI_API_KEYS })),
     storage: createStorage(env),
   });
 

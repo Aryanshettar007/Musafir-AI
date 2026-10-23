@@ -1,4 +1,4 @@
-**Last updated October 19, 2026**
+**Last updated October 23, 2026**
 
 This Privacy Notice for Musafir AI ("**we**," "**us**," or "**our**"), describes how and why we might access, collect, store, use, and/or share ("**process**") your personal information when you use our services ("**Services**") worldwide, including when you:
 
@@ -14,13 +14,13 @@ This Privacy Notice for Musafir AI ("**we**," "**us**," or "**our**"), describes
 
 *This summary provides key points from our Privacy Notice, but you can find out more details about any of these topics by clicking the link following each key point or by using our table of contents below to find the section you are looking for.*
 
-* **What personal information do we process?** When you visit, use, or navigate our Services, we may process personal information depending on how you interact with us and the Services, the choices you make, and the features you use (such as voluntary audio samples for voice cloning, avatar pictures, and travel location data). [Learn more about personal information you disclose to us.](#sec1)
+* **What personal information do we process?** When you visit, use, or navigate our Services, we may process personal information depending on how you interact with us and the Services, the choices you make, and the features you use (such as your voice questions, voluntary audio samples for voice cloning, avatar pictures, and travel location data). [Learn more about personal information you disclose to us.](#sec1)
 * **Do we process any sensitive personal information?** We do not process special category or sensitive personal data (such as racial or ethnic origins, sexual orientation, political opinions, or religious beliefs).
 * **Do we collect any information from third parties?** Aside from profile authentication details provided with your authorization by Apple or Google when using social sign-in, we do not collect information about you from third parties.
 * **How do we process your information?** We process your information to provide, personalize, and administer our Services, deliver AI-guided travel audio stories, process custom voice models, communicate with you, ensure security and fraud prevention, and comply with applicable laws worldwide. [Learn more about how we process your information.](#sec2)
 * **What legal bases do we rely on?** For users in jurisdictions such as the European Economic Area (EEA) and United Kingdom (UK), we process personal information under valid legal grounds under the GDPR and UK GDPR, including consent, performance of our contract with you, legitimate interests, and compliance with legal obligations. [Learn more about our legal bases.](#sec3)
-* **In what situations and with which parties do we share personal information?** We share information only with trusted service providers necessary to operate the Services (such as Google Cloud Platform for cloud hosting, Google Cloud AI for generative audio and translation, and Google Maps for navigation and points of interest). We do not sell your personal data. [Learn more about when and with whom we share your personal information.](#sec4)
-* **Do we transfer your information internationally?** Yes. We serve users globally. Your personal information may be transferred to, stored, and processed in cloud data centers located in India, the United States, and other global regions. We implement robust safeguards, including Standard Contractual Clauses (SCCs), to protect your data. [Learn more about international transfers.](#sec5)
+* **In what situations and with which parties do we share personal information?** We share information only with service providers necessary to operate the Services: Google (Gemini for AI-written stories and answers, Google Maps Platform for maps, routes and places, and Firebase for sign-in), Gnani (Vachana) for speech-to-text, text-to-speech and voice cloning, and our database and file-storage providers. We do not sell your personal data. [Learn more about when and with whom we share your personal information.](#sec4)
+* **Do we transfer your information internationally?** Yes. We serve users globally. Your personal information may be transferred to, stored, and processed in cloud data centers located in India, the United States, and other global regions. Where required, we rely on appropriate transfer safeguards, such as Standard Contractual Clauses (SCCs). [Learn more about international transfers.](#sec5)
 * **How do we keep your information safe?** We employ industry-standard organizational and technical security measures (such as TLS encryption in transit and secure cloud storage) to safeguard your personal information. [Learn more about how we keep your information safe.](#sec10)
 * **What are your privacy rights?** Depending on where you reside (including the European Economic Area, the United Kingdom, Switzerland, the United States, India, Canada, Brazil, and Australia), you have specific statutory privacy rights, including rights of access, correction, deletion, restriction, and data portability. [Learn more about your privacy rights by region.](#sec12)
 * **How do you exercise your rights?** The easiest way to exercise your rights is by emailing us at rishitpadagatti@gmail.com. We respond to verified requests within thirty (30) days or within the statutory timelines required by your local data protection authority.
@@ -60,21 +60,22 @@ We collect personal information that you voluntarily provide to us when you crea
 
 **Personal Information Provided by You.** The personal information that we collect depends on the context of your interactions with us and the Services, the choices you make, and the features you use. The personal information we collect may include:
 
-* **Account details:** names, email addresses, usernames, and hashed passwords.
+* **Account details:** names and email addresses. If you sign in with email and password, your password is handled by our authentication provider (Firebase Authentication, a Google service); it is stored there in hashed form and we never see or store it in readable form.
 * **Location and navigation data:** real-time GPS coordinates, route points, and travel destinations (used solely to trigger localized travel stories and navigation recommendations).
 * **Profile media:** photos and profile avatars that you explicitly pick and upload to customize your voice profile or user avatar.
+* **Voice questions:** when you ask Musafir a question by voice, the audio of your question, the text transcribed from it, and the answer we generate. Your approximate trip context and current location are also used to answer it.
 * **Audio samples:** voice recordings voluntarily recorded or uploaded by you when utilizing our custom voice cloning features.
 * **Travel preferences:** travel mode, destination interests, language preferences, and age range to tailor narration content.
 * **Device local cache:** localized cached story content and app state stored directly on your device.
 
-**Sensitive Information.** We do not process sensitive personal data (e.g., racial or ethnic origin, political opinions, religious or philosophical beliefs, trade union membership, genetic data, biometric identification data for public surveillance, or health data). Audio samples uploaded for voice cloning are processed solely to compute voice feature vectors for custom narration playback and are never used for biometric identity verification or shared with law enforcement or commercial brokers.
+**Sensitive Information.** We do not process sensitive personal data (e.g., racial or ethnic origin, political opinions, religious or philosophical beliefs, trade union membership, genetic data, biometric identification data for public surveillance, or health data). Audio samples uploaded for voice cloning are processed solely to compute voice feature vectors for custom narration playback (by our speech provider, Gnani) and are never used for biometric identity verification or shared with commercial brokers.
 
 **Social Login Data.** We provide the option to register and sign in with us using your existing Apple or Google account. If you choose to register this way, we collect the basic profile information you authorize (typically your name and email address), as described in [HOW DO WE HANDLE YOUR SOCIAL LOGINS?](#sec8).
 
 **Application Permissions.** If you use our mobile application, we request the following permissions on your device:
 * *Geolocation Information:* We request permission to access location data while using the app (or in the background during active trip navigation) to detect nearby landmarks and play timely contextual travel stories. You can adjust or revoke location permissions at any time in your mobile device's settings.
 * *Photos and Media:* When selecting an avatar image, our application utilizes the native system photo picker. We access only the specific photo that you explicitly pick and authorize; our application never requests or obtains full access to your photo library.
-* *Microphone and Audio:* When recording voice samples for custom narration, we request microphone permission to record your reference audio. You can disable microphone access at any time in your device settings.
+* *Microphone and Audio:* We request microphone permission to record the voice questions you ask and, if you use custom voices, the reference audio for your voice sample. The microphone is used only when you start a recording. You can disable microphone access at any time in your device settings.
 
 ### Google API Services Compliance
 Our use and transfer to any other app of information received from Google APIs adheres to the **Google API Services User Data Policy**, including the Limited Use requirements.
@@ -89,7 +90,7 @@ We process your personal information for various purposes depending on how you i
 
 * **Account Creation and Authentication:** To facilitate account registration, authenticate sign-ins, and maintain your account profile.
 * **Service Delivery and Narration:** To deliver location-aware travel stories, route directions, audio transcripts, and interactive Q&A.
-* **Custom Voice Personalization:** To process your voluntarily uploaded audio samples and avatar photos to generate voice models and personalized narration for your trips.
+* **Custom Voice Personalization:** To process your voluntarily uploaded audio samples and avatar photos to generate voice models and personalized narration for your trips, and to transcribe and answer the voice questions you ask.
 * **Service Maintenance and Troubleshooting:** To monitor app performance, fix crashes, diagnose technical bugs, and ensure server stability.
 * **Safety and Fraud Prevention:** To protect our users and infrastructure against unauthorized access, abusive prompt submissions, spam, or security threats.
 * **Legal Compliance:** To fulfill our obligations under tax, corporate, accounting, and consumer protection laws worldwide, and to cooperate with lawful requests from authorities.
@@ -115,18 +116,21 @@ For users residing in other global jurisdictions, we process your personal infor
 
 *In Short: We do not sell your personal data. We share information only with trusted service providers necessary to operate the Services and deliver our features.*
 
-We may share your personal data with third-party vendors, service providers, contractors, or agents ("**third parties**") who perform services on our behalf:
+We share your personal data with third-party vendors and service providers ("**third parties**") who perform services on our behalf. We send them only what they need for the feature you are using:
 
-* **Cloud Infrastructure Providers:**
-  * *Google Cloud Platform (GCP):* Secure backend database, server hosting, and API infrastructure.
-* **Artificial Intelligence and Speech Providers:**
-  * *Google Cloud AI / Vertex AI:* Generative story creation, text-to-speech narration, speech-to-text transcription, and multilingual AI translation.
-* **Mapping and Navigation Providers:**
-  * *Google Maps Platform APIs:* Geocoding, landmark lookup, and route mapping. Google Maps processes location data in accordance with the Google Privacy Policy.
+* **AI and Speech Providers:**
+  * *Google Gemini API (Google):* Writes travel stories and answers your questions. It receives text only: your transcribed question, recent conversation turns, details about your trip and nearby places, and your position along the route.
+  * *Gnani (Vachana):* Converts text to speech for narration and answers, transcribes the audio of your voice questions into text, and creates the voice model from voice samples you choose to upload. It receives the audio of your questions, the text to be spoken, and your voice samples.
+* **Maps and Location Providers:**
+  * *Google Maps Platform (Google Cloud):* Maps displayed in the app, route calculation, geocoding, and nearby place lookup. Your location and trip origin and destination are sent to Google for these features, which Google processes under the Google Privacy Policy.
 * **Identity and Authentication Providers:**
-  * *Apple and Google:* Authenticating user logins and social sign-in.
+  * *Firebase Authentication (Google), Apple and Google:* Email and password sign-in and social sign-in.
+* **Data and Storage Providers:**
+  * *MongoDB Atlas:* Our database for accounts, trips and generated stories.
+  * *Backblaze B2:* Private storage for generated audio files, avatars and voice demos.
+  * *Our cloud hosting provider:* Runs our servers.
 
-We have contractual data processing agreements in place with these third parties requiring them to protect your personal data, process it solely on our instructions, and maintain strict confidentiality and security standards.
+Each provider processes your data under its own terms and privacy policy, which we encourage you to review. We choose providers that publish security and privacy commitments and send them only the data needed to deliver the feature.
 
 We may also disclose your information in the following situations:
 * **Business Transfers:** In connection with any merger, sale of company assets, financing, or acquisition of all or a portion of our business.
@@ -138,15 +142,15 @@ We may also disclose your information in the following situations:
 
 *In Short: Yes. Because Musafir AI operates globally, your personal information may be transferred to, stored, and processed in countries outside your country of residence.*
 
-Our cloud infrastructure and third-party AI service providers (including Google Cloud Platform and Google Cloud AI) operate data centers located in India, the United States, and other global regions.
+Our infrastructure and third-party providers (including Google, Gnani, MongoDB Atlas and Backblaze) operate data centers located in India, the United States, and other global regions.
 
 If you are accessing the Services from the **European Economic Area (EEA), United Kingdom (UK), Switzerland, Canada, Latin America, the Asia-Pacific region, or the Middle East**, please be aware that your personal information will be transferred to and processed in countries that may have different data protection laws than your country of residence.
 
 **Safeguards for International Transfers:**  
 Whenever we transfer personal data originating in the EEA, UK, or Switzerland to countries that have not received an adequacy decision from the European Commission or UK Information Commissioner's Office, we ensure appropriate safeguards are implemented in accordance with Chapter V of the GDPR. These safeguards include:
-* Entering into European Commission-approved **Standard Contractual Clauses (SCCs)** and the **UK International Data Transfer Addendum** with our cloud service providers.
-* Implementing robust technical safeguards, including data encryption in transit (TLS 1.2+) and encryption at rest (AES-256).
-* Enforcing strict contractual limitations on access and processing.
+* Relying on European Commission-approved **Standard Contractual Clauses (SCCs)** and the **UK International Data Transfer Addendum**, or another lawful transfer mechanism, with our service providers.
+* Encrypting data in transit (TLS 1.2+).
+* Limiting the data we send to each provider to what the feature needs.
 
 You may request a copy of the safeguards we employ for international data transfers by contacting us at rishitpadagatti@gmail.com.
 
@@ -168,14 +172,15 @@ We do not use third-party tracking cookies for cross-context behavioral advertis
 
 As a core part of our Services, Musafir AI utilizes generative artificial intelligence, machine learning, and neural speech synthesis technologies:
 
-* **AI Narration and Storytelling:** Dynamic generation of cultural and historical travel stories tailored to your current route and destination.
-* **AI Voice Cloning:** Processing voluntary user voice recordings to produce a personalized speaker model for reading stories.
+* **AI Narration and Storytelling:** Dynamic generation of cultural and historical travel stories tailored to your current route and destination, written by Google Gemini.
+* **AI Voice Q&A:** When you ask a question by voice, Gnani transcribes your audio, Google Gemini writes an answer, and Gnani speaks it back to you.
+* **AI Voice Cloning:** Processing voluntary user voice recordings, by Gnani, to produce a personalized speaker model for reading stories.
 * **AI Multilingual Translation:** Translating travel content and transcripts into your preferred language.
 
 ### Data Protection in AI Processing
-* Your prompts, uploaded photos, and audio recordings are transmitted securely via encrypted enterprise APIs to our AI service providers (Google Cloud AI).
-* **No Public Foundation Model Training:** Your private voice samples and personal travel logs are not used to train or refine publicly accessible foundation models without your explicit, separate consent.
-* All processing complies with strict enterprise confidentiality agreements and privacy guidelines.
+* Your questions, voice recordings and voice samples are sent over encrypted connections (TLS) to our AI and speech providers: Google (Gemini) and Gnani.
+* We do not use your voice samples or travel history to train our own models. The providers handle the data they receive under their own terms and privacy policies, which may allow them to use submitted content to operate and improve their services. Please review the Google Gemini API terms and Gnani's privacy policy, and avoid including sensitive information in your questions.
+* AI-generated stories and answers can be inaccurate; see our Terms of Service.
 
 ---
 

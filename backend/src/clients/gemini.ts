@@ -1,6 +1,7 @@
 import { ApiError, GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { z } from "zod";
 import type { LanguageId } from "../catalog/languages";
+import { createKeyRing } from "./keyRing";
 import { createLimiter } from "./limiter";
 import { UpstreamError, withRetry } from "./upstream";
 
@@ -28,7 +29,7 @@ export interface GeminiClient {
 }
 
 export interface GeminiConfig {
-  apiKey: string;
+  apiKeys: string[]; // tried in order; the next one is used when a key hits its limit
   liteRpm: number;
   flashRpm: number;
   concurrency: number;
@@ -55,11 +56,12 @@ const TIMEOUT_MS = 60_000;
 const MAX_RETRY_DELAY_MS = 120_000;
 
 // The SDK reports 429s as ApiError with Google's JSON in the message, including "retryDelay": "44s".
-function realTransport(apiKey: string): GeminiTransport {
-  const ai = new GoogleGenAI({ apiKey });
-  return async ({ model, system, prompt, jsonSchema }) => {
+function realTransport(apiKeys: string[]): GeminiTransport {
+  const ring = createKeyRing("gemini", apiKeys);
+  const clients = new Map(apiKeys.map((k) => [k, new GoogleGenAI({ apiKey: k })]));
+  return ({ model, system, prompt, jsonSchema }) => ring.withKey(async (key) => {
     try {
-      const res = await ai.models.generateContent({
+      const res = await clients.get(key)!.models.generateContent({
         model,
         contents: prompt,
         config: {
@@ -75,7 +77,7 @@ function realTransport(apiKey: string): GeminiTransport {
     } catch (e) {
       throw toUpstreamError(e);
     }
-  };
+  });
 }
 
 export function toUpstreamError(e: unknown): UpstreamError {
@@ -98,7 +100,7 @@ export function toUpstreamError(e: unknown): UpstreamError {
 type Attempt = { model: string };
 
 export function geminiClient(cfg: GeminiConfig, deps: GeminiDeps = {}): GeminiClient {
-  const transport = deps.transport ?? realTransport(cfg.apiKey);
+  const transport = deps.transport ?? realTransport(cfg.apiKeys);
   // One shared concurrency limit; per-minute limits are per model on the free tier.
   // A per-model limiter counts a request when it hands it to the shared limiter, so it also caps how many requests may
   // wait there: otherwise a burst could queue a whole minute's quota behind the shared slots, start late, and then
@@ -112,7 +114,20 @@ export function geminiClient(cfg: GeminiConfig, deps: GeminiDeps = {}): GeminiCl
   // Every transport try (including retries) waits for the model's rate window, then for a shared slot.
   const callModel = (model: string, call: Omit<GeminiCall, "model">, maxRetryDelayMs?: number, interactive = false) => {
     const priority = interactive ? "high" : "normal";
-    return withRetry(() => perModel[model].run(() => shared.run(() => transport({ model, ...call }), { priority }), { priority }), {
+    return withRetry(() => {
+      const queuedAt = performance.now();
+      return perModel[model].run(() => shared.run(async () => {
+        const startedAt = performance.now();
+        try {
+          return await transport({ model, ...call });
+        } finally {
+          // Tells a slow answer apart: waiting for a rate-limit window/slot (queued) vs. Gemini itself (call).
+          const queued = Math.round(startedAt - queuedAt);
+          const took = Math.round(performance.now() - startedAt);
+          if (queued + took > 3000) console.warn(`[gemini] slow ${model}: queued=${queued}ms call=${took}ms${interactive ? " (interactive)" : ""}`);
+        }
+      }, { priority }), { priority });
+    }, {
       attempts: 4,
       baseDelayMs: 1000,
       sleep: deps.sleep,

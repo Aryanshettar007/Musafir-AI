@@ -81,13 +81,13 @@ async function main() {
   const page = template.replace("__DATA__", JSON.stringify(data).replace(/</g, "\\u003c"));
 
   const gemini = geminiClient({
-    apiKey: env.GEMINI_API_KEY,
+    apiKeys: env.GEMINI_API_KEYS,
     liteRpm: env.GEMINI_LITE_RPM,
     flashRpm: env.GEMINI_FLASH_RPM,
     concurrency: env.GEMINI_CONCURRENCY,
     flashLanguages: env.GEMINI_FLASH_LANGUAGES,
   });
-  const gnani = createGnaniQueue(gnaniClient({ apiKey: env.GNANI_API_KEY }));
+  const gnani = createGnaniQueue(gnaniClient({ apiKeys: env.GNANI_API_KEYS }));
   const ask = createAskService({
     gemini,
     gnani,

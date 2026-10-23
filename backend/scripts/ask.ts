@@ -47,13 +47,13 @@ async function main() {
 
   const service = createAskService({
     gemini: geminiClient({
-      apiKey: env.GEMINI_API_KEY,
+      apiKeys: env.GEMINI_API_KEYS,
       liteRpm: env.GEMINI_LITE_RPM,
       flashRpm: env.GEMINI_FLASH_RPM,
       concurrency: env.GEMINI_CONCURRENCY,
       flashLanguages: env.GEMINI_FLASH_LANGUAGES,
     }),
-    gnani: createGnaniQueue(gnaniClient({ apiKey: env.GNANI_API_KEY })),
+    gnani: createGnaniQueue(gnaniClient({ apiKeys: env.GNANI_API_KEYS })),
     maps: mapsClient({ apiKey: env.GOOGLE_MAPS_API_KEY }),
     ...(values.uid ? {} : { loadProfile: async () => ({ language: language ?? "en-IN", voice: values.voice ?? "Deepak" }) }),
   });
