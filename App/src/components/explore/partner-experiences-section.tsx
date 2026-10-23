@@ -164,26 +164,13 @@ export function PartnerExperiencesSection() {
         <Pressable
           style={({ pressed }) => [styles.titleGroup, pressed && { opacity: 0.7 }]}
           onPress={handlePartnerInfoPress}
-          hitSlop={8}>
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="About Partner Trails">
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
             Partner Trails
           </Text>
-          <View
-            style={[
-              styles.badge,
-              {
-                backgroundColor: isDark ? '#27272A' : '#F4F4F5',
-                borderColor: isDark ? '#3F3F46' : '#E4E4E7',
-              },
-            ]}>
-            <Text
-              style={[
-                styles.badgeText,
-                { color: isDark ? '#A1A1AA' : '#71717A' },
-              ]}>
-              Official Partners
-            </Text>
-          </View>
+          <Ionicons name="information-circle-outline" size={20} color={colors.text} />
         </Pressable>
       </View>
 
@@ -510,17 +497,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     letterSpacing: -0.3,
-  },
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 9999,
-    borderWidth: 1,
-  },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: -0.2,
   },
   cardsScroll: {
     gap: 12,

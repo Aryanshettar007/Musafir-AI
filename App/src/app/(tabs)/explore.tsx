@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Alert,
   Platform,
@@ -9,13 +10,20 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 import { ThemedView } from '@/components/themed-view';
 import { Colors, BottomTabInset } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { CREATOR_PACKS, CreatorPack } from '@/constants/creator-packs';
+import {
+  CREATOR_PACKS,
+  CREATOR_PACKS_INFO_MESSAGE,
+  CREATOR_PACKS_INFO_TITLE,
+  CreatorPack,
+} from '@/constants/creator-packs';
 import { VoiceCloneSection } from '@/components/explore/voice-clone-section';
+import { CreatorPackModal } from '@/components/explore/creator-pack-modal';
 import { PartnerExperiencesSection } from '@/components/explore/partner-experiences-section';
 
 export default function ExploreScreen() {
@@ -23,21 +31,19 @@ export default function ExploreScreen() {
   const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
   const insets = useSafeAreaInsets();
 
-  // Handle Creator Pack preview tap
+  const [selectedPack, setSelectedPack] = useState<CreatorPack | null>(null);
+
   const handleCreatorPackPress = (pack: CreatorPack) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const title = pack.title;
-    const message =
-      'Creator Economy & Voice Localization:\n\n' +
-      'Why this is important: Local creators, historians, and guides can publish and share their unique stories and heritage walks with road-trippers.\n\n' +
-      'Monetization: Musafir earns revenue through creator listing fees and story subscription revenue share.\n\n' +
-      'Multilingual AI Voice: Musafir translates and narrates the story in the user\'s preferred language, while cloning and maintaining the creator\'s own authentic voice.\n\n' +
-      '(Audio preview is currently locked pending creator voice licensing and publishing permissions.)';
+    setSelectedPack(pack);
+  };
 
+  const handleInfoPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (Platform.OS === 'web') {
-      window.alert(`${title}\n\n${message}`);
+      window.alert(`${CREATOR_PACKS_INFO_TITLE}\n\n${CREATOR_PACKS_INFO_MESSAGE}`);
     } else {
-      Alert.alert(title, message);
+      Alert.alert(CREATOR_PACKS_INFO_TITLE, CREATOR_PACKS_INFO_MESSAGE);
     }
   };
 
@@ -67,6 +73,13 @@ export default function ExploreScreen() {
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
                 Creator Packs
               </Text>
+              <Pressable
+                onPress={handleInfoPress}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel="About Creator Packs">
+                <Ionicons name="information-circle-outline" size={20} color={colors.text} />
+              </Pressable>
             </View>
 
             <ScrollView
@@ -102,6 +115,7 @@ export default function ExploreScreen() {
           </View>
         </ScrollView>
       </SafeAreaView>
+      <CreatorPackModal pack={selectedPack} onClose={() => setSelectedPack(null)} />
     </ThemedView>
   );
 }
@@ -131,6 +145,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   creatorSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     paddingVertical: 10,
   },
   sectionTitle: {
