@@ -1066,22 +1066,44 @@ export default function TripScreen() {
     setPreviewItemId(null);
   }, [previewPlayer]);
 
+  // Android's expo-audio silently ignores play() while audio is inactive, and pausing/stopping the story queue
+  // deactivates it — so every preview play must re-activate audio first.
+  const activatePreviewAudio = useCallback(async () => {
+    await setAudioModeAsync({
+      playsInSilentMode: true,
+      shouldPlayInBackground: true,
+      interruptionMode: pauseSystemMusicRef.current ? 'doNotMix' : 'duckOthers',
+    }).catch(() => {});
+    await setIsAudioActiveAsync(true).catch(() => {});
+  }, []);
+
   const togglePreview = useCallback(
-    (item: TripItem) => {
-      if (previewItemId === item.id) {
-        if (previewStatus.playing) previewPlayer.pause();
-        else previewPlayer.play();
-        return;
+    async (item: TripItem) => {
+      try {
+        if (previewItemId === item.id) {
+          if (previewStatus.playing) {
+            previewPlayer.pause();
+          } else {
+            await activatePreviewAudio();
+            previewPlayer.play();
+          }
+          return;
+        }
+        const file = Platform.OS === 'web' ? null : localFile(item.id);
+        const uri = file && file.exists ? file.uri : item.audio?.url;
+        if (!uri) return;
+        audioQueueRef.current.pause(); // a preview takes over the speaker; the current story resumes from the main controls
+        setPreviewItemId(item.id);
+        // Awaited after the queue's pause, so its setIsAudioActiveAsync(false) can't land after this re-activation.
+        await activatePreviewAudio();
+        previewPlayer.replace({ uri });
+        previewPlayer.play();
+      } catch (err) {
+        console.warn('[Preview] Error playing preview:', err);
+        setPreviewItemId(null);
       }
-      const file = Platform.OS === 'web' ? null : localFile(item.id);
-      const uri = file && file.exists ? file.uri : item.audio?.url;
-      if (!uri) return;
-      audioQueueRef.current.pause(); // a preview takes over the speaker; the current story resumes from the main controls
-      setPreviewItemId(item.id);
-      previewPlayer.replace({ uri });
-      previewPlayer.play();
     },
-    [previewItemId, previewStatus.playing, previewPlayer]
+    [previewItemId, previewStatus.playing, previewPlayer, activatePreviewAudio]
   );
 
   // A story starting on its own (geolocation) ends any preview.
@@ -1091,7 +1113,11 @@ export default function TripScreen() {
   }, [playingItem?.id, isPlaying]);
 
   useEffect(() => {
-    if (previewStatus.didJustFinish) setPreviewItemId(null);
+    if (!previewStatus.didJustFinish) return;
+    setPreviewItemId(null);
+    // Release audio focus so the user's music comes back, unless a story is playing.
+    if (!isPlaying) setIsAudioActiveAsync(false).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewStatus.didJustFinish]);
 
   // ─── Toggle Play / Pause Handler ──────────────────────────────────────────
