@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { InterestId } from "../catalog/interests";
 import { LANGUAGES, type LanguageId } from "../catalog/languages";
 import type { GeminiClient } from "../clients/gemini";
-import { checkScript, LANGUAGE_STYLES, wordBudget } from "../speech";
+import { checkScript, LANGUAGE_STYLES, PROMPT_LENGTH_BIAS, wordBudget } from "../speech";
 import { EPISODE_FACTS_CHARS, FACTS_MAX_CHARS } from "./rules";
 import type { Focus, Side } from "./types";
 
@@ -141,7 +141,7 @@ export function buildPrompt(req: WriteRequest): string {
 ${req.places.length ? `PLACES: ${req.places.map((p) => p.name).join("; ")}\n` : ""}SIDE: ${side}
 LISTENER INTERESTS: ${req.interests.join(", ")}${req.focus !== "general" ? ` (lean this story towards ${req.focus})` : ""}. Bring an interest in only where this place really relates to it: no food tips in a story that is not about food.
 LANGUAGE: ${languageLabel(req.language)} (${LANGUAGE_STYLES[req.language].script} script). ${LANGUAGE_STYLES[req.language].guide}
-LENGTH: about ${budget} words (that is about ${req.targetSeconds} seconds when spoken). Stay between ${Math.ceil(budget * 0.6)} and ${Math.floor(budget * 1.3)} words.
+LENGTH: about ${Math.round(budget * (PROMPT_LENGTH_BIAS[req.language] ?? 1))} words (that is about ${req.targetSeconds} seconds when spoken). Stay between ${Math.ceil(budget * 0.6)} and ${Math.floor(budget * 1.3)} words.
 ${areaNote}${knownNote}
 ${factsBlock}`;
 }

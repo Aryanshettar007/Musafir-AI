@@ -47,13 +47,14 @@ describe("geminiClient.generateJson", () => {
     expect(calls[0].jsonSchema).toMatchObject({ type: "object" });
   });
 
-  it("retries flash-lite once with the problems appended, then falls back to flash", async () => {
-    const { result, calls } = run(cfg, [good, good, good], { validate: (v) => (v.script === "hello" ? ["Too short."] : []) });
+  it("retries flash-lite with the problems appended, falls back to flash, then tries flash-lite once more", async () => {
+    const { result, calls } = run(cfg, [good, good, good, good], { validate: (v) => (v.script === "hello" ? ["Too short."] : []) });
     await expect(result).rejects.toMatchObject({ service: "gemini", retryable: false });
-    expect(calls.map((c) => c.model)).toEqual([GEMINI_LITE, GEMINI_LITE, GEMINI_FLASH]);
+    expect(calls.map((c) => c.model)).toEqual([GEMINI_LITE, GEMINI_LITE, GEMINI_FLASH, GEMINI_LITE]);
     expect(calls[0].prompt).toBe("write it");
     expect(calls[1].prompt).toContain("Your previous answer had these problems:\n- Too short.");
     expect(calls[2].prompt).toContain("- Too short.");
+    expect(calls[3].prompt).toContain("- Too short.");
   });
 
   it("succeeds on the second flash-lite attempt after a validation problem", async () => {

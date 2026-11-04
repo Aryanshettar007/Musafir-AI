@@ -21,10 +21,14 @@ export function createKeyRing(service: UpstreamService, keys: readonly string[],
         try {
           return await fn(keys[index]);
         } catch (e) {
-          if (!(e instanceof UpstreamError && e.status !== null && switchOn.includes(e.status)) || tried >= keys.length) throw e;
+          if (!(e instanceof UpstreamError && e.status !== null && switchOn.includes(e.status))) throw e;
+          if (tried >= keys.length) {
+            console.error(`[${service}] key ${index + 1}/${keys.length} failed (${e.status}); all ${keys.length} key(s) tried, giving up`);
+            throw e;
+          }
           // Concurrent calls can fail on the same key: only the first one moves the ring.
           if (current === index) current = (index + 1) % keys.length;
-          console.warn(`[${service}] key ${index + 1}/${keys.length} hit a limit, switching to key ${current + 1}`);
+          console.warn(`[${service}] key ${index + 1}/${keys.length} failed (${e.status}), switching to key ${current + 1}/${keys.length}`);
         }
       }
     },

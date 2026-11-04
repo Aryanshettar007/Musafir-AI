@@ -142,10 +142,12 @@ export function geminiClient(cfg: GeminiConfig, deps: GeminiDeps = {}): GeminiCl
     async generateJson<T>(req: GenerateJsonRequest<T>) {
       const jsonSchema = z.toJSONSchema(req.schema);
       const flashOnly = req.language !== undefined && cfg.flashLanguages.includes(req.language);
-      // lite -> lite with the problems -> flash. Languages routed to flash skip lite.
+      // lite -> lite with the problems -> flash -> lite once more (flash is often overloaded with 503s, and lite's
+      // answers are usually only rejected on length/script, so a last lite try with the problems can still pass).
+      // Languages routed to flash skip lite first.
       const attempts: Attempt[] = flashOnly
-        ? [{ model: GEMINI_FLASH }, { model: GEMINI_FLASH }]
-        : [{ model: GEMINI_LITE }, { model: GEMINI_LITE }, { model: GEMINI_FLASH }];
+        ? [{ model: GEMINI_FLASH }, { model: GEMINI_FLASH }, { model: GEMINI_LITE }]
+        : [{ model: GEMINI_LITE }, { model: GEMINI_LITE }, { model: GEMINI_FLASH }, { model: GEMINI_LITE }];
 
       let problems: string[] = [];
       let lastFailure = "no attempt was made";
