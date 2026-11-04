@@ -57,7 +57,8 @@ const MAX_RETRY_DELAY_MS = 120_000;
 
 // The SDK reports 429s as ApiError with Google's JSON in the message, including "retryDelay": "44s".
 function realTransport(apiKeys: string[]): GeminiTransport {
-  const ring = createKeyRing("gemini", apiKeys);
+  // 402 = "prepayment credits are depleted" (that key is spent), 401/403 = refused key: all move on to the next key, like 429.
+  const ring = createKeyRing("gemini", apiKeys, [401, 402, 403, 429]);
   const clients = new Map(apiKeys.map((k) => [k, new GoogleGenAI({ apiKey: k })]));
   return ({ model, system, prompt, jsonSchema }) => ring.withKey(async (key) => {
     try {
