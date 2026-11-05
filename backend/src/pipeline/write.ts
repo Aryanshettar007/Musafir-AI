@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { InterestId } from "../catalog/interests";
 import { LANGUAGES, type LanguageId } from "../catalog/languages";
 import type { GeminiClient } from "../clients/gemini";
-import { checkScript, LANGUAGE_STYLES, PROMPT_LENGTH_BIAS, wordBudget } from "../speech";
+import { checkScript, LANGUAGE_STYLES, PROMPT_LENGTH_BIAS, spellOutNumbers, wordBudget } from "../speech";
 import { EPISODE_FACTS_CHARS, FACTS_MAX_CHARS } from "./rules";
 import type { Focus, Side } from "./types";
 
@@ -86,6 +86,10 @@ export interface WrittenStory extends StoryDraft {
   budget: number;
 }
 
+// Only an almost-empty script is retried.
+const MIN_WORDS = 15;
+const tooShort = (script: string) => (countWords(script) < MIN_WORDS ? [`The script has only ${countWords(script)} words; write a full story of at least ${MIN_WORDS} words.`] : []);
+
 export const countWords = (text: string) => text.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
 
 const TASK: Record<WriteRequest["type"], string> = {
@@ -110,15 +114,16 @@ export function buildPrompt(req: WriteRequest): string {
       ? "Do not say which side of the road anything is on."
       : `The place is on the ${req.side} side of the road; say so once, naturally ("on your ${req.side}").`;
 
+  // Numbers and units are spelled out here, so the model translates words and never has digits or "km" to copy.
   const factsBlock = req.tripFacts
-    ? `FACTS (the trip):\n"""\n${req.tripFacts}\n"""`
-    : withFacts.map((p) => `FACTS about ${p.name} (English, from Wikipedia):\n"""\n${(p.facts ?? "").slice(0, perPlace)}\n"""`).join("\n\n");
+    ? `FACTS (the trip):\n"""\n${spellOutNumbers(req.tripFacts)}\n"""`
+    : withFacts.map((p) => `FACTS about ${p.name} (English, from Wikipedia):\n"""\n${spellOutNumbers((p.facts ?? "").slice(0, perPlace))}\n"""`).join("\n\n");
 
   // A famous place no article matched (Cubbon Park, Vidyarthi Bhavan). Compared on ten Bengaluru places, flash-lite was
   // right on the famous ones and vague or wrong on minor ones, so only famous places get here, with a strict rule.
   const knownNote = known
     .map((p) =>
-      `\nKNOWN PLACE: ${p.name}${p.card ? ` (from Google: ${p.card})` : ""}. There are no FACTS for it. Use only facts about it that you are ` +
+      `\nKNOWN PLACE: ${p.name}${p.card ? ` (from Google: ${spellOutNumbers(p.card)})` : ""}. There are no FACTS for it. Use only facts about it that you are ` +
       `certain of: well-documented history, who built or founded it, what it is famous for. Never guess dates, names or numbers; if you ` +
       `are not sure of something, leave it out and keep that part general.${req.type === "food" ? " Make it the subject and the title." : ""}\n`)
     .join("");
@@ -126,7 +131,7 @@ export function buildPrompt(req: WriteRequest): string {
   // A place with no article of its own: its neighbours' facts carry the story and the place is only named. A food stop
   // stays the subject (title included) with its place card; the area's facts only add colour. Without this the
   // Brahmins' Coffee Bar story came out titled and written about the neighbourhood, Hanumanthanagar.
-  const cards = area.filter((p) => p.card).map((p) => `PLACE CARD for ${p.name} (from Google): ${p.card}.`).join("\n");
+  const cards = area.filter((p) => p.card).map((p) => `PLACE CARD for ${p.name} (from Google): ${spellOutNumbers(p.card ?? "")}.`).join("\n");
   const foodStop = req.type === "food" ? area[0] : undefined;
   const areaNote = foodStop
     ? `\nNOTE: ${foodStop.name} has no article of its own. Make it the subject and the title: name it, say what kind of place it is and how ` +
@@ -158,7 +163,10 @@ export async function writeStory(gemini: GeminiClient, req: WriteRequest): Promi
     language: req.language,
     // The title is shown and stored too: unchecked, Kannada trips got "श्री कांतिरवा स्टेडियम" and "ವಿದyarthi Bhavan".
     validate: (v) => [
-      ...checkScript(v.script, req.language, { wordBudget: budget }),
+      // Length is not checked: the prompt asks for the budget, but a shorter or longer story is still a good story
+      // (flash-lite often writes about half in South Indian languages and every rejection costs a slow call).
+      ...checkScript(v.script, req.language),
+      ...tooShort(v.script),
       ...checkScript(v.title, req.language).map((p) => `Title: ${p}`),
       ...openingProblems(v.script, req.type),
     ],

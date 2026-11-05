@@ -4,7 +4,7 @@ import { GEMINI_FLASH, GEMINI_LITE, geminiClient, type GeminiCall } from "../src
 import { UpstreamError } from "../src/clients/upstream";
 
 const Schema = z.object({ a: z.string() });
-const cfg = { apiKeys: ["t"], liteRpm: 100, flashRpm: 100, concurrency: 2, flashLanguages: [] };
+const cfg = { project: "t", location: "global", concurrency: 2, flashLanguages: [] };
 
 function run(maxRetryDelayMs: number | undefined) {
   const calls: GeminiCall[] = [];

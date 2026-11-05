@@ -1,4 +1,4 @@
-// Real-API smoke check for the shared foundation: one call to each upstream, kept small (Gemini is on the free tier,
+// Real-API smoke check for the shared foundation: one call to each upstream, kept small (Gemini runs on Vertex AI via ADC,
 // Gnani allows one request at a time). Run: npx tsx scripts/smoke-foundation.ts
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -27,9 +27,8 @@ async function timed<T>(label: string, fn: () => Promise<T>): Promise<T> {
 async function main() {
   const maps = mapsClient({ apiKey: env.GOOGLE_MAPS_API_KEY });
   const gemini = geminiClient({
-    apiKeys: env.GEMINI_API_KEYS,
-    liteRpm: env.GEMINI_LITE_RPM,
-    flashRpm: env.GEMINI_FLASH_RPM,
+    project: env.GOOGLE_CLOUD_PROJECT,
+    location: env.GOOGLE_CLOUD_LOCATION,
     concurrency: env.GEMINI_CONCURRENCY,
     flashLanguages: env.GEMINI_FLASH_LANGUAGES,
   });

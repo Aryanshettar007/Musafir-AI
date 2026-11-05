@@ -64,8 +64,9 @@ npx tsx scripts/demo/server.ts      # local map + live-mode demo at http://local
 - Wikipedia API: send a descriptive User-Agent with a contact URL (generic UAs get 429), call sequentially, retry 429.
 
 ## Gemini gotchas (from spike 2, see backend/spikes/gemini/FINDINGS.md)
-- SDK `@google/genai`; env var `GEMINI_API_KEY`. **Free tier only, no Pro, no paid plan (decided 2026-10-10).** Use `gemini-3.5-flash-lite` for everything; fall back to `gemini-3.8-flash` (thinking `LOW`, it rejects `MINIMAL`) when lite fails. Free-tier flash = 5 requests/min per model; Pro = 0.
+- SDK `@google/genai` in **Vertex AI mode** (`vertexai: true`), paid, billed to the Google Cloud project (`GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, default `global`). **No API keys** — the org policy disallows them; auth is Application Default Credentials (`gcloud auth application-default login` locally, the attached service account on Cloud Run). Replaces the old free-tier key rotation (decided 2026-11-05).
+- `gemini-3.5-flash-lite` first; `gemini-3.8-flash` (thinking `LOW`, it rejects `MINIMAL`) when lite fails or for `GEMINI_FLASH_LANGUAGES`.
 - Use `responseMimeType: "application/json"` + `responseJsonSchema: z.toJSONSchema(schema)`, then validate with zod.
 - flash-lite can leak Telugu characters into Kannada — always validate the Unicode script of generated text.
 - Control length with per-language word budgets, not the model's duration estimate.
-- Retry 429/503 with backoff; quota is tight on the free tier.
+- Retry 429/503 with backoff.

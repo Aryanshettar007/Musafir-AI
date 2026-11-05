@@ -1,0 +1,119 @@
+MUSAFIR AI - APP REVIEW SCREEN RECORDING SCRIPT
+================================================
+Target length: 3-4 minutes. One continuous take, no cuts.
+
+BEFORE YOU PRESS RECORD
+- Use a physical iPhone on the latest iOS (not simulator). Control Centre > Screen Recording. Turn the mic ON if you want to narrate.
+- Install the exact build submitted to App Review (TestFlight build).
+- Delete the app first so the recording starts from a fresh launch and shows permission prompts.
+- Create a throwaway test account for the deletion demo (do NOT delete the demo account you give Apple).
+- Have good internet, the volume up, and a route with already-generated stories ready (for example Bengaluru -> Mysore Palace).
+- Turn on Do Not Disturb so no notifications pop up.
+- Keep the phone in light mode for the whole take.
+
+SCENE 1 - LAUNCH AND ONBOARDING (0:00 - 0:30)
+Say: "This is Musafir AI, a voice-first road-trip companion. It plays short audio stories about history, culture and food as you drive, in your own language."
+1. Tap the app icon on the home screen (the recording must start BEFORE this).
+2. Show the splash, then onboarding.
+3. Pick a language (for example Kannada or Hindi) and show that there are 11 Indian languages.
+4. Pick a voice / mood / audio preference if onboarding asks.
+
+SCENE 2 - ACCOUNT REGISTRATION AND LOGIN (0:30 - 1:00)
+Say: "Users can sign up with email, Google, or Sign in with Apple."
+1. Show the login screen.
+2. Show the Sign in with Apple and Google buttons.
+3. Create the account: tap sign up, enter email and password, submit. (Or tap Sign in with Apple and complete it.)
+4. Land on the Home tab.
+
+SCENE 3 - PERMISSIONS (1:00 - 1:15)
+Say: "The app asks for location so it can play stories for the place you are passing, and the microphone for voice questions."
+1. Tap Allow on the location permission prompt (While Using the App).
+2. Tap Allow on the microphone prompt when it appears (or when you first ask a question in Scene 5).
+
+SCENE 4 - PLAN A TRIP AND PLAY STORIES (1:15 - 2:15)
+Say: "I choose a start and a destination. The app builds a route and narrates stories along it."
+1. On Home, use the source / destination search: type "Bengaluru", pick it, then type "Mysore Palace", pick it.
+2. Show the generated trip and the route on the map.
+3. Open the trip. Show the list of stories along the route.
+4. Tap Preview on a story to play its audio. Let it play 10-15 seconds.
+5. Start the trip. Say: "As the GPS moves along the route, the next story plays automatically when I reach that place."
+6. Show the audio player, the story title and the current-location marker on the map.
+   Note for the reviewer: if you cannot drive during the recording, tap a story's play control (or use your demo / simulated location) to show a story triggering.
+
+SCENE 5 - VOICE Q&A (2:15 - 2:40)
+Say: "I can also ask questions by voice. There is no text chatbot."
+1. Tap the microphone / ask button.
+2. Ask a short question in your language, for example "Tell me about Mysore Palace." (keep it under 30 seconds)
+3. Show the spoken answer playing.
+
+SCENE 6 - CONTENT REPORTING (2:40 - 3:05)
+Say: "All the stories are AI-generated. Users can report any content that is inappropriate or inaccurate."
+1. On a story (or the live Q&A transcript), tap the report / flag option.
+2. Show the report screen with reasons (inappropriate, inaccurate, offensive, harmful, hate speech, copyright, other).
+3. Pick a reason, add a short note, submit.
+4. Show the "Report Submitted" confirmation.
+
+SCENE 7 - PROFILE, SUPPORT AND LEGAL (3:05 - 3:20)
+1. Open the Profile tab.
+2. Show Support, Privacy Policy and Terms of Service links.
+3. Show language / voice preferences, and the light / dark theme.
+
+SCENE 8 - ACCOUNT DELETION (3:20 - 3:45)
+Say: "Account deletion is available inside the app."
+1. Profile tab > Delete Account.
+2. Read out the warning, confirm the deletion with the throwaway account.
+3. Show that the app signs out and returns to the login screen.
+
+SCENE 9 - WRAP UP (3:45 - 4:00)
+Say: "That is Musafir AI: location-triggered audio stories and voice Q&A in 11 Indian languages. There are no in-app purchases and no paid content." (Edit this line if that is not true.)
+Stop the recording.
+
+AFTER RECORDING
+- Watch it once to check nothing private (real email, notifications) is visible.
+- Upload it (a link on Google Drive / YouTube unlisted, or attached in the reply) in the App Store Connect reply AND paste the same link into App Review Information > Notes.
+- In Notes, also include:
+  * Purpose and audience (see the earlier reply draft).
+  * Demo account email and password.
+  * Steps to reach the main features (this script, short form).
+  * External services: Gnani Vachana (TTS/STT), Google Gemini (story generation), Google Maps Platform (Routes, Places), Wikipedia, MongoDB Atlas, Firebase Auth.
+  * Regional note: works anywhere, optimised for India and 11 Indian languages.
+  * "No regulated industry. No protected third-party material. Content is AI-generated from public sources."
+
+THINGS TO VERIFY ON YOUR BUILD BEFORE RECORDING
+- The exact labels of the buttons above (I wrote them from the code structure, so adjust to match what you see on screen).
+- Whether the Sign in with Apple button shows on iOS (it must, if you offer Google sign-in).
+- That the report flow and Delete Account both work on the submitted build.
+
+
+TECHNOLOGIES AND EXTERNAL SERVICES USED
+(Paste this into the Notes field and the reply to App Review. Apple asks for item 4: list of external services.)
+
+MOBILE APP (client)
+- Expo / React Native with TypeScript, Expo Router for navigation
+- react-native-maps (map and route display)
+- expo-location and expo-task-manager (GPS and geofencing to trigger stories)
+- expo-audio (story and answer playback and voice recording)
+- react-native-reanimated, gesture-handler, expo-image, expo-haptics (UI)
+- AsyncStorage and expo-file-system (preferences and offline audio cache)
+- Firebase Authentication client SDK, with Sign in with Apple (expo-apple-authentication) and Google Sign-In
+
+BACKEND (our own server)
+- Node.js, Express and TypeScript
+- zod (request and response validation)
+- MongoDB Atlas via Mongoose (database)
+- Firebase Admin SDK (verifies user login tokens)
+- Backblaze B2 through the S3 API (AWS SDK v3) for storing generated audio, served by signed URLs
+- ffmpeg (audio processing and joining mp3 chunks)
+
+THIRD-PARTY AI AND DATA SERVICES
+- Gnani Vachana (Timbre v2.5): text-to-speech narration and speech-to-text for voice questions, in 11 Indian languages
+- Google Gemini API (@google/genai): generates the story scripts and answers questions
+- Google Maps Platform: Routes API (route) and Places API (nearby places)
+- Wikipedia API: public facts used as source material for stories
+- Firebase Authentication (Google): sign-in and account identity
+- Sign in with Apple: sign-in
+
+DATA AND PRIVACY NOTES
+- API keys stay on our server; the app never contains them.
+- Audio and transcripts of voice questions are sent to Gnani for transcription and to Gemini for answers.
+- Location is used only to pick stories along the route.
