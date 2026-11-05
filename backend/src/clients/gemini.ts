@@ -1,11 +1,11 @@
 import { ApiError, GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { z } from "zod";
 import type { LanguageId } from "../catalog/languages";
-import { createKeyRing } from "./keyRing";
 import { createLimiter } from "./limiter";
 import { UpstreamError, withRetry } from "./upstream";
 
-// Free tier only (decided 2026-10-10): flash-lite for everything, flash when lite fails.
+// Gemini runs on Vertex AI (paid, billed to the Google Cloud project, authenticated with Application Default
+// Credentials; the org policy disallows API keys). Flash-lite first, flash when lite fails or for flash-only languages.
 export const GEMINI_LITE = "gemini-3.5-flash-lite";
 export const GEMINI_FLASH = "gemini-3.8-flash";
 
@@ -19,8 +19,7 @@ export interface GenerateJsonRequest<T> {
   // Fail fast for interactive callers: a retryable failure whose requested wait exceeds this is not retried on the same
   // model (the call moves on to the next attempt/model instead of sleeping). Default: wait as long as asked.
   maxRetryDelayMs?: number;
-  // "interactive" (live questions) jumps ahead of queued background work (trip stories) and may use the request kept
-  // free in each model's per-minute window. Default: "background".
+  // "interactive" (live questions) jumps ahead of queued background work (trip stories). Default: "background".
   priority?: "interactive" | "background";
 }
 
@@ -29,9 +28,8 @@ export interface GeminiClient {
 }
 
 export interface GeminiConfig {
-  apiKeys: string[]; // tried in order; the next one is used when a key hits its limit
-  liteRpm: number;
-  flashRpm: number;
+  project: string; // Google Cloud project that is billed
+  location: string; // Vertex AI location, e.g. "global"
   concurrency: number;
   flashLanguages: LanguageId[];
 }
@@ -52,17 +50,17 @@ export interface GeminiDeps {
 }
 
 const TIMEOUT_MS = 60_000;
-// Longest upstream-requested wait we sit out (the free tier's per-minute 429s ask for up to ~60 s).
+// Longest upstream-requested wait we sit out.
 const MAX_RETRY_DELAY_MS = 120_000;
 
 // The SDK reports 429s as ApiError with Google's JSON in the message, including "retryDelay": "44s".
-function realTransport(apiKeys: string[]): GeminiTransport {
-  // 402 = "prepayment credits are depleted" (that key is spent), 401/403 = refused key: all move on to the next key, like 429.
-  const ring = createKeyRing("gemini", apiKeys, [401, 402, 403, 429]);
-  const clients = new Map(apiKeys.map((k) => [k, new GoogleGenAI({ apiKey: k })]));
-  return ({ model, system, prompt, jsonSchema }) => ring.withKey(async (key) => {
+// Credentials come from Application Default Credentials: `gcloud auth application-default login` locally, the
+// service account attached to the service on Cloud Run.
+function realTransport(cfg: Pick<GeminiConfig, "project" | "location">): GeminiTransport {
+  const client = new GoogleGenAI({ vertexai: true, project: cfg.project, location: cfg.location });
+  return async ({ model, system, prompt, jsonSchema }) => {
     try {
-      const res = await clients.get(key)!.models.generateContent({
+      const res = await client.models.generateContent({
         model,
         contents: prompt,
         config: {
@@ -78,7 +76,7 @@ function realTransport(apiKeys: string[]): GeminiTransport {
     } catch (e) {
       throw toUpstreamError(e);
     }
-  });
+  };
 }
 
 export function toUpstreamError(e: unknown): UpstreamError {
@@ -101,33 +99,26 @@ export function toUpstreamError(e: unknown): UpstreamError {
 type Attempt = { model: string };
 
 export function geminiClient(cfg: GeminiConfig, deps: GeminiDeps = {}): GeminiClient {
-  const transport = deps.transport ?? realTransport(cfg.apiKeys);
-  // One shared concurrency limit; per-minute limits are per model on the free tier.
-  // A per-model limiter counts a request when it hands it to the shared limiter, so it also caps how many requests may
-  // wait there: otherwise a burst could queue a whole minute's quota behind the shared slots, start late, and then
-  // overlap with the next minute's burst (more real requests per minute than allowed).
+  const transport = deps.transport ?? realTransport(cfg);
+  // One concurrency limit for all calls. Interactive calls (live questions) jump ahead of queued background work.
   const shared = createLimiter({ concurrency: cfg.concurrency });
-  const perModel = {
-    [GEMINI_LITE]: createLimiter({ concurrency: cfg.concurrency, perMinute: cfg.liteRpm, reservedForHigh: 1, now: deps.now }),
-    [GEMINI_FLASH]: createLimiter({ concurrency: cfg.concurrency, perMinute: cfg.flashRpm, reservedForHigh: 1, now: deps.now }),
-  } as Record<string, ReturnType<typeof createLimiter>>;
 
   // Every transport try (including retries) waits for the model's rate window, then for a shared slot.
   const callModel = (model: string, call: Omit<GeminiCall, "model">, maxRetryDelayMs?: number, interactive = false) => {
     const priority = interactive ? "high" : "normal";
     return withRetry(() => {
       const queuedAt = performance.now();
-      return perModel[model].run(() => shared.run(async () => {
+      return shared.run(async () => {
         const startedAt = performance.now();
         try {
           return await transport({ model, ...call });
         } finally {
-          // Tells a slow answer apart: waiting for a rate-limit window/slot (queued) vs. Gemini itself (call).
+          // Tells a slow answer apart: waiting for a concurrency slot (queued) vs. Gemini itself (call).
           const queued = Math.round(startedAt - queuedAt);
           const took = Math.round(performance.now() - startedAt);
           if (queued + took > 3000) console.warn(`[gemini] slow ${model}: queued=${queued}ms call=${took}ms${interactive ? " (interactive)" : ""}`);
         }
-      }, { priority }), { priority });
+      }, { priority });
     }, {
       attempts: 4,
       baseDelayMs: 1000,

@@ -1,0 +1,9 @@
+node_modules
+dist
+generated
+spikes
+test
+scripts
+.env
+.env.*
+*.json.bak

@@ -27,9 +27,8 @@ async function main() {
   await connectDB();
   const ads = createSponsorAds({
     gemini: geminiClient({
-      apiKeys: env.GEMINI_API_KEYS,
-      liteRpm: env.GEMINI_LITE_RPM,
-      flashRpm: env.GEMINI_FLASH_RPM,
+      project: env.GOOGLE_CLOUD_PROJECT,
+      location: env.GOOGLE_CLOUD_LOCATION,
       concurrency: env.GEMINI_CONCURRENCY,
       flashLanguages: env.GEMINI_FLASH_LANGUAGES,
     }),

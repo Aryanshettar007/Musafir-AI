@@ -20,7 +20,7 @@ const spoken = (language: string, script: string) =>
 const southIndian = (language: string, script: string, others: string) =>
   `${spoken(language, script)} Every ${language} letter, in the title too, must be ${script} script: never ${others} letters, ` +
   `even for names (write names such as Mysuru or Srirangapatna in ${script} script). Use the whole word budget: ` +
-  `a short answer is rejected, so develop the story with the details from the FACTS.`;
+  `develop the story with the details from the FACTS.`;
 
 export const LANGUAGE_STYLES: Record<LanguageId, LanguageStyle> = {
   "en-IN": { script: "Latin", wordsPerMinute: 190, guide: "Warm, conversational Indian English. Spell out numbers and units." },

@@ -87,7 +87,7 @@ describe("trip builder", () => {
     expect(wikipedia.extractCalls).toContain(102);
     const prompt = gemini.calls.filter((c) => c.purpose === "story").map((c) => c.prompt).find((p) => p.includes("PLACES: Beta Temple"))!;
     expect(prompt).toContain("has no article of its own");
-    expect(prompt).toContain("Plain text facts about page 102");
+    expect(prompt).toContain("Plain text facts about page one hundred two");
     // Facts are saved on the place with the page url (attribution).
     const fort = await Place.findOne({ googlePlaceId: "g-fort" }).lean();
     expect(fort?.facts?.url).toBe("https://en.wikipedia.org/wiki/Page_101");

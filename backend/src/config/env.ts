@@ -28,11 +28,11 @@ const EnvSchema = z.object({
   AUDIO_URL_TTL_SECONDS: z.coerce.number().int().min(60).max(604_800).default(604_800),
   // Third-party API keys. They stay on the server.
   GOOGLE_MAPS_API_KEY: z.string().min(1),
-  // GEMINI_API_KEY1, GEMINI_API_KEY2, ... and GNANI_API_KEY1, ... are collected by loadEnv (see apiKeysFrom).
-  // Gemini free tier: limits are per model, so each model gets its own requests-per-minute limiter.
-  GEMINI_CONCURRENCY: z.coerce.number().int().min(1).default(2),
-  GEMINI_LITE_RPM: z.coerce.number().int().min(1).default(10),
-  GEMINI_FLASH_RPM: z.coerce.number().int().min(1).default(5),
+  // GNANI_API_KEY1, GNANI_API_KEY2, ... are collected by loadEnv (see apiKeysFrom).
+  // Gemini runs on Vertex AI with Application Default Credentials (no API key): this project is billed.
+  GOOGLE_CLOUD_PROJECT: z.string().min(1),
+  GOOGLE_CLOUD_LOCATION: z.string().min(1).default("global"),
+  GEMINI_CONCURRENCY: z.coerce.number().int().min(1).default(8),
   // Languages that skip flash-lite and go straight to flash (comma-separated language ids).
   GEMINI_FLASH_LANGUAGES: z
     .string()
@@ -58,7 +58,6 @@ const EnvSchema = z.object({
 
 export type Env = z.infer<typeof EnvSchema> & {
   // In order; the next key is used when one hits its limit.
-  GEMINI_API_KEYS: string[];
   GNANI_API_KEYS: string[];
 };
 
@@ -80,14 +79,12 @@ function loadEnv(): Env {
     const problems = parsed.error.issues.map((i) => `  ${i.path.join(".")}: ${i.message}`).join("\n");
     throw new Error(`Invalid environment configuration (see backend/.env.example):\n${problems}`);
   }
-  const GEMINI_API_KEYS = apiKeysFrom(set, "GEMINI_API_KEY");
   const GNANI_API_KEYS = apiKeysFrom(set, "GNANI_API_KEY");
   const missing = [
-    ...(GEMINI_API_KEYS.length === 0 ? ["  GEMINI_API_KEY1: at least one Gemini key is required"] : []),
     ...(GNANI_API_KEYS.length === 0 ? ["  GNANI_API_KEY1: at least one Gnani key is required"] : []),
   ];
   if (missing.length > 0) throw new Error(`Invalid environment configuration (see backend/.env.example):\n${missing.join("\n")}`);
-  return { ...parsed.data, GEMINI_API_KEYS, GNANI_API_KEYS };
+  return { ...parsed.data, GNANI_API_KEYS };
 }
 
 export const env = loadEnv();

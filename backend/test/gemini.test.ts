@@ -14,7 +14,7 @@ import { UpstreamError } from "../src/clients/upstream";
 const Schema = z.object({ title: z.string(), script: z.string() });
 const good = JSON.stringify({ title: "Fort", script: "hello" });
 
-const cfg: GeminiConfig = { apiKeys: ["test"], liteRpm: 100, flashRpm: 100, concurrency: 2, flashLanguages: [] };
+const cfg: GeminiConfig = { project: "test", location: "global", concurrency: 2, flashLanguages: [] };
 
 // A transport that answers from a script (a string, or an Error to throw) and records the calls.
 function scripted(answers: Array<string | Error>): { transport: GeminiTransport; calls: GeminiCall[] } {
@@ -90,42 +90,6 @@ describe("geminiClient.generateJson", () => {
     const { result, calls } = run({ ...cfg, flashLanguages: ["kn-IN"] }, [good], { language: "kn-IN" });
     expect(await result).toMatchObject({ model: GEMINI_FLASH, attempts: 1 });
     expect(calls.map((c) => c.model)).toEqual([GEMINI_FLASH]);
-  });
-
-  it("applies each model's requests-per-minute limit separately", async () => {
-    vi.useFakeTimers();
-    try {
-      const { transport, calls } = scripted([good, good, good]);
-      const client = geminiClient({ ...cfg, liteRpm: 1, flashRpm: 1 }, { transport, sleep: async () => {}, now: () => Date.now() });
-      const req = { purpose: "test", system: "sys", prompt: "p", schema: Schema };
-      const a = client.generateJson(req);
-      const b = client.generateJson(req);
-      await vi.advanceTimersByTimeAsync(0);
-      expect(calls.map((x) => x.model)).toEqual([GEMINI_LITE]);
-      await vi.advanceTimersByTimeAsync(59_000);
-      expect(calls).toHaveLength(1);
-      await vi.advanceTimersByTimeAsync(1_000);
-      expect(calls.map((x) => x.model)).toEqual([GEMINI_LITE, GEMINI_LITE]);
-      await Promise.all([a, b]);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("does not use flash's quota for lite calls", async () => {
-    vi.useFakeTimers();
-    try {
-      const { transport, calls } = scripted([good, good]);
-      const client = geminiClient({ ...cfg, liteRpm: 1, flashRpm: 1, flashLanguages: ["kn-IN"] }, { transport, sleep: async () => {}, now: () => Date.now() });
-      const req = { purpose: "test", system: "sys", prompt: "p", schema: Schema };
-      const lite = client.generateJson(req);
-      const flash = client.generateJson({ ...req, language: "kn-IN" as const });
-      await vi.advanceTimersByTimeAsync(0);
-      expect(calls.map((x) => x.model)).toEqual([GEMINI_LITE, GEMINI_FLASH]);
-      await Promise.all([lite, flash]);
-    } finally {
-      vi.useRealTimers();
-    }
   });
 
   it("throws an UpstreamError carrying the last problems when everything fails", async () => {

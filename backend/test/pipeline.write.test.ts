@@ -11,7 +11,7 @@ const base: WriteRequest = {
 describe("story prompt", () => {
   it("states the word budget, the language guide, the side and the facts", () => {
     const p = buildPrompt(base);
-    expect(p).toContain("about 115 words"); // 60 s x 115 wpm (Kannada, measured)
+    expect(p).toContain("about 173 words"); // 60 s x 115 wpm (Kannada, measured) x 1.5 prompt bias
     expect(p).toContain("between 69 and 149 words");
     expect(p).toContain("LANGUAGE: Kannada (Kannada script). Natural spoken Kannada in Kannada script");
     expect(p).toContain('on the right side of the road; say so once, naturally ("on your right")');
@@ -22,7 +22,7 @@ describe("story prompt", () => {
 
   it("sizes the word budget for the narrating voice", () => {
     const p = buildPrompt({ ...base, voice: "Girish" });
-    expect(p).toContain("about 140 words"); // Girish speaks about 140 wpm in Kannada
+    expect(p).toContain("about 210 words"); // Girish speaks about 140 wpm in Kannada, x 1.5 prompt bias
     expect(p).toContain("between 84 and 182 words");
   });
 
@@ -62,6 +62,13 @@ describe("story prompt", () => {
     expect(p).toContain("Never guess dates, names or numbers");
     expect(p).toContain("Make it the subject and the title.");
     expect(p).not.toContain("has no article of its own");
+  });
+
+  it("spells out numbers and units in the facts so the model has no digits to copy", () => {
+    const p = buildPrompt({ ...base, places: [{ name: "Fort", kind: "poi", facts: "Built in 1799, 5 km from town, 45% restored." }, { name: "Cafe", kind: "poi", known: true, card: "Museum; 1,200 reviews" }] });
+    expect(p).toContain("Built in seventeen ninety-nine, five kilometres from town, forty-five percent restored.");
+    expect(p).toContain("one thousand two hundred reviews");
+    expect(p.slice(p.indexOf("KNOWN PLACE"))).not.toMatch(/\d/); // the LENGTH line above legitimately has digits
   });
 
   it("brings interests in only where the place fits them", () => {
@@ -118,9 +125,15 @@ describe("writeStory", () => {
     expect(gemini.calls[0]).toMatchObject({ language: "kn-IN" });
   });
 
-  it("checks the script: wrong length, digits, km and stray scripts become problems", async () => {
+  it("accepts a shorter or longer story but retries an almost empty one", async () => {
     const check = (script: string) => fakeGemini([{ ...ok, script }]);
-    await expect(writeStory(check(words(10)), base)).rejects.toThrow(/words; aim for about 115/);
+    expect((await writeStory(check(words(40)), base)).words).toBe(40);
+    expect((await writeStory(check(words(300)), base)).words).toBe(300);
+    await expect(writeStory(check(words(5)), base)).rejects.toThrow(/only 5 words/);
+  });
+
+  it("checks the script: digits, km and stray scripts become problems", async () => {
+    const check = (script: string) => fakeGemini([{ ...ok, script }]);
     await expect(writeStory(check(`${words(115)} 1799`), base)).rejects.toThrow(/digits/);
     await expect(writeStory(check(`${words(114)} 5 km`), base)).rejects.toThrow(/Contains digits|km/);
     await expect(writeStory(check(`${words(100)} ${Array.from({ length: 15 }, () => "కోట").join(" ")}`), base)).rejects.toThrow(/Telugu/);
