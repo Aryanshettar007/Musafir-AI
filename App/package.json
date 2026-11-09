@@ -64,7 +64,7 @@
     "lint": "expo lint",
     "build:android": "npx eas build --platform android --profile production",
     "build:android:preview": "npx eas build --platform android --profile preview",
-    "build:ios": "npx eas build --platform ios --profile production",
+    "build:ios": "npx eas build --platform ios --profile production --auto-submit",
     "build:ios:preview": "npx eas build --platform ios --profile preview",
     "build:all": "npx eas build --platform all --profile production",
     "submit:android": "npx eas submit --platform android",

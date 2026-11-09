@@ -98,7 +98,7 @@
       "reactCompiler": true
     },
     "extra": {
-      "backendUrl": "https://musafir-ai.onrender.com",
+      "backendUrl": "https://musafir-api-pzc3vcdgfa-el.a.run.app",
       "router": {},
       "eas": {
         "projectId": "edbad38a-f972-4542-bd2b-b8f90b8b1108"
