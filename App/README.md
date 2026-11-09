@@ -1,56 +1,43 @@
-# Welcome to your Expo app 👋
+# Musafir AI — Mobile app
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Expo / React Native app (Expo Router, SDK 57) for Android and iOS. It follows the user's GPS along a trip, plays the
+geo-triggered audio stories from the trip pack, and lets them talk to Musafir by voice.
 
-## Get started
-
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Run it
 
 ```bash
-npm run reset-project
+npm install
+cp .env.example .env    # EXPO_PUBLIC_BACKEND_URL = your computer's LAN IP, e.g. http://192.168.1.10:3000
+npm run android         # or: npm run ios
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Background location needs a development build (`expo run:*`), not Expo Go. A phone can't reach `localhost` on your
+computer, so use its LAN IP. After the first native build, `npm run android:fast` / `npm run ios:fast` starts only the
+dev server.
 
-### Other setup steps
+## Layout
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+| Path | What it holds |
+|---|---|
+| `src/app/` | Screens (Expo Router): `(auth)` login and sign-up, `(onboarding)`, `(tabs)` home / explore / profile, `trip/[id]`, legal and support pages |
+| `src/components/trip/` | Trip view: map, now-playing card, scrubber, bottom sheet, voice record button, simulator, report modal |
+| `src/components/explore/` | Partner experiences, creator packs, voice cloning |
+| `src/components/ui/` | Shared UI: buttons, inputs, sheets, modals |
+| `src/services/` | API calls, background geofencing, audio queue and cache, offline trip storage, auth |
+| `src/context/` | Auth and user preferences |
+| `src/constants/` | Theme (light and dark), map styles, onboarding options, creator packs, legal text |
+| `src/config/` | Firebase and API configuration |
+| `plugins/` | Expo config plugins (Android Play Console fixes) |
+| `scripts/` | Build helpers (voice avatar extraction, markdown transformer) |
 
-## Learn more
+## Builds
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+npm run lint
+npm run build:android            # EAS production build (also :preview)
+npm run build:ios                # EAS production build, auto-submits to TestFlight
+npm run submit:android           # upload to the Play Console
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Backend API reference: [`../docs/API.md`](../docs/API.md). Screen-by-screen guide: [`../docs/FRONTEND_GUIDE.md`](../docs/FRONTEND_GUIDE.md).
+Coding conventions for this folder: [`AGENTS.md`](AGENTS.md).

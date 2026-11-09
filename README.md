@@ -119,6 +119,10 @@ The full design is in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 | [`backend/scripts/`](backend/scripts) | CLI tools: build a trip, ask a question, demo server, voice demos, sponsor seeding, deploy |
 | `backend/spikes/` | API experiments, each with a `FINDINGS.md` |
 | [`docs/`](docs) | [Architecture](docs/ARCHITECTURE.md), [API reference](docs/API.md), [frontend guide](docs/FRONTEND_GUIDE.md) |
+| [`reference/`](reference) | Original idea sketches |
+
+Each folder has its own README: [App](App/README.md), [backend](backend/README.md), [docs](docs/README.md),
+[reference](reference/README.md).
 
 ## Getting started
 

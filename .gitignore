@@ -83,3 +83,6 @@ backend/generated/
 
 # Local Claude Code instructions
 CLAUDE.md
+
+# Local scratch files
+temp-*.txt
