@@ -32,7 +32,7 @@ Built for the Gnani hackathon: **voice and Indian languages are the product.**
 | 📱 Android app | [Download the APK](https://drive.google.com/file/d/1lLjuxTssInW-RKspIpeNCBblvy0fQ6Ym/view?usp=sharing) |
 | 🍎 iOS | [Join the TestFlight beta](https://testflight.apple.com/join/MGuPTcPq) |
 | 💻 GitHub repository | [Aryanshettar007/Musafir-AI](https://github.com/Aryanshettar007/Musafir-AI) |
-| 💼 LinkedIn | [Read the launch post](LINKEDIN_POST_LINK_HERE) |
+| 💼 LinkedIn | [Read the launch post](https://lnkd.in/p/gbviqd28) |
 
 ## Demo
 
