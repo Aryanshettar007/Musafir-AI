@@ -18,7 +18,7 @@ Built for the Gnani hackathon: **voice and Indian languages are the product.**
   <a href="https://testflight.apple.com/join/MGuPTcPq"><b>🍎 iOS on TestFlight</b></a> &nbsp;·&nbsp;
   <a href="https://www.youtube.com/watch?v=3aWyltIUwaQ"><b>▶️ Demo video</b></a> &nbsp;·&nbsp;
   <a href="https://www.youtube.com/watch?v=w5tXsCebxUE"><b>🎬 Detailed demo</b></a> &nbsp;·&nbsp;
-  <a href="LINKEDIN_POST_LINK_HERE"><b>💼 LinkedIn post</b></a>
+  <a href="https://lnkd.in/p/gbviqd28"><b>💼 LinkedIn post</b></a>
 </p>
 
 ---
