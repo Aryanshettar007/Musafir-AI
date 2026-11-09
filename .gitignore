@@ -80,3 +80,6 @@ backend/spikes/out/
 
 # Generated assets (voice demos etc.) - distributed via storage, not git
 backend/generated/
+
+# Local Claude Code instructions
+CLAUDE.md
