@@ -14,22 +14,31 @@ Download a trip before you leave and it plays with no internet at all.
 Built for the Gnani hackathon: **voice and Indian languages are the product.**
 
 <p>
-  <a href="APK_LINK_HERE"><b>⬇️ Download for Android (APK)</b></a> &nbsp;·&nbsp;
+  <a href="https://drive.google.com/file/d/1lLjuxTssInW-RKspIpeNCBblvy0fQ6Ym/view?usp=sharing"><b>⬇️ Download for Android (APK)</b></a> &nbsp;·&nbsp;
   <a href="https://testflight.apple.com/join/MGuPTcPq"><b>🍎 iOS on TestFlight</b></a> &nbsp;·&nbsp;
-  <a href="DEMO_VIDEO_LINK_HERE"><b>▶️ Demo video</b></a> &nbsp;·&nbsp;
+  <a href="https://www.youtube.com/watch?v=3aWyltIUwaQ"><b>▶️ Demo video</b></a> &nbsp;·&nbsp;
+  <a href="https://www.youtube.com/watch?v=w5tXsCebxUE"><b>🎬 Detailed demo</b></a> &nbsp;·&nbsp;
   <a href="LINKEDIN_POST_LINK_HERE"><b>💼 LinkedIn post</b></a>
 </p>
 
 ---
 
-## Try it
+## 🎬 Experience Musafir AI
 
-| Platform | Link |
+| | Link |
 |---|---|
-| Android | [Download the APK](APK_LINK_HERE) |
-| iOS | [Join the TestFlight beta](https://testflight.apple.com/join/MGuPTcPq) |
-| Demo video | [Watch the demo](DEMO_VIDEO_LINK_HERE) |
-| LinkedIn | [Read the launch post](LINKEDIN_POST_LINK_HERE) |
+| 🎥 Demo video | [Watch on YouTube](https://www.youtube.com/watch?v=3aWyltIUwaQ) |
+| 🎬 Detailed demo video | [Watch on YouTube](https://www.youtube.com/watch?v=w5tXsCebxUE) |
+| 📱 Android app | [Download the APK](https://drive.google.com/file/d/1lLjuxTssInW-RKspIpeNCBblvy0fQ6Ym/view?usp=sharing) |
+| 🍎 iOS | [Join the TestFlight beta](https://testflight.apple.com/join/MGuPTcPq) |
+| 💻 GitHub repository | [Aryanshettar007/Musafir-AI](https://github.com/Aryanshettar007/Musafir-AI) |
+| 💼 LinkedIn | [Read the launch post](LINKEDIN_POST_LINK_HERE) |
+
+## Demo
+
+| Demo | Detailed walkthrough |
+|---|---|
+| [![Musafir AI demo](https://img.youtube.com/vi/3aWyltIUwaQ/hqdefault.jpg)](https://www.youtube.com/watch?v=3aWyltIUwaQ) | [![Musafir AI detailed demo](https://img.youtube.com/vi/w5tXsCebxUE/hqdefault.jpg)](https://www.youtube.com/watch?v=w5tXsCebxUE) |
 
 ## Features
 
@@ -82,20 +91,9 @@ Built for the Gnani hackathon: **voice and Indian languages are the product.**
 
 ## How it works
 
-```
- Mobile app (Expo / React Native)                    Backend (Express + TypeScript, Cloud Run)
- ┌──────────────────────────────────┐                ┌──────────────────────────────────────────────┐
- │ Background GPS → geofences       │                │ Trip pipeline                                │
- │   → audio queue → player         │  trip pack     │  Route (Google Routes)                       │
- │ Offline store (manifest + mp3s)  │ ◀───────────── │  → Discover places (Places API, Wikipedia)   │
- │ Push-to-talk mic                 │ ─────────────▶ │  → Match, classify, curate, plan slots       │
- └──────────────────────────────────┘  voice question│  → Write scripts (Gemini on Vertex AI)       │
-                                                     │  → Narrate (Gnani TTS) → store mp3s          │
-                                                     │ Ask pipeline                                 │
-                                                     │  Gnani STT → Gemini + trip context → Gnani TTS│
-                                                     └──────────────────────────────────────────────┘
-   MongoDB Atlas · Backblaze B2 (S3 API) · Firebase Auth · Google Maps Platform · Vertex AI · Gnani Vachana
-```
+<p align="center">
+  <img src="docs/images/architecture.svg" alt="Architecture: the mobile app plays trip packs built by the backend's trip pipeline (Google Routes, Places and Wikipedia, curate and plan, Gemini, Gnani TTS) and sends voice questions to the ask pipeline (Gnani STT, Gemini, Gnani TTS)." width="100%">
+</p>
 
 - **Trip packs.** The server builds the whole trip as a manifest of geo-triggered audio items, so online and offline
   playback are the same code path.
