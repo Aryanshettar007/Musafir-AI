@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/images/banner.png" alt="Musafir AI, your road trip companion. Voice powered by Gnani." width="100%">
+</p>
+
 # Musafir AI
 
 **Google Maps tells you where you are. Musafir tells you the story of where you are.**
